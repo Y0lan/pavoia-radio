@@ -81,7 +81,7 @@ const words = {
   retrying:'Reconnecting', blocked:'Tap to play', error:'Tap to retry', soon:'Soon', soonSuffix:' (soon)', untitled:'Untitled track', unknownArtist:'Unknown artist',
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
   unavailableTrack:'Track unavailable', live:'Live', standby:'Standby', offline:'Data unavailable', audience:'live audio connections', audienceUnknown:'Audience unavailable',
-  cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Change photo',
+  cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Change photo', photoOnly:'Photo only', showArtwork:'Show artwork',
   busPlace:'Somewhere in the forest', busLine:'No playlist here. You have to be there.', busTicket:'Get your Pavoia ticket ↗',
   places:['Finding your own rhythm in the open air, with no pressure to rush the day.','A growing sense of possibility: something is beginning, and you want to be part of it!','Pałac at its peak. The shared moment when everyone commits to the dance and everything else can wait.','The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.','The tracks I keep close and always come back to, at different times for different reasons.','The basement. Giving yourself fully to the speed and intensity, whether the feeling is dark or joyful.','The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.'],
   lines:['Sunny, groovy and easygoing records for warm ups and the open air.','Bright, melodic and a little energetic, building toward the dance floor.','Physical, driving, peak time. Built to move a room.','Melancholic, hypnotic and deep. Night music with a focus on feeling.','The tracks I keep coming back to.','Hard techno and hard trance from the basement. Dark or happy, always fast and full of energy.','Happy house for daylight dancing and relaxed afternoons.'] },
@@ -93,7 +93,7 @@ const words = {
   retrying:'Neu verbinden', blocked:'Zum Start tippen', error:'Erneut versuchen', soon:'Bald', soonSuffix:' (bald)', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
   unavailableTrack:'Titel nicht verfügbar', live:'Live', standby:'Bereit', offline:'Daten fehlen', audience:'Live-Audioverbindungen', audienceUnknown:'Hörerzahl nicht verfügbar',
-  cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Foto wechseln',
+  cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Foto wechseln', photoOnly:'Nur Foto', showArtwork:'Artwork zeigen',
   busPlace:'Irgendwo im Wald', busLine:'Hier gibt es keine Playlist. Du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket ↗',
   places:['Unter freiem Himmel den eigenen Rhythmus finden und dem Tag seine Zeit lassen.','Das Gefühl, dass immer mehr möglich ist: Etwas beginnt, und du möchtest dabei sein!','Pałac auf dem Höhepunkt. Dieser gemeinsame Moment, in dem sich alle ganz dem Tanzen hingeben und alles andere warten kann.','Pałac, mit dem Blick nach innen. Sehnsucht, Zärtlichkeit, Melancholie: diesen Gefühlen Raum geben, während du weitertanzt.','Die Tracks, die mir am Herzen liegen und zu denen ich immer wieder zurückkehre, zu verschiedenen Zeiten aus verschiedenen Gründen.','Der Keller. Sich ganz dem Tempo und der Intensität hingeben, ob düster oder voller Freude.','Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.'],
   lines:['Sonnige, groovige und entspannte Musik zum Aufwärmen und für draußen.','Melodisch und zunehmend energiegeladen, auf dem Weg zur Tanzfläche.','Kraftvoll und treibend. Musik für die volle Tanzfläche.','Melancholisch, hypnotisch und tief. Nachtmusik mit Gefühl.','Die Tracks, zu denen ich immer wieder zurückkehre.','Hard Techno und Hard Trance aus dem Keller. Dunkel oder fröhlich, immer schnell und voller Energie.','Fröhlicher House zum Tanzen bei Tageslicht und für entspannte Nachmittage.'] }
@@ -220,11 +220,11 @@ for (const mood of moods) {
   label.append(input, thumbnail, text);
   if (mood.stage==='essentials') {
     label.classList.add('mood-essentials');label.title=plain(mood);text.className='visually-hidden';
-    const globe=document.createElementNS('http://www.w3.org/2000/svg','svg');
-    globe.setAttribute('viewBox','0 0 36 36');globe.setAttribute('class','essentials-icon');globe.setAttribute('aria-hidden','true');
+    const heart=document.createElementNS('http://www.w3.org/2000/svg','svg');
+    heart.setAttribute('viewBox','0 0 36 36');heart.setAttribute('class','essentials-icon');heart.setAttribute('aria-hidden','true');
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
-    path.setAttribute('d','M28 21a11 11 0 1 1-22 0 11 11 0 0 1 22 0ZM9 14l6 1 2 4-4 2-1 4-5-1m17-10-4 5 4 3-2 6M28 2v8m-4-4h8M5 4v4M3 6h4M31 28v4m-2-2h4');
-    globe.append(path);label.prepend(globe);
+    path.setAttribute('d','M18 30.5S5 22.6 5 13.6A6.6 6.6 0 0 1 18 10.4a6.6 6.6 0 0 1 13 3.2c0 9-13 16.9-13 16.9Z');
+    heart.append(path);label.prepend(heart);
     const badge=Object.assign(document.createElement('small'),{className:'special-tag',textContent:words[language].special});
     badge.dataset.copy='special';label.append(badge);
   }
@@ -291,6 +291,19 @@ function changePhoto() {
 }
 $('change-photo').addEventListener('click', changePhoto);
 
+// Desktop viewers can hide the record sleeve and artist portraits to see the stage photo alone.
+let photoOnly = false;
+try { photoOnly = localStorage.getItem('pavoia-photo-only') === 'on'; } catch { /* Storage is optional. */ }
+function renderArtworkToggle() {
+  document.body.toggleAttribute('data-photo-only', photoOnly);
+  $('artwork-toggle').textContent = text(photoOnly ? 'showArtwork' : 'photoOnly');
+}
+$('artwork-toggle').addEventListener('click', () => {
+  photoOnly = !photoOnly;
+  try { localStorage.setItem('pavoia-photo-only', photoOnly ? 'on' : 'off'); } catch { /* Storage is optional. */ }
+  renderArtworkToggle();
+});
+
 function renderScene() {
   const bus = location.hash === '#bus';
   const photo = bus ? { src: 'photos/bus-stage.jpg', focus: '50% 50%' }
@@ -300,7 +313,8 @@ function renderScene() {
   if (bus) $('bus-link').setAttribute('aria-current', 'page');
   else $('bus-link').removeAttribute('aria-current');
   $('change-photo').hidden = bus || currentMood.photos.length < 2;
-  $('photo-controls').hidden = $('change-photo').hidden;
+  $('photo-count').hidden = $('change-photo').hidden;
+  $('photo-controls').hidden = bus;
   showPhoto(photo);
   document.title = `${bus ? 'The Bus' : plain(currentMood)} · Pavoia Radio`;
   const nextScene = bus ? 'bus' : currentMood.id;
@@ -557,6 +571,7 @@ function localise() {
   document.querySelectorAll('.mood span').forEach(node=>{node.dataset.soon=text('soonSuffix');});
   document.querySelector('.wordmark').setAttribute('aria-label',text('home'));
   document.querySelector('.player').setAttribute('aria-label',text('player'));
+  renderArtworkToggle();
   renderScene();
   metadata(track);
   if (!dataFresh && 'mediaSession' in navigator) navigator.mediaSession.metadata=null;

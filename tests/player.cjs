@@ -7,7 +7,7 @@ const source = readFileSync(resolve(__dirname, '../web/app.js'), 'utf8');
 const flush = async () => { for (let i=0;i<8;i++) await Promise.resolve(); };
 const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date().toISOString()}});
 
-function setup({deferFetch=false,deferImages=false,saveData=false,hash=''}={}) {
+function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storage={getItem:()=>null,setItem(){}}}={}) {
   const imageRequests=[];
   class Element {
     constructor(){this.dataset={};this.events={};this.children=[];this.attrs={};this.textContent='';this.complete=true;this.naturalWidth=100;this.classList={add(){},remove(){}};this.style={setProperty(key,value){this[key]=value;}};}
@@ -29,7 +29,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash=''}={}) {
     getAnimations(){return [];}
     animate(){return {cancel(){},finished:Promise.resolve()};}
   }
-  const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-controls','photo-count','change-photo','bus-link','bus-copy','live-text','language','wordmark','signed'];
+  const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-controls','photo-count','change-photo','artwork-toggle','bus-link','bus-copy','live-text','language','wordmark','signed'];
   const nodes=ids.map(id=>Object.assign(new Element(),{id}));
   const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id)});
   elements.photo.src='photos/selected/p005.jpg';
@@ -60,7 +60,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash=''}={}) {
   };
   runInNewContext(source,{document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
     matchMedia:()=>({matches:false,addEventListener(){}}),Image:class extends Element {constructor(){super();env.preloader=this;}},
-    localStorage:{getItem:()=>null,setItem(){}},
+    localStorage:storage,
     fetch:(url,{signal})=>url.startsWith('/api/audience?') ? Promise.resolve({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
@@ -70,6 +70,19 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash=''}={}) {
   });
   return env;
 }
+
+test('photo-only toggle hides artwork, is remembered and works without storage',async()=>{
+ const saved={},storage={getItem:key=>saved[key] ?? null,setItem(key,value){saved[key]=value;}};
+ const e=setup({storage});await flush();const toggle=e.elements['artwork-toggle'],body=e.document.body;
+ assert.equal(body.getAttribute('data-photo-only'),null);assert.equal(toggle.textContent,'Photo only');
+ toggle.emit('click');assert.equal(body.getAttribute('data-photo-only'),'');assert.equal(toggle.textContent,'Show artwork');assert.equal(saved['pavoia-photo-only'],'on');
+ const restored=setup({storage});await flush();
+ assert.equal(restored.document.body.getAttribute('data-photo-only'),'');assert.equal(restored.elements['artwork-toggle'].textContent,'Show artwork');
+ toggle.emit('click');assert.equal(body.getAttribute('data-photo-only'),null);assert.equal(saved['pavoia-photo-only'],'off');
+ const denied=()=>{throw new Error('Storage denied');};
+ const blocked=setup({storage:{getItem:denied,setItem:denied}});await flush();
+ blocked.elements['artwork-toggle'].emit('click');assert.equal(blocked.document.body.getAttribute('data-photo-only'),'');
+});
 
 test('gesture, pause/resume races and media controls release the source',async()=>{
  const e=setup();await flush();assert.equal(e.audio.calls.length,0);
