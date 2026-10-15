@@ -1,0 +1,13 @@
+.git
+.superpowers
+secrets
+state
+state-dance
+artifacts
+output
+*.env
+*.log
+
+# Per-station state and private Icecast configuration.
+state-*/
+icecast/

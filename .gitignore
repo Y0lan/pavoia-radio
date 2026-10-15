@@ -1,0 +1,18 @@
+.superpowers/
+state/
+state-dance/
+bin/
+.env*
+!*.env.example
+*.sqlite*
+*.db*
+*.log
+secrets/
+artifacts/
+output/
+.playwright-cli/
+__pycache__/
+
+# Per-station state and private Icecast configuration.
+state-*/
+icecast/

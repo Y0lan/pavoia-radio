@@ -1,0 +1,11 @@
+FROM docker.io/library/debian:trixie-slim@sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483 AS build
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl build-essential pkg-config libxml2-dev libxslt1-dev libvorbis-dev libogg-dev libssl-dev libcurl4-openssl-dev librhash-dev && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN curl --fail --location --retry 3 https://downloads.xiph.org/releases/igloo/libigloo-0.9.5.tar.gz -o igloo.tar.gz && echo 'ea22e9119f7a2188810f99100c5155c6762d4595ae213b9ac29e69b4f0b87289  igloo.tar.gz' | sha256sum -c - && tar xzf igloo.tar.gz && cd libigloo-0.9.5 && ./configure --prefix=/opt/icecast --disable-shared --enable-static && make -j2 && make install
+RUN curl --fail --location --retry 3 https://downloads.xiph.org/releases/icecast/icecast-2.5.0.tar.gz -o icecast.tar.gz && echo 'd9aa07c7429aec19d950ff6fd425c371f77158cd34ff220fc191b2c186c67c7a  icecast.tar.gz' | sha256sum -c - && tar xzf icecast.tar.gz && cd icecast-2.5.0 && PKG_CONFIG_PATH=/opt/icecast/lib/pkgconfig ./configure --prefix=/opt/icecast --disable-yp && make -j2 && make install
+
+FROM docker.io/library/debian:trixie-slim@sha256:918311b7b6c4c6f68b232ba516584925f6c78ad82b6fd534b98979df6438e483
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates libxml2 libxslt1.1 libvorbis0a libogg0 libssl3t64 libcurl4t64 librhash1 && rm -rf /var/lib/apt/lists/*
+COPY --from=build /opt/icecast /opt/icecast
+ENTRYPOINT ["/opt/icecast/bin/icecast"]
+CMD ["-c", "/config/icecast.xml"]

@@ -1,0 +1,95 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cream-palette",
+        "value": "*",
+        "files": [
+          "web/index.html"
+        ],
+        "createdAt": "2026-10-06T04:46:15.489Z",
+        "reason": "Agent: docs/PLAN.md lines 39-40 explicitly prescribe warm cream, charcoal and restrained peach for the approved listening pilot; final visual identity remains a later validation."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "design/premiere-direction/index.html",
+          "design/premiere-direction/style.css"
+        ],
+        "createdAt": "2026-10-06T06:21:48.053Z",
+        "reason": "Agent: user requests the Pavoia identity. pavoia.com source inspected 2026-10-06 explicitly uses Inter for controls; provenance in design/premiere-direction/README.md."
+      },
+      {
+        "rule": "overused-font",
+        "value": "instrument serif",
+        "files": [
+          "design/premiere-direction/index.html",
+          "design/premiere-direction/style.css"
+        ],
+        "createdAt": "2026-10-06T06:21:48.062Z",
+        "reason": "Agent: user requests the Pavoia typography. pavoia.com source inspected 2026-10-06 explicitly uses Instrument Serif roman and italic; provenance in design/premiere-direction/README.md."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "design/stage-direction/index.html",
+          "design/stage-direction/style.css"
+        ],
+        "createdAt": "2026-10-06T08:16:05.312Z",
+        "reason": "Agent: Pavoia identity; pavoia.com source inspected 2026-10-06 uses Inter and Instrument Serif; same exception already recorded for design/premiere-direction."
+      },
+      {
+        "rule": "overused-font",
+        "value": "instrument serif",
+        "files": [
+          "design/stage-direction/index.html",
+          "design/stage-direction/style.css"
+        ],
+        "createdAt": "2026-10-06T08:16:05.318Z",
+        "reason": "Agent: Pavoia identity; pavoia.com source inspected 2026-10-06 uses Inter and Instrument Serif; same exception already recorded for design/premiere-direction."
+      },
+      {
+        "rule": "overused-font",
+        "value": "instrument serif",
+        "files": [
+          "web/index.html",
+          "web/style.css"
+        ],
+        "createdAt": "2026-10-06T23:37:47.438Z",
+        "reason": "User requested Pavoia typography and approved this frontend; official Pavoia uses Instrument Serif."
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "web/index.html",
+          "web/style.css"
+        ],
+        "createdAt": "2026-10-06T23:37:47.448Z",
+        "reason": "User requested Pavoia typography and approved this frontend; official Pavoia uses Inter."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "web/index.html"
+        ],
+        "createdAt": "2026-10-08T03:44:52.852Z",
+        "reason": "Agent verified: artwork images are hidden until journey.js assigns a valid source and its load handler succeeds."
+      },
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          "web/index.html"
+        ],
+        "createdAt": "2026-10-08T03:46:11.760Z",
+        "reason": "Agent: live Chromium at 320/390/760 px measures the Stations title 14 px below the dialog border and 21 px from its left edge. The 64 px centered flex header supplies the inset although dialog padding-top is zero. Evidence: artifacts/mobile-layout-20261015/hook-padding-measurements.json and output/playwright/mobile-layout/public-sheet-390.png."
+      }
+    ]
+  }
+}

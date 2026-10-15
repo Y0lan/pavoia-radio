@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0a09">
+  <title>Pavoia Radio</title>
+  <link rel="icon" href="assets/gaende-icon-white.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+  <script src="journey.js" defer></script>
+  <script src="waveform.js" defer></script>
+</head>
+<body>
+  <main>
+      <header class="top">
+        <a class="wordmark" href="#" aria-label="Pavoia Radio, home"><svg class="broadcast-mark" viewBox="0 0 160 60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 10Q-2 30 12 50M18 17Q9 30 18 43M24 23Q19 30 24 37M148 10Q162 30 148 50M142 17Q151 30 142 43M136 23Q141 30 136 37"/></svg><img src="assets/wordmark-day.svg" alt="" width="461" height="259"></a>
+        <p class="promise" data-copy="promise">So it never ends.</p>
+        <div class="station-status"><p class="live"><span class="dot" aria-hidden="true"></span><span id="live-text">Connecting</span></p><select id="language" aria-label="Language"><option value="en">EN</option><option value="de">DE</option></select></div>
+      </header>
+    <div class="listen-layout">
+    <section class="poster" id="poster" aria-labelledby="mood-name">
+      <img class="photo" id="photo" src="photos/selected/p005.jpg" alt="" width="798" height="1200">
+      <img class="photo photo-back" id="photo-buffer" alt="" width="798" height="1200" hidden>
+      <div class="bottom">
+        <h1 id="mood-name">Lost in <em>Feelings</em></h1>
+        <p class="place" id="mood-place">The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.</p>
+        <div id="bus-copy" hidden>
+          <p class="bus-line" data-copy="busLine">No playlist here. You have to be there.</p>
+          <a class="bus-ticket" href="https://pavoia.com/#tickets" target="_blank" rel="noopener noreferrer" data-copy="busTicket">Get your Pavoia ticket ↗</a>
+        </div>
+      </div>
+        <div id="station-selector-home"><fieldset class="moods" id="station-selector">
+          <legend class="visually-hidden" data-copy="choose">Choose a radio</legend>
+          <div class="mood-list" id="moods">
+            <a class="bus-link" id="bus-link" href="#bus" aria-label="The Bus">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="15" rx="2"/><path d="M3 11h18M8 3v8M16 3v8M6 18v3M18 18v3M7 15h1M16 15h1"/></svg><span class="special-name">The Bus</span><small class="special-tag" data-copy="special">Special</small>
+            </a>
+          </div>
+        </fieldset></div>
+        <p class="swipe-hint"><svg width="20" height="12" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3-4 4 4 4m14-8 4 4-4 4M2 7h20"/></svg><span data-copy="swipeHint">Swipe to change stage</span></p>
+        <div class="station-controls" id="station-controls">
+          <button class="station-switcher" id="open-stations" type="button" aria-haspopup="dialog" aria-controls="stations-sheet" aria-expanded="false"><span data-copy="stations">Change stage</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
+          <span class="station-position" id="station-position" aria-live="polite" aria-atomic="true">4 / 9</span>
+          <div class="station-tools">
+        <div class="photo-controls" id="photo-controls" hidden>
+          <button type="button" id="change-photo" class="change-photo" aria-label="Change photo" title="Change photo" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16H3V3h13v2M8 8h13v13H8zM8 18l4-4 3 3 2-2 4 4M16 3h5m-2-2 2 2-2 2"/><circle cx="17" cy="12" r="1"/></svg><span data-copy="changePhoto">Change photo</span></button>
+          <output id="photo-count" aria-live="polite" aria-atomic="true"></output>
+        </div>
+        <a id="stage-spotify" class="stage-spotify" target="_blank" rel="noopener noreferrer" hidden><span data-journey="spotifyStage">Follow this playlist on Spotify ↗</span><span class="spotify-caption" data-journey="playlist">Playlist</span><span class="spotify-daily" data-journey="spotifyDaily">I add new tracks every day.</span></a>
+          </div>
+        </div>
+    </section>
+
+    <div class="scene-artwork" aria-hidden="true">
+      <div class="record-sleeve"><img id="hero-cover" width="600" height="600" alt="" hidden><span id="sleeve-empty" hidden></span></div>
+      <img id="painted-artist" class="painted-artist" width="800" height="1000" alt="" hidden>
+      <img id="painted-artist-secondary" class="painted-artist secondary" width="800" height="1000" alt="" hidden>
+    </div>
+    </div>
+
+    <section class="letter" aria-labelledby="letter-title">
+      <h2 id="letter-title"><span data-copy="letterTitle">The festival ends.</span> <em data-copy="letterEnd">The music stays.</em></h2>
+      <div class="letter-body">
+        <p data-copy="letterOne">Years spent finding tracks, keeping them close and collecting them in playlists named after the stages of Pavoia.</p>
+        <p data-copy="letterTwo">This radio is a way to share them. To return to a little of that place between editions, and keep discovering music there.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="roots-footer">
+    <p class="signature"><span data-copy="love">With love,</span><img src="assets/gaende-white.svg" alt="Gaende" width="720" height="180"></p>
+    <div class="roots-ground">
+      <svg class="roots" viewBox="0 0 900 360" preserveAspectRatio="none" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <g stroke-width="2">
+          <path d="M450 0c-8 24 8 34-7 54s-42 18-65 36-46 22-76 29-57 30-72 57-42 47-61 67-22 51-33 72"/>
+          <path d="M450 16c5 24 21 30 33 49s39 18 67 33 43 28 60 49 53 23 77 51 32 56 61 79 35 38 45 65"/>
+        </g>
+        <g stroke-width="1.2">
+          <path d="M378 90c-47 0-56 17-88 8s-56 7-81 19-60 10-83 26-50 17-88 24M302 119c-19 30-51 37-57 71s-16 34-28 53-6 41-23 62M230 176c-35 9-45 32-76 34s-47 23-67 38-45 16-64 33M169 243c3 30 22 47 17 74l-8 34"/>
+          <path d="M483 65c38 1 56 20 87 17s56 9 83 8 56 21 85 23 55 16 77 35M610 147c35-4 49 11 78 6s49 16 78 16 54 20 87 24M687 198c-9 31 11 48 6 74s-3 48 14 69M748 277c38-2 46 22 73 26s37 15 52 29"/>
+          <path d="M443 54c2 29-16 42-10 65M550 98c-9 19-4 31 10 43M245 190c20 27 6 49 20 66s20 46 18 69M693 272c-26 14-39 28-45 59"/>
+        </g>
+        <g stroke-width=".7">
+          <path d="M209 117c-8 18-27 22-30 41M126 143c-28-6-52 5-73-1M154 210c-5-20-26-27-30-43M87 248c-2 23-21 32-23 58M217 243c-21 8-34 8-48 23M136 315l-17 27M186 317l18 20M265 256c20 4 31 17 35 33M570 82c12-16 39-11 54-21M738 113c-9 20 14 29 16 42M815 148c25-1 36 10 52 10M766 169c-4 20 18 37 15 59M853 193l27 22M693 244c-22 6-21 29-33 36M821 303c-2-21 17-29 22-48M648 331l-23 21M793 342l-5 15"/>
+        </g>
+      </svg>
+      <button type="button" id="go-deeper" class="roots-button" data-journey="deeper">See the roots it's built on</button>
+    </div>
+  </footer>
+
+  <div class="player" role="region" aria-label="Player">
+    <audio id="audio" preload="none"></audio>
+    <div class="dock-artwork"><img id="dock-cover" class="dock-cover" width="48" height="48" alt="" hidden></div>
+    <button class="play" id="play" type="button" disabled aria-pressed="false" aria-label="Play">
+      <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg>
+    </button>
+    <div class="now"><em id="player-title">Loading track…</em><a id="player-album"></a></div>
+    <div class="player-credits"><span id="player-artist">Lost in Feelings</span><div id="credited-artists" class="credited-artists"></div><span id="label-note" class="label-note" hidden></span></div>
+    <a id="track-spotify" class="track-spotify" target="_blank" rel="noopener noreferrer" hidden><span class="spotify-caption" data-journey="track">Track</span></a>
+    <div class="transport-track">
+      <div class="transport-time"><span id="playback-status" role="status">Paused</span><span id="track-clock">—</span></div>
+      <canvas id="waveform" aria-hidden="true"></canvas>
+      <progress id="track-progress" max="1" value="0" aria-label="Live track progress"></progress>
+    </div>
+    <label class="volume-control"><span data-journey="volume">Volume</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+  </div>
+  <dialog id="stations-sheet" aria-labelledby="stations-title">
+    <header class="stations-heading"><h2 id="stations-title" data-copy="stations">Change stage</h2><button id="close-stations" type="button" aria-label="Close stages"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <div id="station-sheet-list"></div>
+  </dialog>
+  <dialog id="explorer" aria-labelledby="explorer-title">
+    <header class="explorer-top"><div><p class="eyebrow">PÂVOIA / <span data-journey="exploreLabel">EXPLORE</span></p><h2 id="explorer-title" data-journey="connections">Follow the music.</h2></div><div class="explorer-controls"><button id="explorer-play" type="button" data-journey="playRadio">Play radio</button><button id="explorer-close" type="button" data-journey="backListen">Back to listening ↙</button></div></header>
+    <nav class="explorer-nav" aria-label="Explore"><a href="#explore" data-journey="exploreTab">Explore</a><a href="#history" data-journey="history">History</a><a href="#statistics" data-journey="statistics">Music statistics</a></nav>
+    <section id="music-view" hidden aria-label="Music collection">
+      <form id="music-filters" class="music-filters"><label><span data-journey="stage">Stage</span><select id="music-stage"></select></label><label id="history-period-label"><span data-journey="period">Period</span><select id="history-period"><option value="1" data-journey="day">Last 24 hours</option><option value="7" selected data-journey="week">Last 7 days</option><option value="30" data-journey="month">Last 30 days</option><option value="all" data-journey="allHistory">All recorded history</option></select></label></form>
+      <p id="music-status" class="collection-note" role="status"></p>
+      <div id="music-content"></div><button id="history-more" type="button" data-journey="older" hidden>Older tracks</button>
+    </section>
+    <form id="discovery-search" class="discovery-search" role="search"><label for="discovery-query" data-journey="searchLabel">Artist, track, release or label</label><div><input id="discovery-query" type="search" maxlength="100" autocomplete="off"><button type="submit" data-journey="search">Search</button></div></form>
+    <p id="discovery-status" class="collection-note" role="status"></p>
+    <div id="discovery-results" class="discovery-results" hidden></div>
+    <div class="explore-workspace" id="explore-workspace" hidden><section class="connection-map" aria-label="Connections"><div id="connection-map"></div><p class="map-caption" data-journey="mapNote">Choose a connection to continue exploring.</p></section><section id="entity-inspector" class="entity-inspector" aria-label="Details"></section></div>
+    <div id="preview-banner" class="preview-banner" hidden><audio id="preview-audio" preload="none"></audio><p id="preview-title"></p><button id="preview-stop" type="button" data-journey="stopPreview">Stop preview</button></div>
+  </dialog>
+<noscript><p lang="en">Enable JavaScript to listen to the radio.</p><p lang="de">Aktiviere JavaScript, um Radio zu hören.</p></noscript>
+</body>
+</html>
