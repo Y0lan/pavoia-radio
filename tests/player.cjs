@@ -766,11 +766,11 @@ test('the explorer opens over an inert page, keeps the player, and ✕, Escape o
  assert.equal(explorer.events.cancel,undefined,'no cancel listener is left');
 });
 
-test('a shared explorer link gets the radio page under it',async()=>{
+test('a shared explorer link closes in place, onto the radio page',async()=>{
  const e=setup({journey:true,hash:'#explore/art_0123456789ab'});await flush();
- assert.deepEqual([e.entries(),e.elements.explorer.open],[['','#explore/art_0123456789ab'],true]);
+ assert.deepEqual([e.entries(),e.elements.explorer.open,e.history.state.explorer],[['#explore/art_0123456789ab'],true,true],'no entry is made up under it, which Chromium would skip on Back');
  e.elements['explorer-close'].emit('click');await flush();
- assert.deepEqual([e.location.hash,e.position(),e.elements.explorer.open],['',0,false],'✕ lands on the radio, not off the site');
+ assert.deepEqual([e.location.hash,e.entries(),e.elements.explorer.open],['',[''],false],'✕ lands on the radio, not off the site');
 });
 
 test('every way into the explorer lands on music: the record on air, or one line when nothing is',async()=>{
@@ -859,12 +859,17 @@ test('however deep the digging, the explorer keeps one entry and closing reaches
  const link=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
  for(let i=1;i<=60;i++){link('#explore/art_'+i.toString(16).padStart(12,'0'));await flush();}
  assert.deepEqual([e.entries().length,e.position()],[2,1],'sixty moves, one entry');
- let asked=0;const back=e.history.back;e.history.back=()=>{asked++;};
- e.elements['explorer-close'].emit('click');e.key('Escape');link('#history');await flush();
- assert.deepEqual([asked,e.location.hash],[1,'#explore/art_00000000003c'],'while the browser goes back, a second close or a move waits');
- e.history.back=back;e.history.back();await flush();
+ e.elements['explorer-close'].emit('click');await flush();
  assert.deepEqual([e.position(),e.location.hash,e.elements.explorer.open,e.elements.main.inert],[0,'',false,false]);
  const at=e.position();e.elements['explorer-close'].emit('click');await flush();assert.equal(e.position(),at,'a click on ✕ while it fades out goes nowhere');
+ link('#explore/art_0123456789ab');await flush();
+ let asked=0,arrive;const back=e.history.back;e.history.back=()=>{asked++;arrive=()=>back.call(e.history);};
+ e.elements['explorer-close'].emit('click');e.key('Escape');link('#history');await flush();
+ assert.deepEqual([asked,e.elements.explorer.open,e.location.hash,e.entries()],[1,true,'#explore/art_0123456789ab',['','#explore/art_0123456789ab']],'while a slow Back is on its way, a second close or a move changes nothing');
+ arrive();await flush();
+ assert.deepEqual([e.elements.explorer.open,e.position(),e.entries()],[false,0,['','#explore/art_0123456789ab']],'then it lands on the page, and Forward still holds the explorer');
+ e.history.back=back;link('#explore/art_0123456789ab');await flush();e.evict(1);e.window.navigation={canGoBack:false};
+ e.elements['explorer-close'].emit('click');await flush();assert.deepEqual([asked,e.elements.explorer.open,e.location.hash],[1,false,''],'where the Navigation API says the page entry is gone, the close happens in place');
 });
 
 test('the current tab keeps its history entry, and a new language searches again',async()=>{
@@ -914,6 +919,15 @@ test('Back then Forward keeps an entry this page opened, and a reloaded typed en
  e.visit('#history');await flush();assert.equal(e.history.state.explorer,true,'an entry the browser added is marked as found');
  const again=setup({journey:true,hash:'#history',state:{explorer:true}});await flush();
  assert.deepEqual(again.entries(),['#history'],'so its reload pushes no page over the Forward entries');
+});
+
+test('a focused result replaced by a live search hands focus to the field, not to the page',async()=>{
+ const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'];
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
+ e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore'})},preventDefault(){}});await flush();
+ query.value='jimi';query.emit('input');e.fire(300);await flush();results.children[0].focus();
+ query.value='jimi j';query.emit('input');e.fire(300);await flush();
+ assert.equal(e.document.activeElement,query,'Space then types, it does not toggle the radio');
 });
 
 test('Escape while composing text stays in the field',async()=>{

@@ -256,7 +256,10 @@
     const timeout=setTimeout(()=>c.abort(),10000);
     try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent(query),{signal:c.signal});if(!res.ok)throw new Error();
       const data=await res.json();if(explorerRequest!==c)return;if(!Array.isArray(data.items))throw new Error();
+      // A focused result that goes away hands focus to the field, never to the page, where Space plays.
+      const focused=$('discovery-results').contains(document.activeElement);
       $('discovery-results').replaceChildren(...data.items.map(e=>{const b=action('',()=>navigate(e.id),'search-result');b.append(node('small','',word(e.type)),node('span','',e.title));return b;}));
+      if(focused)$('discovery-query').focus();
       shownQuery=query;$('discovery-results').hidden=false;$('discovery-status').textContent=data.items.length?word('firstResults'):word('empty');
     }catch{if(explorerRequest===c){$('discovery-results').hidden=true;$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
   }
@@ -284,15 +287,18 @@
   $('volume').addEventListener('input',()=>{volume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
   // The footer opens the record on air; only with nothing on air does it open the search.
   $('go-deeper').addEventListener('click',()=>{if(entityID(nowID()))openEntity(nowID());else go('#explore');});
-  // ✕ and Escape. An entry this page opened, a shared link included, goes back to the page's entry
-  // right under it, and restore() then closes the dialog; until then, work stops and moves wait. Any
-  // other (a reload, a restored session, a typed URL) closes in place, since the entry under it may
-  // not be this page. A plain dialog fires no cancel event, so Escape is caught below.
+  // ✕ and Escape. An entry this page opened goes back to the page's entry right under it, and
+  // restore() then closes the dialog; until then, work stops and moves wait. Any other (a shared link,
+  // a reload, a restored session, a typed URL) closes in place, since the entry under it may not be
+  // this page. A plain dialog fires no cancel event, so Escape is caught below.
   const halt=()=>{clearTimeout(typing);explorerRequest?.abort();explorerRequest=null;musicRequest?.abort();musicRequest=null;};
   const close=()=>{
     if(!dialog.open||closing)return;
     halt();
-    if(history.state?.explorer===life){closing=true;history.back();return;}
+    // The browser may have pruned the page's entry; the Navigation API says so before going back.
+    // ponytail: without that API, such a pruned history (over 50 entries in one tab) leaves the close
+    // waiting, since a slow Back and a failed one look the same; every current browser has the API.
+    if(history.state?.explorer===life&&window.navigation?.canGoBack!==false){closing=true;history.back();return;}
     shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();
   };
   function shut(){closing=false;halt();finishPreview();for(const n of behind)n.inert=false;dialog.close();}
@@ -430,8 +436,5 @@
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
     if(landing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
-  // An explorer URL loaded without the explorer's state, such as a shared link, gets the radio page
-  // right under it, so ✕ and Back land on the radio. A reload keeps its entries, Forward ones included.
-  if(/^#(?:explore|history|statistics)/.test(location.hash)&&!history.state?.explorer){const hash=location.hash;history.replaceState(null,'',location.pathname+location.search);history.pushState({explorer:life},'',hash);}
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
 })();
