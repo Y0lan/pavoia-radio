@@ -24,7 +24,6 @@ const moods = [
     { src: 'photos/selected/p133.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p238.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p240.jpg', focus: '50% 50%' },
-    { src: 'photos/selected/p313.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p327.jpg', focus: '50% 50%' },
   ] },
   { id: '03', title: ["Night in", "Motion"], stage: 'palac-dance', photos: [
@@ -36,7 +35,6 @@ const moods = [
   { id: '04', title: ["Lost in", "Feelings"], stage: 'palac-feel', photos: [
     { src: 'photos/selected/p005.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p204.jpg', focus: '50% 50%' },
-    { src: 'photos/selected/p250.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p306.jpg', focus: '50% 50%' },
   ] },
   { id: '06', title: ["Etage", "0"], stage: 'etage-zero', photos: [
@@ -56,13 +54,11 @@ const moods = [
   { id: '09', title: ['', 'Closing'], stage: 'closing', photos: [{ src: 'photos/selected/p313.jpg', focus: '50% 50%' }] },
   { id: '05', title: ["", "Essentials"], stage: 'essentials', photos: [
     { src: 'photos/selected/p007.jpg', focus: '50% 50%' },
-    { src: 'photos/selected/p015.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p016.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p017.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p039.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p063.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p080.jpg', focus: '50% 50%' },
-    { src: 'photos/selected/p084.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p092.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p131.jpg', focus: '50% 50%' },
     { src: 'photos/selected/p165.jpg', focus: '50% 50%' },
@@ -73,37 +69,35 @@ const moods = [
 
 
 const words = {
- en: { promise:'So it never ends.', choose:'Choose a radio', letterTitle:'The festival ends.', letterEnd:'The music stays.',
+ en: { promise:'So it never ends.', choose:'Choose a stage', letterTitle:'The festival ends.', letterEnd:'The music stays.',
   letterOne:'Years spent finding tracks, keeping them close and collecting them in playlists named after the stages of Pavoia.',
   letterTwo:'This radio is a way to share them. To return to a little of that place between editions, and keep discovering music there.',
   love:'With love,', footer:'Pavoia Radio · A personal selection by Gaende', language:'Language', selectedBy:'Selected by Gaende',
   play:'Play', pause:'Pause', space:'Space', retry:'Try again', paused:'Paused', connecting:'Connecting…', playing:'Playing', buffering:'Buffering…',
-  retrying:'Reconnecting…', blocked:'Press play to start', error:'Stream lost. Press play to retry.', soon:'Soon', soonSuffix:' (soon)', untitled:'Untitled track', unknownArtist:'Unknown artist',
+  retrying:'Reconnecting…', blocked:'Press play to start', error:'Stream lost. Press play to retry.', untitled:'Untitled track', unknownArtist:'Unknown artist',
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
   live:'Live', listening:'listening', audience:'listening to this stage',
   cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Next photo', of:'of', photoOnly:'Photo only',
   busPlace:'Somewhere in the forest. No playlist here, you have to be there.', busTicket:'Get your Pavoia ticket',
   places:['Finding your own rhythm in the open air, with no pressure to rush the day.','A growing sense of possibility: something is beginning, and you want to be part of it!','Pałac at its peak. The shared moment when everyone commits to the dance and everything else can wait.','The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.','The tracks I keep close and always come back to, at different times for different reasons.','The basement. Giving yourself fully to the speed and intensity, whether the feeling is dark or joyful.','The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.'],
-  lines:['Sunny, groovy and easygoing records for warm ups and the open air.','Bright, melodic and a little energetic, building toward the dance floor.','Physical, driving, peak time. Built to move a room.','Melancholic, hypnotic and deep. Night music with a focus on feeling.','The tracks I keep coming back to.','Hard techno and hard trance from the basement. Dark or happy, always fast and full of energy.','Happy house for daylight dancing and relaxed afternoons.'] },
- de: { promise:'Damit es niemals aufhört.', choose:'Wähle ein Radio', letterTitle:'Das Festival endet.', letterEnd:'Die Musik bleibt.',
+  lines:['Sunny, groovy open-air warm-up','Bright and melodic, building up','Driving peak-time dance music','Melancholic, hypnotic and deep','The tracks I keep coming back to','Hard techno and hard trance','Happy house for daylight','Ambient, to lie down and rest','Tracks to close a set'] },
+ de: { promise:'Damit es niemals aufhört.', choose:'Wähle eine Bühne', letterTitle:'Das Festival endet.', letterEnd:'Die Musik bleibt.',
   letterOne:'Über Jahre gesammelt: Tracks, die bleiben. Vereint in Playlists, die die Namen der Bühnen von Pavoia tragen.',
   letterTwo:'Mit diesem Radio möchte ich sie teilen. Ein Stück dieses Ortes zwischen den Festivals wiederfinden und dort weiter Musik entdecken.',
   love:'Mit Liebe,', footer:'Pavoia Radio · Eine persönliche Auswahl von Gaende', language:'Sprache', selectedBy:'Ausgewählt von Gaende',
   play:'Abspielen', pause:'Pause', space:'Leertaste', retry:'Erneut versuchen', paused:'Pausiert', connecting:'Verbinden…', playing:'Wiedergabe', buffering:'Puffern…',
-  retrying:'Neu verbinden…', blocked:'Zum Starten Play drücken', error:'Stream unterbrochen. Play erneut drücken.', soon:'Bald', soonSuffix:' (bald)', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
+  retrying:'Neu verbinden…', blocked:'Zum Starten Play drücken', error:'Stream unterbrochen. Play erneut drücken.', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
   live:'Live', listening:'hören', audience:'hören auf dieser Bühne',
   cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Nächstes Foto', of:'von', photoOnly:'Nur Foto',
   busPlace:'Irgendwo im Wald. Hier gibt es keine Playlist, du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket',
   places:['Unter freiem Himmel den eigenen Rhythmus finden und dem Tag seine Zeit lassen.','Das Gefühl, dass immer mehr möglich ist: Etwas beginnt, und du möchtest dabei sein!','Pałac auf dem Höhepunkt. Dieser gemeinsame Moment, in dem sich alle ganz dem Tanzen hingeben und alles andere warten kann.','Pałac, mit dem Blick nach innen. Sehnsucht, Zärtlichkeit, Melancholie: diesen Gefühlen Raum geben, während du weitertanzt.','Die Tracks, die mir am Herzen liegen und zu denen ich immer wieder zurückkehre, zu verschiedenen Zeiten aus verschiedenen Gründen.','Der Keller. Sich ganz dem Tempo und der Intensität hingeben, ob düster oder voller Freude.','Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.'],
-  lines:['Sonnige, groovige und entspannte Musik zum Aufwärmen und für draußen.','Melodisch und zunehmend energiegeladen, auf dem Weg zur Tanzfläche.','Kraftvoll und treibend. Musik für die volle Tanzfläche.','Melancholisch, hypnotisch und tief. Nachtmusik mit Gefühl.','Die Tracks, zu denen ich immer wieder zurückkehre.','Hard Techno und Hard Trance aus dem Keller. Dunkel oder fröhlich, immer schnell und voller Energie.','Fröhlicher House zum Tanzen bei Tageslicht und für entspannte Nachmittage.'] }
+  lines:['Sonnig, groovig, zum Aufwärmen','Hell und melodisch, steigend','Treibende Peak-Time-Musik','Melancholisch, hypnotisch, tief','Tracks, zu denen ich zurückkehre','Hard Techno und Hard Trance','Fröhlicher House bei Tageslicht','Ambient, zum Hinlegen','Tracks zum Ende eines Sets'] }
 };
 words.en.places.push('A safe, quiet space to lie down, relax and feel good. Nothing demanding your energy.', 'Tracks I could play to close a set.');
 words.de.places.push('Ein sicherer, ruhiger Ort zum Hinlegen, Entspannen und Wohlfühlen. Hier musst du nichts leisten.', 'Tracks, mit denen ich ein Set beenden könnte.');
-Object.assign(words.en, {special:'Special', stations:'Change stage', closeStations:'Close stages', stationPosition:'Stage', swipeHint:'Swipe to change stage'});
-Object.assign(words.de, {special:'Besonders', stations:'Bühne wechseln', closeStations:'Bühnen schließen', stationPosition:'Bühne', swipeHint:'Wischen, um die Bühne zu wechseln'});
-words.en.lines.push('Ambiance', 'Closing');
-words.de.lines.push('Ambiance', 'Closing');
+Object.assign(words.en, {stations:'Change stage', closeStations:'Close', stationPosition:'Stage', notStreamed:'Not streamed. You have to be there.'});
+Object.assign(words.de, {stations:'Bühne wechseln', closeStations:'Schließen', stationPosition:'Bühne', notStreamed:'Nicht im Radio. Du musst dabei sein.'});
 let language = 'en';
 try { const saved=localStorage.getItem('pavoia-language'); if (Object.hasOwn(words,saved)) language=saved; } catch { /* Storage is optional. */ }
 const text = key => words[language][key];
@@ -182,16 +176,6 @@ async function showPhoto(photo) {
   }
 }
 
-function revealStation(smooth = false) {
-  const rail = $('station-selector');
-  const selected = location.hash === '#bus' ? $('bus-link') : document.querySelector(`input[value="${currentMood.id}"]`).parentElement;
-  if (!selected || rail.scrollWidth <= rail.clientWidth) return;
-  const bounds = rail.getBoundingClientRect(), item = selected.getBoundingClientRect();
-  const left = item.left < bounds.left + 24 || item.right > bounds.right - 24 ? (item.left + item.right - bounds.left - bounds.right) / 2 : 0;
-  if (left) rail.scrollBy({ left, behavior: smooth && !reducedMotion.matches ? 'smooth' : 'instant' });
-}
-document.fonts.ready.then(() => revealStation());
-window.addEventListener('resize', () => revealStation());
 document.documentElement.toggleAttribute('data-page-hidden', document.hidden);
 document.addEventListener('visibilitychange', () => {
   document.documentElement.toggleAttribute('data-page-hidden', document.hidden);
@@ -212,26 +196,29 @@ function setTitle(element, [roman, italic]) {
   element.replaceChildren(...(roman ? [`${roman} `, em] : [em]));
 }
 
+// Each label carries its stage's line: a second line in the phone sheet, a tooltip on the desktop rail.
+// The line describes the radio and stays out of its name, so the radio is called by the stage alone.
+// Essentials and the Bus close the rail as one group, so they never wrap apart.
 for (const mood of moods) {
   const label = document.createElement('label');
-  label.className = mood.stage ? 'mood' : 'mood is-soon';
+  label.className = 'mood';
   const input = Object.assign(document.createElement('input'), { type: 'radio', name: 'mood', value: mood.id });
+  input.setAttribute('aria-describedby', `line-${mood.id}`);
   const text = Object.assign(document.createElement('span'), { textContent: plain(mood) });
-  text.dataset.soon = words[language].soonSuffix;
   const thumbnail = Object.assign(document.createElement('img'), {className:'mood-preview', src:mood.photos[0].src, alt:'', width:52, height:52, loading:'lazy', decoding:'async'});
   thumbnail.style.objectPosition = mood.photos[0].focus;
-  label.append(input, thumbnail, text);
+  const line = Object.assign(document.createElement('small'), { className: 'sheet-line', id: `line-${mood.id}` });
+  line.setAttribute('aria-hidden', 'true');
+  label.append(input, thumbnail, text, line);
   if (mood.stage==='essentials') {
-    label.classList.add('mood-essentials');label.title=plain(mood);text.className='visually-hidden';
+    label.classList.add('mood-essentials');
     const heart=document.createElementNS('http://www.w3.org/2000/svg','svg');
     heart.setAttribute('viewBox','0 0 36 36');heart.setAttribute('class','essentials-icon');heart.setAttribute('aria-hidden','true');
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d','M18 30.5S5 22.6 5 13.6A6.6 6.6 0 0 1 18 10.4a6.6 6.6 0 0 1 13 3.2c0 9-13 16.9-13 16.9Z');
     heart.append(path);label.prepend(heart);
-    const badge=Object.assign(document.createElement('small'),{className:'special-tag',textContent:words[language].special});
-    badge.dataset.copy='special';label.append(badge);
-  }
-  $('moods').insertBefore(label, $('bus-link'));
+    $('bus-link').before(label);
+  } else $('moods').querySelector('.mood-specials').before(label);
 }
 
 function closeStations() {
@@ -245,8 +232,10 @@ function arrangeStations() {
   if (wasOpen && !mobileLayout.matches) document.querySelector(`input[value="${currentMood.id}"]`).focus();
   renderScene();
 }
+// The sheet opens on the current stage, not on its close button, and scrolls it into view.
 $('open-stations').addEventListener('click', () => {
   $('stations-sheet').showModal();
+  (location.hash === '#bus' ? $('bus-link') : document.querySelector(`input[value="${currentMood.id}"]`)).focus();
   $('open-stations').setAttribute('aria-expanded', 'true');
 });
 $('close-stations').addEventListener('click', closeStations);
@@ -327,13 +316,12 @@ function renderScene() {
     setTitle($('mood-name'), bus ? ['The', 'Bus'] : currentMood.title);
     sceneText.getAnimations().forEach(animation => animation.cancel());
     if (sceneID && !reducedMotion.matches && !document.hidden) sceneText.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.22, 1, .36, 1)' });
-    revealStation(Boolean(sceneID));
       sceneID = nextScene;
   }
   const index=moods.indexOf(currentMood);
   $('mood-place').textContent = bus ? text('busPlace') : words[language].places[Number(currentMood.id)-1];
-  $('station-position').textContent = `${index+1} / ${moods.length}`;
-  $('station-position').setAttribute('aria-label', `${text('stationPosition')} ${index+1} / ${moods.length}: ${plain(currentMood)}`);
+  $('station-text').textContent = `${index+1} / ${moods.length}`;
+  $('station-label').textContent = `${text('stationPosition')} ${index+1} ${text('of')} ${moods.length}, ${plain(currentMood)}`;
   $('station-position').hidden = bus;
 }
 // The tab names the record while it plays, and the stage otherwise.
@@ -394,7 +382,7 @@ function pause() {
   wanted = false;
   clearTimeout(retryTimer);
   release();
-  state('paused', currentMood.stage ? 'paused' : 'soon');
+  state('paused', 'paused');
 }
 
 function fail(token, blocked = false) {
@@ -574,7 +562,7 @@ function selectMood(id) {
   if (!next.stage) wanted = false;
   render();
   if (wanted) connect();
-  else state('paused', next.stage ? 'paused' : 'soon');
+  else state('paused', 'paused');
   poll();
   pollListeners(true);
 }
@@ -601,7 +589,6 @@ function renderStatus() {
   document.body.toggleAttribute('data-on-air',onAir);
   live.toggleAttribute('data-pending',pending);
   live.removeAttribute('title');
-  if (!currentMood.stage) { live.textContent=label.textContent=text('soon'); return; }
   if (!loading && !dataFresh && !track) $('player-title').textContent=plain(currentMood);
   if (pending) { label.textContent=text('connecting'); return; }
   const { listeners: count, measuredAt, available }=audienceData || {};
@@ -620,7 +607,7 @@ function localise() {
   $('language').setAttribute('aria-label',text('language'));
   $('close-stations').setAttribute('aria-label',text('closeStations'));
   document.querySelectorAll('[data-copy]').forEach(node=>{node.textContent=text(node.dataset.copy);});
-  document.querySelectorAll('.mood span').forEach(node=>{node.dataset.soon=text('soonSuffix');});
+  document.querySelectorAll('.mood').forEach(node=>{node.title=node.querySelector('.sheet-line').textContent=text('lines')[Number(node.querySelector('input').value)-1];});
   document.querySelector('.wordmark').setAttribute('aria-label',text('home'));
   document.querySelector('.player').setAttribute('aria-label',text('player'));
   renderArtworkToggle();

@@ -34,7 +34,7 @@ async page => {
   assert(await photo.getAttribute('src') !== stablePhoto, 'Keyboard activation did not change the photo');
   await page.locator('#play').click();
 
-  const counts = { '01': 8, '02': 13, '03': 4, '04': 4, '05': 13, '06': 8, '07': 1 };
+  const counts = { '01': 8, '02': 12, '03': 4, '04': 3, '05': 11, '06': 8, '07': 1 };
   for (const [stage, count] of Object.entries(counts)) {
     await page.locator(`input[name="mood"][value="${stage}"]`).check();
     await loaded();

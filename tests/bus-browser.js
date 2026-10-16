@@ -13,10 +13,10 @@ async page => {
   assert(await icon.getAttribute('href') === '#bus', 'Bus icon has no shareable route');
   assert(await page.locator('#bus-link').evaluate(link => link === link.parentElement.lastElementChild), 'Bus icon must remain last');
   assert(await page.getByRole('radio', { name: 'The Bus' }).count() === 0, 'Bus became a regular station');
-  const faint = await icon.evaluate(link => Number(getComputedStyle(link).opacity));
+  // The bus rests in the soft colour and turns cream on hover; it is never dimmed.
+  assert(await icon.evaluate(link => getComputedStyle(link).color === 'rgba(240, 237, 229, 0.78)' && getComputedStyle(link).opacity === '1'), 'Bus icon does not rest in the soft colour');
   await icon.hover();
-  await page.waitForFunction(() => Number(getComputedStyle(document.getElementById('bus-link')).opacity) === 1);
-  assert(await icon.evaluate(link => Number(getComputedStyle(link).opacity)) > faint, 'Bus icon does not brighten on hover');
+  await page.waitForFunction(() => getComputedStyle(document.getElementById('bus-link')).color === 'rgb(240, 237, 229)').catch(() => { throw new Error('Bus icon does not turn cream on hover'); });
 
   await page.locator('#audio').evaluate(audio => { audio.volume = 0; });
   await page.locator('#play').click();

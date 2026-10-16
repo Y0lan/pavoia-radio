@@ -44,17 +44,16 @@
         <p class="place" id="mood-place">The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.</p>
       </div>
         <div id="station-selector-home"><fieldset class="moods" id="station-selector">
-          <legend class="visually-hidden" data-copy="choose">Choose a radio</legend>
+          <legend class="visually-hidden" data-copy="choose">Choose a stage</legend>
           <div class="mood-list" id="moods">
-            <a class="bus-link" id="bus-link" href="#bus" aria-label="The Bus">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="15" rx="2"/><path d="M3 11h18M8 3v8M16 3v8M6 18v3M18 18v3M7 15h1M16 15h1"/></svg><span class="special-name">The Bus</span><small class="special-tag" data-copy="special">Special</small>
-            </a>
+            <span class="mood-specials"><a class="bus-link" id="bus-link" href="#bus" aria-label="The Bus" aria-describedby="line-bus" title="The Bus">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="15" rx="2"/><path d="M3 11h18M8 3v8M16 3v8M6 18v3M18 18v3M7 15h1M16 15h1"/></svg><span class="special-name">The Bus</span><small class="sheet-line" id="line-bus" aria-hidden="true" data-copy="notStreamed">Not streamed. You have to be there.</small>
+            </a></span>
           </div>
         </fieldset></div>
-        <p class="swipe-hint"><svg width="20" height="12" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3-4 4 4 4m14-8 4 4-4 4M2 7h20"/></svg><span data-copy="swipeHint">Swipe to change stage</span></p>
         <div class="station-controls" id="station-controls">
           <button class="station-switcher" id="open-stations" type="button" aria-haspopup="dialog" aria-controls="stations-sheet" aria-expanded="false"><span data-copy="stations">Change stage</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
-          <span class="station-position" id="station-position" aria-live="polite" aria-atomic="true">4 / 9</span>
+          <span class="station-position" id="station-position" aria-live="polite" aria-atomic="true"><svg width="20" height="12" viewBox="0 0 24 14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 3-4 4 4 4m14-8 4 4-4 4M2 7h20"/></svg><span id="station-text" aria-hidden="true">4 / 9</span><span id="station-label" class="visually-hidden">Stage 4 of 9, Lost in Feelings</span></span>
           <div class="stage-actions">
             <span class="stage-action"><a id="stage-spotify" class="stage-spotify" target="_blank" rel="noopener noreferrer" hidden><span data-journey="spotifyStage">Follow this playlist on Spotify</span><span class="spotify-caption" data-journey="playlist">Playlist</span></a><span class="spotify-daily" data-journey="spotifyDaily">I add new tracks every day</span><a class="bus-ticket" href="https://pavoia.com/#tickets" target="_blank" rel="noopener noreferrer" data-copy="busTicket">Get your Pavoia ticket</a></span>
             <button type="button" id="change-photo" class="change-photo" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16H3V3h13v2M8 8h13v13H8zM8 18l4-4 3 3 2-2 4 4M16 3h5m-2-2 2 2-2 2"/><circle cx="17" cy="12" r="1"/></svg><span data-copy="changePhoto">Next photo</span> <output id="photo-count" aria-live="polite" aria-atomic="true"></output></button>
@@ -100,7 +99,7 @@
   </footer>
 
   <dialog id="stations-sheet" aria-labelledby="stations-title">
-    <header class="stations-heading"><h2 id="stations-title" data-copy="stations">Change stage</h2><button id="close-stations" type="button" aria-label="Close stages"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
+    <header class="stations-heading"><h2 id="stations-title" data-copy="stations">Change stage</h2><button id="close-stations" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
     <div id="station-sheet-list"></div>
   </dialog>
   <dialog id="explorer" aria-labelledby="explorer-title">

@@ -43,12 +43,13 @@ body[data-on-air] .dot { background:var(--red); }
 .scene-artwork { display:contents; }
 .listen-layout::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse 60% 55% at 0% 70%,rgb(11 10 9 / .6),transparent),linear-gradient(180deg,rgb(11 10 9 / .75),rgb(11 10 9 / .6) 90px,rgb(11 10 9 / .25) 160px,transparent 30%,rgb(11 10 9 / .2) 45%,rgb(11 10 9 / .92) 100%); }
 .poster { min-width:0; }
-.swipe-hint, .station-switcher, .station-position, .mood-preview, .change-photo svg { display:none; }
-.spotify-caption, .special-name, .special-tag { display:none; }
-#stations-sheet { margin:auto 0 0; width:100%; max-width:none; max-height:calc(100dvh - 24px); padding:0 20px max(12px,env(safe-area-inset-bottom)); border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0; background:#141210; color:var(--cream); overscroll-behavior:contain; opacity:0; transform:translateY(24px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
+.station-switcher, .station-position, .mood-preview, .sheet-line, .change-photo svg { display:none; }
+.spotify-caption, .special-name { display:none; }
+#stations-sheet { margin:auto 0 0; width:100%; max-width:none; max-height:calc(100dvh - 24px); padding:0 20px max(12px,env(safe-area-inset-bottom)); border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0; background:#141210; color:var(--cream); overscroll-behavior:contain; opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
 #stations-sheet[open] { opacity:1; transform:none; }
-#stations-sheet::backdrop { background:rgb(11 10 9 / .72); }
-@starting-style { #stations-sheet[open] { opacity:0; transform:translateY(24px); } }
+#stations-sheet::backdrop { background:rgb(11 10 9 / .72); opacity:0; transition:opacity var(--panel) ease, display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
+#stations-sheet[open]::backdrop { opacity:1; }
+@starting-style { #stations-sheet[open] { opacity:0; transform:translateY(12px); } #stations-sheet[open]::backdrop { opacity:0; } }
 .stations-heading { position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; min-height:64px; background:#141210; border-bottom:1px solid var(--line); }
 .stations-heading h2 { font:28px var(--serif); }
 #close-stations { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; color:var(--cream); background:transparent; cursor:pointer; }
@@ -72,9 +73,20 @@ body:not([data-bus]) :is(.bus-ticket, .stage-action:has(#stage-spotify[hidden]))
 .mood input { position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
 .mood:hover, .mood:has(input:checked) { color:var(--cream); }
 .mood span { position:relative; pointer-events:none; }
-.mood span::after { content:""; position:absolute; inset:auto 0 -6px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
-.mood:has(input:checked) span::after { transform:scaleX(1); }
+.mood span::after, .bus-link::after { content:""; position:absolute; inset:auto 0 -6px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
+.mood:has(input:checked) span::after, .bus-link[aria-current]::after { transform:scaleX(1); }
+/* The Bus scene has one current mark: the bus. The stage that keeps playing goes back to rest. */
+body[data-bus] .mood:has(input:checked):not(:hover) { color:var(--soft); }
+body[data-bus] .mood:has(input:checked) span::after { transform:scaleX(0); }
+/* Essentials and the Bus close the rail as one group behind a thin divider, and never wrap apart. */
+.mood-specials { display:inline-flex; align-items:center; gap:18px; white-space:nowrap; }
+.mood-specials::before { content:""; width:1px; height:18px; background:var(--line); }
+/* Below 1000px the group can start the second line, where a divider would separate nothing. */
+@media (max-width:1000px) { .mood-specials::before { display:none; } }
 .mood:has(input:focus-visible) span { outline:2px solid var(--cream); outline-offset:3px; }
+/* The Essentials ring frames the heart with the name. */
+.mood-essentials:has(input:focus-visible) span { outline:none; }
+.mood-essentials:has(input:focus-visible) { outline:2px solid var(--cream); outline-offset:3px; }
 .change-photo { display:block; min-height:44px; padding:0; border:0; background:none; color:var(--muted); font:12px Inter,sans-serif; text-underline-offset:5px; cursor:pointer; }
 .change-photo:hover, .artwork-toggle[aria-pressed=true] { color:var(--cream); }
 .artwork-toggle[aria-pressed=true] { text-decoration:underline; }
@@ -83,8 +95,9 @@ body:not(:has(#hero-cover[src], #painted-artist[src])) #artwork-toggle:not(:focu
 .record-sleeve, .painted-artist { transition:opacity var(--panel) var(--ease), visibility var(--panel); }
 @media (min-width:761px) { body[data-photo-only] :is(.record-sleeve, .painted-artist) { opacity:0; visibility:hidden; } .change-photo:hover { text-decoration:underline; } }
 #photo-count { font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
-.bus-link { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; min-width:44px; min-height:44px; color:var(--soft); opacity:.65; }
-.bus-link:hover, .bus-link:focus-visible, .bus-link[aria-current] { color:var(--cream); opacity:1; }
+.bus-link { position:relative; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; min-width:44px; min-height:44px; color:var(--soft); }
+.bus-link:hover, .bus-link:focus-visible, .bus-link[aria-current] { color:var(--cream); }
+.bus-link::after { inset:auto 13px 4px; }
 body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-daily, #artwork-toggle) { display:none; }
 /* Explicit ellipse radii reach transparency before every rectangular image edge. */
 .record-sleeve { position:absolute; z-index:-3; left:28%; top:-3%; width:60%; max-width:860px; aspect-ratio:1; pointer-events:none; opacity:.88; mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 24%,rgb(0 0 0 / .92) 43%,rgb(0 0 0 / .4) 70%,transparent 100%); }
@@ -119,13 +132,10 @@ button:disabled { opacity:.45; cursor:default; }
 .volume-control input::-moz-range-thumb { width:12px; height:12px; border:0; border-radius:50%; background:var(--cream); }
 .volume-control>span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
 
-/* Essentials stays a radio choice; the Bus remains a separate scene. */
-.mood-essentials { display:inline-flex; align-items:center; justify-content:center; min-width:44px; }
-.essentials-icon { width:28px; height:28px; fill:none; stroke:currentColor; stroke-width:1.4; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; pointer-events:none; }
-.mood .visually-hidden { position:absolute; }
-.mood-essentials:has(input:checked) { color:var(--red); }
-.mood-essentials:has(input:checked) .essentials-icon { fill:currentColor; }
-.mood-essentials:has(input:focus-visible) { outline:2px solid var(--cream); outline-offset:3px; }
+/* Essentials stays a radio choice and reads like every stage, its name after a small heart; the Bus remains a separate scene. */
+.essentials-icon { width:14px; height:14px; margin-right:6px; vertical-align:-1px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linecap:round; stroke-linejoin:round; pointer-events:none; }
+.essentials-icon path { vector-effect:non-scaling-stroke; }
+body:not([data-bus]) .mood-essentials:has(input:checked) .essentials-icon { fill:currentColor; }
 
 /* Letter */
 .letter { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: end; padding: 160px var(--gutter) 48px; }
@@ -221,10 +231,6 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .bottom { bottom: 26px; }
   h1 { font-size: clamp(50px, 15vw, 72px); }
   .place { font-size: 20px; }
-  .moods { margin-top: 28px; padding-top: 16px; }
-  .mood-list { column-gap: 18px; }
-  .mood { font-size: 19px; }
-  .mood + .mood::before { content: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after, ::view-transition-old(*), ::view-transition-new(*) { animation: none !important; transition: none !important; }
@@ -315,11 +321,9 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .bottom { width:100%; min-width:0; }
   h1 { font-size:clamp(44px,12vw,66px); text-wrap:balance; }
   .place { margin-top:14px; max-width:44ch; font:italic 19px/1.45 var(--serif); }
-  .swipe-hint { display:flex; align-items:center; gap:8px; margin-top:20px; color:var(--muted); font:14px/1.5 Inter,sans-serif; }
-  body[data-bus] .swipe-hint { visibility:hidden; }
   .station-controls { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
   .station-switcher { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0; border:0; background:none; color:var(--cream); font:17px var(--serif); cursor:pointer; }
-  .station-position { display:block; font:11px var(--mono); color:var(--muted); font-variant-numeric:tabular-nums; }
+  .station-position { display:flex; align-items:center; gap:6px; font:11px var(--mono); color:var(--muted); font-variant-numeric:tabular-nums; }
   .stage-actions { gap:6px; margin-left:auto; }
   .stage-spotify { display:flex; align-items:end; justify-content:center; width:50px; height:48px; background:url('assets/spotify.svg') center 2px / 22px no-repeat; }
   .stage-spotify .spotify-caption { display:block; font:12px/18px Inter,sans-serif; color:var(--soft); }
@@ -331,20 +335,22 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .artwork-toggle { display:none; }
   #stations-sheet .moods { margin:0; padding:0; overflow:visible; }
   #stations-sheet .mood-list { display:grid; grid-template-columns:1fr; gap:0; width:auto; }
-  #stations-sheet .mood, #stations-sheet .bus-link { grid-column:1 / -1; display:flex; align-items:center; gap:16px; min-height:64px; padding:8px 4px; font:22px/1.15 var(--serif); border-bottom:1px solid var(--line); }
-  #stations-sheet .mood:has(input:checked) { background:rgb(240 237 229 / .06); }
-  #stations-sheet .mood span::after { display:none; }
-  #stations-sheet .mood:has(input:checked)::after { content:""; width:6px; height:6px; margin-left:auto; border-radius:50%; background:var(--cream); }
-  #stations-sheet .mood-preview { display:block; width:48px; height:48px; object-fit:cover; flex-shrink:0; pointer-events:none; }
-  #stations-sheet .mood-essentials, #stations-sheet .bus-link { justify-content:start; }
+  /* Rows: the 48px picture spans the name and its line; the red dot marks the stage you hear now. */
+  #stations-sheet .mood-specials { display:contents; }
+  #stations-sheet .mood-specials::before, #stations-sheet :is(.mood span, .bus-link)::after { display:none; }
+  #stations-sheet .mood, #stations-sheet .bus-link { grid-column:1 / -1; display:grid; grid-template-columns:48px minmax(0,1fr) auto; align-content:center; gap:2px 16px; min-height:64px; padding:8px 4px; font:22px/1.15 var(--serif); border-bottom:1px solid var(--line); }
+  #stations-sheet :is(.mood-preview, .essentials-icon, .bus-link svg) { grid-area:1 / 1 / 3; }
+  #stations-sheet :is(.mood span, .special-name) { grid-area:1 / 2; }
+  /* A two-line row takes the focus ring itself, so the ring never crosses the second line. */
+  #stations-sheet .mood:has(input:focus-visible) span { outline:none; }
+  #stations-sheet .mood:has(input:focus-visible), #stations-sheet .bus-link:focus-visible { outline:2px solid var(--cream); outline-offset:-2px; }
+  #stations-sheet .sheet-line { display:block; grid-area:2 / 2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:12px/16px Inter,sans-serif; color:var(--muted); }
+  body:not([data-bus]) #stations-sheet .mood:has(input:checked), #stations-sheet .bus-link[aria-current] { background:rgb(240 237 229 / .06); }
+  body[data-playing]:not([data-bus]) #stations-sheet .mood:has(input:checked)::after { content:""; grid-area:1 / 3 / 3; align-self:center; width:6px; height:6px; border-radius:50%; background:var(--red); }
+  #stations-sheet .mood-preview { display:block; width:48px; height:48px; object-fit:cover; pointer-events:none; }
   #stations-sheet .mood-essentials .mood-preview { display:none; }
-  #stations-sheet .essentials-icon, #stations-sheet .bus-link svg { width:48px; height:48px; padding:6px; color:var(--soft); }
-  #stations-sheet .mood-essentials .visually-hidden { position:static; width:auto; height:auto; overflow:visible; clip-path:none; white-space:normal; }
+  #stations-sheet .essentials-icon, #stations-sheet .bus-link svg { width:48px; height:48px; margin:0; padding:6px; color:var(--soft); }
   #stations-sheet .special-name { display:inline; }
-  #stations-sheet .special-tag { display:block; margin-left:auto; color:var(--muted); font:12px Inter,sans-serif; }
-  #stations-sheet .bus-link { opacity:1; }
-  #stations-sheet .bus-link[aria-current] { background:rgb(240 237 229 / .06); }
-  #stations-sheet .mood-essentials:has(input:checked)::after { margin-left:0; }
   .scene-artwork { display:none; }
   /* Rows: title, artists, the release line at full width, then the waveform. 26+24+36+10 fills the 120px bar. */
   :root { --bar:calc(120px + env(safe-area-inset-bottom)); }
@@ -369,6 +375,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   #connection-map .map-node { width:80px; font-size:11px; }
   .map-center { font-size:18px; }
 }
+/* Under 375px the arrows would push the photo tools onto a second line, as German does at 360px. */
+@media (max-width:374px) { .station-position svg { display:none; } }
 @media (max-width:360px) { .top { padding-inline:16px; } .wordmark { width:108px; height:41px; } .wordmark img { width:89px; } .station-status { gap:6px; } }
 
 .explorer-nav { display:flex; flex-wrap:wrap; gap:12px 28px; }

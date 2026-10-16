@@ -56,14 +56,14 @@ with sync_playwright() as p:
  assert page.locator('#go-deeper').inner_text()=="See the roots it's built on"
  assert page.locator('.top #go-deeper').count()==0
  assert page.locator('.roots-footer #go-deeper').count()==1
- assert page.locator('.swipe-hint').is_visible()
+ assert page.locator('.swipe-hint').count()==0 and page.locator('#station-position svg').is_visible()
  assert page.locator('#open-stations').inner_text()=='Change stage'
  assert page.locator('#station-selector').evaluate("n=>n.closest('dialog')?.id==='stations-sheet'")
  assert page.locator('#language').evaluate("n=>getComputedStyle(n).appearance==='none'&&getComputedStyle(n).borderTopWidth==='0px'")
  for identifier in range(1,10):
   select(f'{identifier:02}')
   no_overflow()
-  assert page.locator('#station-position').inner_text()==f'{order.index(f"{identifier:02}")+1} / 9'
+  assert page.locator('#station-text').inner_text()==f'{order.index(f"{identifier:02}")+1} / 9'
   assert page.locator('#mood-place').is_visible()
   assert page.locator('#poster .record-sleeve, #poster .painted-artist').count()==0
   assert not page.locator('.scene-artwork').is_visible()
@@ -92,7 +92,7 @@ with sync_playwright() as p:
   page.locator('#language [value=de]').dispatch_event('click')
   for identifier in ('02','04','08','09'):
    select(identifier);no_overflow()
-   assert page.locator('#station-position').inner_text()==f'{order.index(identifier)+1} / 9'
+   assert page.locator('#station-text').inner_text()==f'{order.index(identifier)+1} / 9'
   shot(f'german-{width}')
   page.locator('#language [value=en]').dispatch_event('click')
  for width in (1024,1440):
@@ -115,7 +115,7 @@ with sync_playwright() as p:
   def stage_is(identifier):
    wait_for('(id)=>window.Pavoia.getState().stage===id',arg=identifier)
   select('05');swipe_photo(-160);stage_is('bermuda-day')
-  assert page.locator('#station-position').inner_text()=='1 / 9'
+  assert page.locator('#station-text').inner_text()=='1 / 9'
   assert page.locator('#audio').evaluate('a=>a.paused&&!a.getAttribute("src")')
   swipe_photo(160);stage_is('essentials')
   swipe_photo(-25,120);stage_is('essentials')

@@ -55,8 +55,18 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     append(...children){for(const child of children){if(typeof child==='object')child.parent=this;this.children.push(child);}}
     prepend(...children){for(const child of children.reverse())this.insertBefore(child,this.children[0]);}
     insertBefore(child,before){const index=this.children.indexOf(before);child.parent=this;if(index<0)this.children.push(child);else this.children.splice(index,0,child);}
+    before(child){this.parent.insertBefore(child,this);}
     replaceChildren(...children){this.children=[];this.append(...children);}
-    querySelector(selector){const kind=/data-kind="([^"]+)"/.exec(selector)?.[1];return this.children.find(c=>c.dataset?.kind===kind)||null;}
+    descendants(){return this.children.flatMap(c=>typeof c==='object'?[c,...c.descendants()]:[]);}
+    // A class (.name), a tag, or the journey's [data-kind] lookup.
+    querySelector(selector){
+      if(selector.startsWith('.'))return this.descendants().find(c=>c.className?.split(' ').includes(selector.slice(1)))||null;
+      if(/^[a-z]+$/.test(selector))return this.descendants().find(c=>c.localName===selector)||null;
+      const kind=/data-kind="([^"]+)"/.exec(selector)?.[1];return this.children.find(c=>c.dataset?.kind===kind)||null;
+    }
+    focus(){document.activeElement=this;}
+    showModal(){this.open=true;}
+    close(){this.open=false;}
     contains(child){return this.children.includes(child);}
     remove(){if(this.parent)this.parent.children=this.parent.children.filter(c=>c!==this);}
     decode(){return deferImages ? new Promise((resolve,reject)=>imageRequests.push({src:this.src,resolve,reject})) : Promise.resolve();}
@@ -70,7 +80,8 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   // Any other id gets a plain element, so journey.js finds every node it wires.
   const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id) || (nodes.push(Object.assign(new Element(),{id})),nodes.at(-1))});
   elements.photo.src='photos/selected/p005.jpg';
-  elements['station-selector'].scrollWidth=elements['station-selector'].clientWidth=0;
+  // The rail ends on the Essentials and Bus group, as in index.html.
+  elements.moods.append(Object.assign(new Element(),{className:'mood-specials'}));elements.moods.children[0].append(elements['bus-link']);
   const body=new Element();
   const audio=elements.audio;
   audio.paused=true;audio.readyState=0;audio.calls=[];
@@ -82,9 +93,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   let wallOffset=0;
   class FakeDate extends Date {static now(){return clock.now+wallOffset;}}
   const mediaSession={setActionHandler(name,fn){actions[name]=fn;}};
-  const document=Object.assign(new Element(),{body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:()=>new Element(),createElementNS:()=>new Element(),
-    querySelector:selector=> selector==='dialog[open]' ? env.openDialog || null : selector.startsWith('input') ? new Element() : elements[selector.slice(1)],
-    querySelectorAll:()=>[]});
+  const document=Object.assign(new Element(),{body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:tag=>Object.assign(new Element(),{localName:tag}),createElementNS:()=>new Element(),
+    querySelector:selector=> selector==='dialog[open]' ? env.openDialog || null : selector.startsWith('input') ? elements.moods.descendants().find(n=>n.localName==='input'&&selector.includes(`"${n.value}"`)) || new Element() : elements[selector.slice(1)],
+    querySelectorAll:selector=>selector==='.mood' ? elements.moods.descendants().filter(n=>n.className==='mood') : []});
   class MediaMetadata{constructor(value){Object.assign(this,value);}}
   const window=new Element(),location={hash,pathname:'/',search:''};
   window.MediaMetadata=MediaMetadata;window.dispatchEvent=event=>window.emit(event.type,event);
@@ -118,6 +129,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     setInterval:fn=>intervals.push(fn),
   };
   runInNewContext(source,context);
+  env.run=code=>runInContext(code,context);
   if(journey)runInContext(web('journey.js'),context);
   return env;
 }
@@ -299,9 +311,9 @@ test('Next photo carries its position and names it in full',async()=>{
  assert.match(button,/<span data-copy="changePhoto">Next photo<\/span> <output id="photo-count"/,'the count lives inside the button');
  assert.doesNotMatch(button,/title=/,'no tooltip repeats the label');
  const e=setup();await flush();const next=e.elements['change-photo'];
- assert.equal(next.getAttribute('aria-label'),'Next photo, 1 of 4');assert.equal(e.elements['photo-count'].textContent,'1 / 4');
- next.emit('click');await flush();assert.equal(next.getAttribute('aria-label'),'Next photo, 2 of 4');assert.equal(e.elements['photo-count'].textContent,'2 / 4');
- e.setLanguage('de');assert.equal(next.getAttribute('aria-label'),'Nächstes Foto, 2 von 4');assert.equal(next.title,undefined);
+ assert.equal(next.getAttribute('aria-label'),'Next photo, 1 of 3');assert.equal(e.elements['photo-count'].textContent,'1 / 3');
+ next.emit('click');await flush();assert.equal(next.getAttribute('aria-label'),'Next photo, 2 of 3');assert.equal(e.elements['photo-count'].textContent,'2 / 3');
+ e.setLanguage('de');assert.equal(next.getAttribute('aria-label'),'Nächstes Foto, 2 von 3');assert.equal(next.title,undefined);
  e.change('01');await flush();assert.equal(next.getAttribute('aria-label'),'Nächstes Foto, 1 von 8');
 });
 
@@ -309,7 +321,7 @@ test('selected photos cycle on request and stage entry without changing playback
  const e=setup();await flush();e.click();e.playing();
  const first=e.elements.photo.src,seen=new Set([first]),audioCalls=e.audio.calls.length;
  assert.equal(e.elements['change-photo'].hidden,false);
- for(let i=0;i<3;i++){
+ for(let i=0;i<2;i++){
   e.elements['change-photo'].emit('click');await flush();
   assert.ok(!seen.has(e.elements.photo.src));seen.add(e.elements.photo.src);
  }
@@ -584,7 +596,6 @@ test('the stage column is one line of stations over one constant line of actions
  assert.match(rules.get('body:not([data-bus]) :is(.bus-ticket, .stage-action:has(#stage-spotify[hidden]))'),/display:none/,'the ticket only on the Bus; no playlist, no empty slot before the photo tools');
  assert.match(rules.get('body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-daily, #artwork-toggle)'),/display:none/,'the Bus swaps the playlist for the ticket');
  assert.match(rules.get('.place'),/min-height:2lh/,'a one-line description keeps the title where two lines put it');
- assert.match(cssRules('(max-width:760px)').get('body[data-bus] .swipe-hint'),/visibility:hidden/,'on phones the Bus keeps the hint\'s height, so its title does not drop');
  assert.match(cssRules('(max-width:760px)').get('.stage-spotify>span:not(.spotify-caption), .spotify-daily'),/display:none/,'phones keep the Playlist tile alone');
  for(const gone of ['bus-copy','bus-line','busLine','sleeve-empty','painted-artist-secondary','.secondary','showArtwork','standby','offline','audienceUnknown'])
   for(const name of ['index.html','app.js','journey.js','style.css'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
@@ -609,4 +620,110 @@ test('title and description arrive together, on the shared curve',async()=>{
  assert.deepEqual(plain(moves),[[[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:240,easing:'cubic-bezier(.22, 1, .36, 1)'}]]);
  e.setLanguage('de');assert.equal(moves.length,1,'a language change is not a scene change');
  assert.deepEqual(plain(fades),[{duration:360,easing:'cubic-bezier(.22, 1, .36, 1)'}],'the photo crossfade uses the same curve');
+});
+
+test('Essentials reads like every stage and closes the rail with the Bus, as one group',async()=>{
+ const e=setup();await flush();const moods=e.elements.moods,specials=moods.querySelector('.mood-specials');
+ assert.equal(moods.children.at(-1),specials,'the group ends the rail');
+ assert.deepEqual(moods.children.slice(0,-1).map(label=>label.querySelector('input').value),['01','02','03','04','06','07','08','09'],'every other stage comes before it');
+ const [essentials,bus]=specials.children;
+ assert.deepEqual([essentials.querySelector('input').value,bus],['05',e.elements['bus-link']],'Essentials, then the Bus');
+ assert.notEqual(essentials.querySelector('span').className,'visually-hidden','its name is visible');
+ assert.equal(essentials.title,'The tracks I keep coming back to','its tooltip is its line, like every stage');
+ assert.match(web('index.html'),/<span class="mood-specials"><a class="bus-link" id="bus-link" href="#bus" aria-label="The Bus" aria-describedby="line-bus" title="The Bus">\s*<svg viewBox="0 0 24 24" width="18" height="18"[^>]*stroke-width="1.5"/,'an 18px bus, named on hover, inside the group');
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.mood-specials'),/display:inline-flex; align-items:center; gap:18px; white-space:nowrap/,'the heart and the bus never wrap apart');
+ assert.match(rules.get('.mood-specials::before'),/width:1px; height:18px; background:var\(--line\)/,'a thin divider opens the group');
+ assert.match(phone.get('#stations-sheet .mood-specials'),/display:contents/,'in the sheet they are two plain rows');
+ assert.match(phone.get('#stations-sheet .mood-specials::before, #stations-sheet :is(.mood span, .bus-link)::after'),/display:none/,'with no divider and no rail underline');
+ assert.match(rules.get('.essentials-icon'),/width:14px; height:14px;.*stroke-width:1.5/,'a small heart before the name');
+ assert.match(rules.get('body:not([data-bus]) .mood-essentials:has(input:checked) .essentials-icon'),/fill:currentColor/,'the heart fills when chosen, except in the Bus scene');
+ assert.ok(![...rules.keys()].includes('.mood-essentials:has(input:checked) .essentials-icon'),'no filled heart beside the current bus');
+ assert.match(rules.get('.mood-essentials:has(input:focus-visible)'),/outline:2px solid var\(--cream\)/,'the keyboard ring frames the heart with the name');
+ assert.match(rules.get('.mood-essentials:has(input:focus-visible) span'),/outline:none/);
+ assert.match(cssRules('(max-width:1000px)').get('.mood-specials::before'),/display:none/,'no divider where the group can start a line');
+ for(const [selector,body] of rules)if(selector.includes('essentials'))assert.doesNotMatch(body,/--red|width:28px/,'checked Essentials is cream like every stage: '+selector);
+ assert.doesNotMatch(rules.get('.bus-link'),/opacity/,'the bus is not dimmed');
+ assert.match(rules.get('.mood:has(input:checked) span::after, .bus-link[aria-current]::after'),/transform:scaleX\(1\)/,'the current bus takes the stage underline');
+ for(const name of ['index.html','app.js','style.css'])for(const gone of ['special-tag','data-copy="special"','special:','Besonders'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
+});
+
+test('the Bus scene shows one current mark, and the red dot marks the stage you hear',()=>{
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('body[data-bus] .mood:has(input:checked):not(:hover)'),/color:var\(--soft\)/,'the stage that keeps playing goes back to rest');
+ assert.match(rules.get('body[data-bus] .mood:has(input:checked) span::after'),/transform:scaleX\(0\)/,'and loses its underline');
+ assert.match(phone.get('body:not([data-bus]) #stations-sheet .mood:has(input:checked), #stations-sheet .bus-link[aria-current]'),/^\s*background:rgb\(240 237 229 \/ \.06\);\s*$/,'a checked row gets only the background, and only the Bus row in its scene');
+ assert.match(phone.get('body[data-playing]:not([data-bus]) #stations-sheet .mood:has(input:checked)::after'),/width:6px; height:6px; border-radius:50%; background:var\(--red\)/,'the dot shows only while the stage plays, in red');
+ assert.ok(!phone.has('#stations-sheet .mood:has(input:checked)::after'),'no dot at rest');
+ for(const [selector,body] of phone)if(selector.includes('#stations-sheet'))assert.doesNotMatch(body,/margin-left/,'no margin hack: '+selector);
+});
+
+test('each stage has one line: a second line in the sheet, a tooltip on the rail, in both languages',async()=>{
+ const e=setup();await flush();
+ const lines=()=>Object.fromEntries(e.document.querySelectorAll('.mood').map(label=>[label.querySelector('input').value,[label.querySelector('.sheet-line').textContent,label.title]]));
+ const expected=list=>Object.fromEntries(list.map((line,i)=>['0'+(i+1),[line,line]]));
+ assert.deepEqual(lines(),expected(['Sunny, groovy open-air warm-up','Bright and melodic, building up','Driving peak-time dance music','Melancholic, hypnotic and deep','The tracks I keep coming back to','Hard techno and hard trance','Happy house for daylight','Ambient, to lie down and rest','Tracks to close a set']));
+ e.setLanguage('de');
+ assert.deepEqual(lines(),expected(['Sonnig, groovig, zum Aufwärmen','Hell und melodisch, steigend','Treibende Peak-Time-Musik','Melancholisch, hypnotisch, tief','Tracks, zu denen ich zurückkehre','Hard Techno und Hard Trance','Fröhlicher House bei Tageslicht','Ambient, zum Hinlegen','Tracks zum Ende eines Sets']));
+ for(const label of e.document.querySelectorAll('.mood')){
+  const input=label.querySelector('input'),line=label.querySelector('.sheet-line');
+  assert.deepEqual([input.getAttribute('aria-describedby'),line.getAttribute('aria-hidden')],[line.id,'true'],'the line describes the radio and stays out of its name: '+input.value);
+ }
+ const html=web('index.html');
+ assert.match(html,/<small class="sheet-line" id="line-bus" aria-hidden="true" data-copy="notStreamed">Not streamed\. You have to be there\.<\/small>/,'the Bus row says why it has no radio, as the link\'s description');
+ assert.equal(e.run('words.de.notStreamed'),'Nicht im Radio. Du musst dabei sein.');
+ assert.match(html,/<legend class="visually-hidden" data-copy="choose">Choose a stage<\/legend>/,'the legend uses the visible word');
+ assert.deepEqual([e.run('words.en.choose'),e.run('words.de.choose')],['Choose a stage','Wähle eine Bühne']);
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.station-switcher, .station-position, .mood-preview, .sheet-line, .change-photo svg'),/display:none/,'the rail shows no second line');
+ assert.match(phone.get('#stations-sheet .sheet-line'),/display:block; grid-area:2 \/ 2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:12px\/16px Inter,sans-serif; color:var\(--muted\)/);
+ assert.match(phone.get('#stations-sheet .mood, #stations-sheet .bus-link'),/display:grid; grid-template-columns:48px minmax\(0,1fr\) auto;.*min-height:64px/,'rows stay 64px');
+ assert.match(phone.get('#stations-sheet :is(.mood-preview, .essentials-icon, .bus-link svg)'),/grid-area:1 \/ 1 \/ 3/,'the picture spans both lines');
+});
+
+test('the sheet opens on the current stage, or on the Bus in its scene, and closes with a plain Close',async()=>{
+ const e=setup();await flush();const open=()=>{e.elements['stations-sheet'].open=false;e.elements['open-stations'].emit('click');};
+ open();assert.equal(e.document.activeElement,e.document.querySelector('input[value="04"]'),'focus lands on the checked stage, not on ✕');
+ e.change('03');open();assert.equal(e.document.activeElement,e.document.querySelector('input[value="03"]'));
+ e.location.hash='#bus';e.window.emit('hashchange');open();assert.equal(e.document.activeElement,e.elements['bus-link'],'in the Bus scene, on the bus');
+ assert.match(web('index.html'),/<button id="close-stations" type="button" aria-label="Close">/);
+ assert.equal(e.elements['close-stations'].getAttribute('aria-label'),'Close');e.setLanguage('de');assert.equal(e.elements['close-stations'].getAttribute('aria-label'),'Schließen');
+ const rules=cssRules();
+ assert.match(rules.get('#stations-sheet'),/transform:translateY\(12px\)/,'a short rise');
+ assert.match(web('style.css'),/@starting-style \{ #stations-sheet\[open\] \{ opacity:0; transform:translateY\(12px\); \} #stations-sheet\[open\]::backdrop \{ opacity:0; \} \}/);
+ assert.match(rules.get('#stations-sheet::backdrop'),/opacity:0; transition:opacity var\(--panel\) ease, display var\(--panel\) allow-discrete, overlay var\(--panel\) allow-discrete/,'the backdrop fades in like the explorer\'s');
+ assert.match(rules.get('#stations-sheet[open]::backdrop'),/opacity:1/);
+});
+
+test('the counter carries the swipe arrows, shows numbers and says the stage in words',async()=>{
+ const html=web('index.html');
+ assert.match(html,/<span class="station-position" id="station-position" aria-live="polite" aria-atomic="true"><svg [^>]*aria-hidden="true"><path d="m5 3-4 4 4 4m14-8 4 4-4 4M2 7h20"\/><\/svg><span id="station-text" aria-hidden="true">4 \/ 9<\/span><span id="station-label" class="visually-hidden">Stage 4 of 9, Lost in Feelings<\/span><\/span>/);
+ for(const name of ['index.html','app.js','style.css'])for(const gone of ['swipe-hint','swipeHint'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
+ const e=setup();await flush();const label=e.elements['station-label'];
+ assert.deepEqual([e.elements['station-text'].textContent,label.textContent],['4 / 9','Stage 4 of 9, Lost in Feelings']);
+ assert.equal(e.elements['station-position'].getAttribute('aria-label'),null,'the live region reads its words, not a label');
+ e.change('03');assert.deepEqual([e.elements['station-text'].textContent,label.textContent],['3 / 9','Stage 3 of 9, Night in Motion']);
+ e.setLanguage('de');assert.equal(label.textContent,'Bühne 3 von 9, Night in Motion');
+ assert.match(cssRules('(max-width:760px)').get('.station-position'),/display:flex; align-items:center; gap:6px/,'the arrows sit before the numbers');
+ assert.match(cssRules('(max-width:374px)').get('.station-position svg'),/display:none/,'narrow phones drop the arrows, so the controls stay on one line');
+});
+
+test('every visit opens on Lost in Feelings, whatever stage was chosen before',async()=>{
+ const saved={},storage={getItem:key=>saved[key] ?? null,setItem(key,value){saved[key]=value;}};
+ const e=setup({storage});await flush();e.change('03');assert.equal(e.window.Pavoia.getState().stage,'palac-dance');
+ const back=setup({storage});await flush();assert.equal(back.window.Pavoia.getState().stage,'palac-feel','the page HTML shows Lost in Feelings first, so the radio starts there too');
+});
+
+test('a stage\'s first photo shows under that stage alone',async()=>{
+ const e=setup();await flush();const moods=e.run('moods');
+ for(const mood of moods)for(const other of moods)if(other!==mood)assert.ok(!other.photos.some(photo=>photo.src===mood.photos[0].src),`${mood.photos[0].src} opens ${mood.stage} and also shows under ${other.stage}`);
+ assert.equal(moods.find(mood=>mood.id==='04').photos.map(photo=>photo.src).join(),'photos/selected/p005.jpg,photos/selected/p204.jpg,photos/selected/p306.jpg');
+});
+
+test('every mood has a stage, so no Soon code and no rail scrolling remain',async()=>{
+ const app=web('app.js');
+ for(const gone of ['revealStation','soonSuffix',"'soon'",'is-soon','dataset.soon','data-soon'])assert.ok(!app.includes(gone),gone+' is gone');
+ const e=setup();await flush();assert.equal(e.run('words.en.soon'),undefined);
+ const small=cssRules('(max-width: 600px)');
+ for(const selector of ['.moods','.mood-list','.mood','.mood + .mood::before'])assert.ok(!small.has(selector),selector+' has no phone override left');
 });
