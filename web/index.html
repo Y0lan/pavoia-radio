@@ -12,6 +12,23 @@
   <script src="waveform.js" defer></script>
 </head>
 <body>
+  <div class="player" role="region" aria-label="Player" data-status="paused">
+    <audio id="audio" preload="none"></audio>
+    <div class="dock-artwork"><img id="dock-cover" class="dock-cover" width="48" height="48" alt="" hidden></div>
+    <button class="play" id="play" type="button" disabled aria-keyshortcuts="Space" aria-label="Play" title="Play (Space)">
+      <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>
+      <svg class="icon-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg>
+    </button>
+    <div class="now"><em id="player-title">Loading track…</em><a id="player-album"></a></div>
+    <div class="player-credits"><span id="player-artist"></span><div id="credited-artists" class="credited-artists"></div><span id="label-note" class="label-note" hidden></span></div>
+    <a id="track-spotify" class="track-spotify" target="_blank" rel="noopener noreferrer" hidden><span class="spotify-caption" data-journey="track">Track</span></a>
+    <div class="transport-track">
+      <div class="transport-time"><span id="playback-status" role="status">Paused</span><span id="player-stage">Lost in Feelings</span><span id="track-clock">—</span></div>
+      <canvas id="waveform" aria-hidden="true"></canvas>
+      <progress id="track-progress" max="1" value="0" aria-label="Live track progress"></progress>
+    </div>
+    <label class="volume-control"><span data-journey="volume">Volume</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+  </div>
   <main>
       <header class="top">
         <a class="wordmark" href="#" aria-label="Pavoia Radio, home"><svg class="broadcast-mark" viewBox="0 0 160 60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 10Q-2 30 12 50M18 17Q9 30 18 43M24 23Q19 30 24 37M148 10Q162 30 148 50M142 17Q151 30 142 43M136 23Q141 30 136 37"/></svg><img src="assets/wordmark-day.svg" alt="" width="461" height="259"></a>
@@ -90,23 +107,6 @@
     </div>
   </footer>
 
-  <div class="player" role="region" aria-label="Player">
-    <audio id="audio" preload="none"></audio>
-    <div class="dock-artwork"><img id="dock-cover" class="dock-cover" width="48" height="48" alt="" hidden></div>
-    <button class="play" id="play" type="button" disabled aria-pressed="false" aria-label="Play">
-      <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>
-      <svg class="icon-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg>
-    </button>
-    <div class="now"><em id="player-title">Loading track…</em><a id="player-album"></a></div>
-    <div class="player-credits"><span id="player-artist">Lost in Feelings</span><div id="credited-artists" class="credited-artists"></div><span id="label-note" class="label-note" hidden></span></div>
-    <a id="track-spotify" class="track-spotify" target="_blank" rel="noopener noreferrer" hidden><span class="spotify-caption" data-journey="track">Track</span></a>
-    <div class="transport-track">
-      <div class="transport-time"><span id="playback-status" role="status">Paused</span><span id="track-clock">—</span></div>
-      <canvas id="waveform" aria-hidden="true"></canvas>
-      <progress id="track-progress" max="1" value="0" aria-label="Live track progress"></progress>
-    </div>
-    <label class="volume-control"><span data-journey="volume">Volume</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
-  </div>
   <dialog id="stations-sheet" aria-labelledby="stations-title">
     <header class="stations-heading"><h2 id="stations-title" data-copy="stations">Change stage</h2><button id="close-stations" type="button" aria-label="Close stages"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
     <div id="station-sheet-list"></div>

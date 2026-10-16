@@ -96,11 +96,11 @@ async page => {
   await page.screenshot({path:'output/playwright/polish-mobile-connecting.png'});
   releaseStream();
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'retrying');
-  assert(await page.locator('#playback-status').innerText() === 'Reconnecting', 'Retry feedback missing');
+  assert(await page.locator('#playback-status').innerText() === 'Reconnecting…', 'Retry feedback missing');
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'error', null, {timeout:25000});
-  assert(await page.locator('#play').getAttribute('aria-label') === 'Retry playback', 'Terminal error has no retry control');
+  assert(await page.locator('#play').getAttribute('aria-label') === 'Try again', 'Terminal error has no retry control');
   await page.locator('#language').selectOption('de');
-  assert(await page.locator('#playback-status').innerText() === 'Erneut versuchen', 'German error feedback missing');
+  assert(await page.locator('#playback-status').innerText() === 'Stream unterbrochen. Play erneut drücken.', 'German error feedback missing');
   assert((await page.locator('#playback-status').boundingBox()).width <= 320, 'German feedback overflows');
   await page.unroute('**/stream/fontanna.mp3', unavailable);
   await page.locator('#play').click();

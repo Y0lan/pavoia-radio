@@ -9,15 +9,14 @@
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   const samples = new Float32Array(2048), levels = new Float32Array(72);
   let context, analyser, stream, source, frame = 0, last = 0, width = 0, height = 0;
+  // Without an analyser there is nothing true to draw, so the canvas leaves the bar.
+  const unavailable = () => !capture || !AudioContext || reduced.matches;
+  canvas.hidden = unavailable();
 
   function draw(active = false) {
     paint.clearRect(0, 0, width, height);
-    paint.lineWidth = 2; paint.lineCap = 'round';
-    paint.strokeStyle = active ? '#f0ede5' : 'rgba(240,237,229,.3)';
-    if (!active) {
-      paint.beginPath(); paint.moveTo(1, height / 2); paint.lineTo(width - 1, height / 2); paint.stroke();
-      return;
-    }
+    if (!active) return;
+    paint.lineWidth = 2; paint.lineCap = 'round'; paint.strokeStyle = '#f0ede5';
     analyser.getFloatTimeDomainData(samples);
     let energy = 0;
     for (const sample of samples) energy += sample * sample;
@@ -54,7 +53,7 @@
     } catch { stop(); }
   }
   function enable() {
-    if (!capture || !AudioContext || reduced.matches) return;
+    if (unavailable()) return;
     try {
       if (!context) {
         context = new AudioContext(); analyser = context.createAnalyser(); analyser.fftSize = samples.length;
@@ -65,12 +64,13 @@
   document.addEventListener('click', event => {
     if (event.target.closest('#play, #explorer-play')) enable();
   }, { capture: true });
+  document.addEventListener('keydown', event => { if (event.code === 'Space') enable(); }, { capture: true });
   audio.addEventListener('playing', start);
   for (const event of ['pause', 'emptied', 'ended', 'waiting', 'error']) audio.addEventListener(event, stop);
   document.addEventListener('visibilitychange', () => {
     if (document.hidden) { stop(); context?.suspend().catch(() => {}); } else start();
   });
-  reduced.addEventListener('change', () => { if (reduced.matches) stop(); else start(); });
+  reduced.addEventListener('change', () => { canvas.hidden = unavailable(); if (reduced.matches) stop(); else start(); });
   new ResizeObserver(() => {
     width = canvas.clientWidth; height = canvas.clientHeight;
     const ratio = Math.min(devicePixelRatio || 1, 2);

@@ -13,7 +13,7 @@ async (page) => {
   try {
     for (const [id, stage] of [['04', 'palac-feel'], ['03', 'palac-dance'], ['01', 'bermuda-day'], ['02', 'bermuda-evening'], ['05', 'essentials'], ['06', 'etage-zero'], ['07', 'fontanna'], ['08', 'ambiance'], ['09', 'closing']]) {
       await choose(id);
-      if (await page.locator('#play').getAttribute('aria-pressed') !== 'true') await page.locator('#play').click();
+      if (await page.locator('#play').getAttribute('aria-label') !== 'Pause') await page.locator('#play').click();
       await page.waitForFunction(() => document.querySelector('.player').dataset.state === 'playing', { timeout: 30000 });
       await page.waitForFunction(() => document.getElementById('audio').currentTime > 1);
       assert((await page.locator('#audio').getAttribute('src')) === `/stream/${stage}.mp3`, 'Wrong stream');
@@ -117,18 +117,18 @@ async (page) => {
   await page.evaluate(() => { window.oldReject = window.lastReject; });
   await choose('04');
   await page.evaluate(() => window.oldReject(Object.assign(new Error('Old request'), { name: 'NotAllowedError' })));
-  assert(await page.locator('#play').getAttribute('aria-pressed') === 'true', 'Old audio error stopped new station');
+  assert(await page.locator('#play').getAttribute('aria-label') === 'Pause', 'Old audio error stopped new station');
   await page.evaluate(() => document.getElementById('audio').dispatchEvent(new Event('playing')));
   assert(await page.locator('#playback-status').innerText() === 'Playing', 'Playing state missing');
   await page.locator('#play').click();
   assert(await page.locator('#audio').getAttribute('src') === null, 'Mock pause did not release source');
   await page.locator('#play').click();
   await page.evaluate(() => window.lastReject(Object.assign(new Error('Blocked'), { name: 'NotAllowedError' })));
-  await page.waitForFunction(() => document.getElementById('playback-status').textContent === 'Tap to play');
-  assert(await page.locator('#play').getAttribute('aria-pressed') === 'false', 'Blocked play must need a new gesture');
+  await page.waitForFunction(() => document.getElementById('playback-status').textContent === 'Press play to start');
+  assert(await page.locator('#play').getAttribute('aria-label') === 'Play', 'Blocked play must need a new gesture');
   await page.locator('#play').click();
   await page.evaluate(() => document.getElementById('audio').dispatchEvent(new Event('ended')));
-  await page.waitForFunction(() => document.getElementById('playback-status').textContent === 'Reconnecting');
+  await page.waitForFunction(() => document.getElementById('playback-status').textContent === 'Reconnecting…');
   await page.locator('#play').click();
   await page.waitForTimeout(1200);
   assert(await page.locator('#audio').getAttribute('src') === null, 'Pause failed to cancel retry');

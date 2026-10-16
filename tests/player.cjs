@@ -7,6 +7,33 @@ const source = readFileSync(resolve(__dirname, '../web/app.js'), 'utf8');
 const flush = async () => { for (let i=0;i<8;i++) await Promise.resolve(); };
 // One clock for the page under test and the measurements it receives; tests move it forward by hand.
 const clock = {now: Date.now()};
+// Just enough CSS matching for the key handler: tags, [attr] and [attr=value], :focus-visible and :not() lists.
+function cssMatches(list, el) {
+  const parts=[];let depth=0,from=0;
+  for(let i=0;i<list.length;i++){if(list[i]==='(')depth++;else if(list[i]===')')depth--;else if(list[i]===','&&!depth){parts.push(list.slice(from,i));from=i+1;}}
+  parts.push(list.slice(from));
+  return parts.some(part=>{
+    let rest=part.trim(),m;
+    if((m=/^[a-z]+/.exec(rest))){if(m[0]!==el.tag)return false;rest=rest.slice(m[0].length);}
+    while(rest){
+      if((m=/^\[([a-z-]+)(?:=([a-z-]+))?\]/.exec(rest))){if(!(m[1] in el.attrs)||(m[2]&&el.attrs[m[1]]!==m[2]))return false;}
+      else if((m=/^:focus-visible/.exec(rest))){if(!el.focusVisible)return false;}
+      else if((m=/^:checked/.exec(rest))){if(!('checked' in el.attrs))return false;}
+      else if((m=/^:not\(/.exec(rest))){let end=m[0].length;for(let d=1;d&&end<rest.length;end++)d+=rest[end]==='('?1:rest[end]===')'?-1:0;if(cssMatches(rest.slice(m[0].length,end-1),el))return false;m=[rest.slice(0,end)];}
+      else throw new Error('Unsupported selector: '+rest);
+      rest=rest.slice(m[0].length);
+    }
+    return true;
+  });
+}
+// A focused element as the key handler sees it. Chromium reports :focus-visible during any keydown.
+const control=(tag,attrs={},focusVisible=false)=>{const el={tag,attrs,focusVisible};el.matches=selector=>cssMatches(selector,el);return el;};
+// Top-level rules of the stylesheet, as selector -> declarations.
+const topRules=()=>{
+  const css=readFileSync(resolve(__dirname,'../web/style.css'),'utf8').replace(/\/\*[\s\S]*?\*\//g,'');let flat='',depth=0,media=false;
+  for(let i=0;i<css.length;i++){const c=css[i];if(!depth&&c==='@')media=true;if(c==='{')depth++;if(!media)flat+=c;if(c==='}'&&!--depth)media=false;}
+  return new Map([...flat.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([,selector,body])=>[selector.trim(),body]));
+};
 const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date(clock.now).toISOString()}});
 
 function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storage={getItem:()=>null,setItem(){}}}={}) {
@@ -31,7 +58,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     getAnimations(){return [];}
     animate(){return {cancel(){},finished:Promise.resolve()};}
   }
-  const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-controls','photo-count','change-photo','artwork-toggle','bus-link','bus-copy','live-text','language','wordmark','signed'];
+  const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','player-stage','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-controls','photo-count','change-photo','artwork-toggle','bus-link','bus-copy','live-text','language','wordmark','signed'];
   const nodes=ids.map(id=>Object.assign(new Element(),{id}));
   const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id)});
   elements.photo.src='photos/selected/p005.jpg';
@@ -47,15 +74,18 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   let wallOffset=0;
   class FakeDate extends Date {static now(){return clock.now+wallOffset;}}
   const mediaSession={setActionHandler(name,fn){actions[name]=fn;}};
-  const document={body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:()=>new Element(),createElementNS:()=>new Element(),
-    querySelector:selector=> selector.startsWith('input') ? new Element() : elements[selector.slice(1)],
-    querySelectorAll:()=>[],addEventListener(){}};
+  const document=Object.assign(new Element(),{body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:()=>new Element(),createElementNS:()=>new Element(),
+    querySelector:selector=> selector==='dialog[open]' ? env.openDialog || null : selector.startsWith('input') ? new Element() : elements[selector.slice(1)],
+    querySelectorAll:()=>[]});
   class MediaMetadata{constructor(value){Object.assign(this,value);}}
   const window=new Element(),location={hash,pathname:'/',search:''};
   window.MediaMetadata=MediaMetadata;
   const history={pushState(_state,_title,url){location.hash=url.includes('#')?url.slice(url.indexOf('#')):'';}};
   const env={clock,elements,audio,actions,timers,mediaSession,document,window,location,imageRequests,requests:[],response:status('First'),
-    click:()=>elements.play.emit('click'),change:id=>elements.moods.emit('change',{target:{value:id}}),
+    click:()=>elements.play.emit('click'),
+    focus:target=>document.emit('focusin',{target}),
+    pointer:()=>document.emit('pointerdown',{}),
+    key(code,target=control('body'),extra={}){const event={code,key:code==='Space'?' ':code,target,repeat:false,ctrlKey:false,metaKey:false,altKey:false,prevented:false,preventDefault(){event.prevented=true;},...extra};document.emit('keydown',event);return event;},change:id=>elements.moods.emit('change',{target:{value:id}}),
     playing:()=>{audio.readyState=4;audio.emit('playing');},
     error:()=>{audio.error={code:2};audio.emit('error');},
     poll:()=>intervals[0](),
@@ -94,9 +124,9 @@ test('photo-only toggle hides artwork, is remembered and works without storage',
 
 test('the start says Connecting; only a stall during play says Buffering',async()=>{
  const e=setup();await flush();e.click();e.audio.emit('waiting');
- assert.equal(e.elements['playback-status'].textContent,'Connecting');
- e.playing();e.audio.readyState=2;e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering');
- e.change('03');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Connecting','a new station connects again');
+ assert.equal(e.elements['playback-status'].textContent,'Connecting…');
+ e.playing();e.audio.readyState=2;e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering…');
+ e.change('03');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Connecting…','a new station connects again');
 });
 
 test('the live count polls fast after a change and backs off while it stays the same',async()=>{
@@ -130,7 +160,7 @@ test('four bounded retries, blocking and cancellation',async()=>{
  for(const delay of [1000,2000,4000,8000]){e.error();e.error();assert.equal(e.timers.size,1);e.fire(delay);}
  e.error();assert.equal(e.elements.player.dataset.state,'error');assert.equal(e.audio.src,undefined);assert.equal(e.timers.size,0);
  e.click();e.audio.calls.at(-1).reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
- assert.equal(e.elements['playback-status'].textContent,'Tap to play');assert.equal(e.timers.size,0);
+ assert.equal(e.elements['playback-status'].textContent,'Press play to start');assert.equal(e.timers.size,0);
  e.click();e.error();e.click();assert.equal(e.timers.size,0);assert.equal(e.audio.src,undefined);
  e.click();e.audio.emit('waiting');e.fire(20000);assert.equal(e.elements.player.dataset.state,'retrying');e.click();
 });
@@ -213,7 +243,7 @@ test('Bus navigation and metadata updates keep the playing station and source',a
  const e=setup();await flush();e.change('03');await flush();e.click();e.playing();
  const source=e.audio.src,calls=e.audio.calls.length,photo=e.elements.photo.src;
  e.location.hash='#bus';e.window.emit('hashchange');await flush();
- assert.equal(e.document.title,'The Bus · Pavoia Radio');
+ assert.equal(e.document.title,'▶ First · Artist First · Pavoia Radio','while it plays, the tab names the record even on the Bus');
  assert.equal(e.elements['mood-place'].textContent,'Somewhere in the forest');
  assert.equal(e.elements['bus-copy'].hidden,false);assert.equal(e.elements['change-photo'].hidden,true);
  assert.equal(e.elements.photo.src,'photos/bus-stage.jpg');
@@ -233,7 +263,7 @@ test('Bus navigation and metadata updates keep the playing station and source',a
 
 test('direct Bus links remain paused and use the regular station for playback',async()=>{
  const e=setup({hash:'#bus'});await flush();
- assert.equal(e.elements['bus-copy'].hidden,false);assert.equal(e.audio.calls.length,0);
+ assert.equal(e.document.title,'The Bus · Pavoia Radio');assert.equal(e.elements['bus-copy'].hidden,false);assert.equal(e.audio.calls.length,0);
  assert.equal(e.elements.play.disabled,false);assert.notEqual(e.elements['player-title'].textContent,'Not on air yet');
  e.click();e.playing();assert.equal(e.audio.src,'/stream/palac-feel.mp3');
  await flush();e.actions.pause();assert.equal(e.audio.src,undefined);assert.equal(e.elements.photo.src,'photos/bus-stage.jpg');
@@ -275,4 +305,69 @@ test('a failed first photo stays hidden and can recover on the next render',asyn
  assert.equal(e.document.body.getAttribute('data-photo-loading'),null);
  e.window.Pavoia.renderScene();e.elements.photo.naturalWidth=100;
  e.imageRequests[1].resolve();await flush();assert.equal(e.elements.photo.hidden,false);
+});
+
+test('Space plays and pauses from anywhere, except while typing or on a keyboard-focused button',async()=>{
+ const e=setup();await flush();
+ assert.equal(e.key('Space').prevented,true);assert.equal(e.audio.src,'/stream/palac-feel.mp3','Space on the page plays');
+ e.playing();e.key('Space');assert.equal(e.audio.src,undefined,'Space again pauses');
+ for(const [target,why] of [[control('input',{type:'search'}),'search field'],[control('textarea'),'textarea'],[control('select'),'select'],[control('div',{contenteditable:''}),'editable text']]){
+  assert.equal(e.key('Space',target).prevented,false,why);assert.equal(e.audio.calls.length,1,why);
+ }
+ for(const extra of [{ctrlKey:true},{metaKey:true},{altKey:true}]){e.key('Space',undefined,extra);assert.equal(e.audio.calls.length,1,JSON.stringify(extra));}
+ assert.equal(e.key('Space',undefined,{repeat:true}).prevented,true,'a held Space does not scroll the page');assert.equal(e.audio.calls.length,1,'and does not toggle again');
+ for(const target of [control('button',{},true),control('summary',{},true)]){
+  e.focus(target);assert.equal(e.key('Space',target).prevented,false,target.tag+' reached by keyboard keeps its native Space');assert.equal(e.audio.calls.length,1);
+ }
+ const clicked=control('button');e.focus(clicked);clicked.focusVisible=true;
+ assert.equal(e.key('Space',clicked).prevented,true,'a button focused by a click is not clicked again');assert.equal(e.audio.calls.length,2);
+ assert.equal(e.key('Space',clicked,{repeat:true}).prevented,true,'holding Space does not click it on release');assert.equal(e.window.Pavoia.getState().wanted,true,'and the radio stays on');
+ const volume=control('input',{type:'range'},true);e.focus(volume);e.key('Space',volume);assert.equal(e.audio.src,undefined,'Space on the volume slider pauses');
+ const link=control('a',{},true);e.focus(link);assert.equal(e.key('Space',link).prevented,true,'a link has no Space of its own');assert.equal(e.audio.calls.length,3,'so Space plays');
+ const radio=control('input',{type:'radio',checked:''},true);e.focus(radio);assert.equal(e.key('Space',radio).prevented,true,'the current station is already checked');assert.equal(e.audio.src,undefined,'so Space pauses');
+ const other=control('input',{type:'radio'},true);e.focus(other);assert.equal(e.key('Space',other).prevented,false,'Space selects a station not yet selected');assert.equal(e.audio.src,undefined,'and leaves playback alone');
+ const tabbed=control('button',{},true);e.focus(tabbed);e.pointer();assert.equal(e.key('Space',tabbed).prevented,true,'a button reached by Tab and then clicked does not capture Space');assert.equal(e.audio.calls.length,4,'so Space plays');
+ e.window.Pavoia.stopPreview=()=>true;e.key('Space');assert.equal(e.audio.calls.length,4,'Space first stops a preview');
+});
+
+test('the arrow keys and the media keys step through the stations',async()=>{
+ const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage;
+ e.key('ArrowRight');assert.equal(stage(),'etage-zero');
+ e.key('ArrowLeft');e.key('ArrowLeft');assert.equal(stage(),'palac-dance');
+ e.key('ArrowLeft',undefined,{repeat:true});assert.equal(stage(),'palac-dance','a held arrow steps once');
+ e.actions.nexttrack();assert.equal(stage(),'palac-feel');
+ e.actions.previoustrack();assert.equal(stage(),'palac-dance');
+ for(const target of [control('input',{type:'radio'}),control('input',{type:'range'}),control('input',{type:'search'})]){e.key('ArrowRight',target);assert.equal(stage(),'palac-dance',target.attrs.type);}
+ e.key('ArrowLeft',undefined,{altKey:true});assert.equal(stage(),'palac-dance','Alt+Left stays browser Back');
+ e.openDialog={};e.key('ArrowRight');assert.equal(stage(),'palac-dance','an open dialog keeps its arrows');
+ e.openDialog=null;e.change('01');e.key('ArrowLeft');assert.equal(stage(),'essentials','the first station wraps to the last');
+ e.click();e.key('ArrowRight');assert.equal(e.audio.src,'/stream/bermuda-day.mp3','playback follows the station');
+});
+
+test('a blocked autoplay is a neutral pause and only transient states show words',async()=>{
+ const e=setup();await flush();const player=e.elements.player;
+ assert.deepEqual({...player.dataset},{state:'paused',status:'paused'});
+ e.click();assert.equal(player.dataset.status,'connecting');
+ e.audio.calls[0].reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
+ assert.deepEqual({...player.dataset},{state:'paused',status:'blocked'},'blocked is not the red error state');
+ assert.equal(e.elements['playback-status'].textContent,'Press play to start');assert.equal(e.elements.play.getAttribute('aria-label'),'Play');
+ e.click();e.playing();assert.deepEqual({...player.dataset},{state:'playing',status:'playing'});
+ const rules=topRules(),reveal=rules.get('.player:not([data-status=paused],[data-status=playing]) #playback-status');
+ assert.match(rules.get('#playback-status'),/clip-path:inset\(50%\)/,'paused and playing keep the status out of sight at every width');
+ assert.match(reveal,/clip-path:none/,'a transient state shows its words');
+ assert.match(rules.get('.player:not([data-status=paused],[data-status=playing]) #player-stage'),/display:none/,'and takes the stage name\'s place');
+ assert.match(rules.get('.player[data-state="error"] .play'),/var\(--red\)/,'red stays for a real error');
+});
+
+test('the bar names the stage, the tab names the record and Play names its key',async()=>{
+ const e=setup();await flush();
+ assert.equal(e.elements['player-stage'].textContent,'Lost in Feelings');assert.equal(e.document.title,'Lost in Feelings · Pavoia Radio');
+ assert.equal(e.elements.play.title,'Play (Space)');assert.equal(e.elements.play.getAttribute('aria-pressed'),null);
+ e.click();assert.equal(e.elements.play.title,'Pause (Space)');assert.equal(e.document.title,'Lost in Feelings · Pavoia Radio','connecting is not playing yet');
+ e.playing();assert.equal(e.document.title,'▶ First · Artist First · Pavoia Radio');assert.equal(e.elements['player-artist'].textContent,'Artist First');
+ e.response=new Error('Offline');e.change('03');await flush();
+ assert.equal(e.elements['player-stage'].textContent,'Night in Motion');assert.equal(e.elements['player-title'].textContent,'Night in Motion','a failed metadata call names the stage');
+ assert.equal(e.elements['player-artist'].textContent,'','the artist line does not repeat it');
+ e.elements.language.value='de';e.elements.language.emit('change');assert.equal(e.elements.play.title,'Pause (Leertaste)');
+ e.click();assert.equal(e.elements.play.title,'Abspielen (Leertaste)');assert.equal(e.document.title,'Night in Motion · Pavoia Radio');
 });

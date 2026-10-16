@@ -21,7 +21,6 @@
       bioEnglish:'Biography in English',held:'Artist details are being checked.',relatedTitle:'Connections',tracks:'Tracks in the selection',
       preview:'Listen · 60 seconds',previewPending:'No audio preview available yet.',stopPreview:'Stop preview',previewError:'The preview could not play. Try again.',
       results:'results',firstResults:'Showing up to 40 matches.',limited:'Showing the nearest connections. Search to explore further.',
-      playing:'Playing',paused:'Paused',connecting:'Connecting',retrying:'Reconnecting',error:'Try playback again',
       basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',source:'Source',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',explore:'Entdecken',exploreLabel:'ENTDECKEN',connections:'Folge der Musik.',
@@ -35,7 +34,6 @@
       bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',relatedTitle:'Verbindungen',tracks:'Tracks in der Auswahl',
       preview:'Anhören · 60 Sekunden',previewPending:'Noch keine Hörprobe verfügbar.',stopPreview:'Hörprobe stoppen',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
       results:'Treffer',firstResults:'Bis zu 40 Treffer werden angezeigt.',limited:'Die nächsten Verbindungen werden angezeigt. Suche, um mehr zu entdecken.',
-      playing:'Wiedergabe',paused:'Pausiert',connecting:'Verbinden',retrying:'Neu verbinden',error:'Wiedergabe erneut versuchen',
       basicDetails:'Für diesen Track gibt es noch keine Künstler- und Veröffentlichungsprofile.',cover:'Cover der Veröffentlichung',portrait:'Künstlerporträt',source:'Quelle',
     },
   };
@@ -227,11 +225,14 @@
   }
   function finishPreview() {const resume=preview?.resume;cancelPreview();if(resume)radio.play();else renderPlayer();}
   radio.cancelPreview=cancelPreview;
+  radio.stopPreview=()=>{if(!preview)return false;finishPreview();return true;};
   $('preview-audio').addEventListener('ended',finishPreview);
   $('preview-audio').addEventListener('error',()=>{if(preview){$('discovery-status').textContent=word('previewError');finishPreview();}});
   $('preview-stop').addEventListener('click',finishPreview);
   $('explorer-play').addEventListener('click',radio.toggle);
-  $('volume').addEventListener('input',()=>{$('audio').volume=$('preview-audio').volume=Number($('volume').value);});
+  try{const saved=parseFloat(localStorage.getItem('pavoia-volume'));if(saved>=0&&saved<=1)$('volume').value=saved;}catch{/* Storage is optional. */}
+  const volume=()=>{$('audio').volume=$('preview-audio').volume=Number($('volume').value);};volume();
+  $('volume').addEventListener('input',()=>{volume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
   $('go-deeper').addEventListener('click',()=>{if(enriched)openEntity(enriched.entity.id);else location.hash='explore';});
   function close(){explorerRequest?.abort();musicRequest?.abort();finishPreview();dialog.close();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();}
   $('explorer-close').addEventListener('click',close);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});

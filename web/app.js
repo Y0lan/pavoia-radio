@@ -77,10 +77,10 @@ const words = {
   letterOne:'Years spent finding tracks, keeping them close and collecting them in playlists named after the stages of Pavoia.',
   letterTwo:'This radio is a way to share them. To return to a little of that place between editions, and keep discovering music there.',
   love:'With love,', footer:'Pavoia Radio · A personal selection by Gaende', language:'Language', selectedBy:'Selected by Gaende',
-  play:'Play', pause:'Pause', retry:'Retry playback', paused:'Paused', connecting:'Connecting', playing:'Playing', buffering:'Buffering',
-  retrying:'Reconnecting', blocked:'Tap to play', error:'Tap to retry', soon:'Soon', soonSuffix:' (soon)', untitled:'Untitled track', unknownArtist:'Unknown artist',
+  play:'Play', pause:'Pause', space:'Space', retry:'Try again', paused:'Paused', connecting:'Connecting…', playing:'Playing', buffering:'Buffering…',
+  retrying:'Reconnecting…', blocked:'Press play to start', error:'Stream lost. Press play to retry.', soon:'Soon', soonSuffix:' (soon)', untitled:'Untitled track', unknownArtist:'Unknown artist',
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
-  unavailableTrack:'Track unavailable', live:'Live', standby:'Standby', offline:'Data unavailable', audience:'live audio connections', audienceUnknown:'Audience unavailable',
+  live:'Live', standby:'Standby', offline:'Data unavailable', audience:'live audio connections', audienceUnknown:'Audience unavailable',
   cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Change photo', photoOnly:'Photo only', showArtwork:'Show artwork',
   busPlace:'Somewhere in the forest', busLine:'No playlist here. You have to be there.', busTicket:'Get your Pavoia ticket ↗',
   places:['Finding your own rhythm in the open air, with no pressure to rush the day.','A growing sense of possibility: something is beginning, and you want to be part of it!','Pałac at its peak. The shared moment when everyone commits to the dance and everything else can wait.','The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.','The tracks I keep close and always come back to, at different times for different reasons.','The basement. Giving yourself fully to the speed and intensity, whether the feeling is dark or joyful.','The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.'],
@@ -89,10 +89,10 @@ const words = {
   letterOne:'Über Jahre gesammelt: Tracks, die bleiben. Vereint in Playlists, die die Namen der Bühnen von Pavoia tragen.',
   letterTwo:'Mit diesem Radio möchte ich sie teilen. Ein Stück dieses Ortes zwischen den Festivals wiederfinden und dort weiter Musik entdecken.',
   love:'Mit Liebe,', footer:'Pavoia Radio · Eine persönliche Auswahl von Gaende', language:'Sprache', selectedBy:'Ausgewählt von Gaende',
-  play:'Abspielen', pause:'Pause', retry:'Erneut abspielen', paused:'Pausiert', connecting:'Verbinden', playing:'Wiedergabe', buffering:'Lädt',
-  retrying:'Neu verbinden', blocked:'Zum Start tippen', error:'Erneut versuchen', soon:'Bald', soonSuffix:' (bald)', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
+  play:'Abspielen', pause:'Pause', space:'Leertaste', retry:'Erneut versuchen', paused:'Pausiert', connecting:'Verbinden…', playing:'Wiedergabe', buffering:'Puffern…',
+  retrying:'Neu verbinden…', blocked:'Zum Starten Play drücken', error:'Stream unterbrochen. Play erneut drücken.', soon:'Bald', soonSuffix:' (bald)', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
-  unavailableTrack:'Titel nicht verfügbar', live:'Live', standby:'Bereit', offline:'Daten fehlen', audience:'Live-Audioverbindungen', audienceUnknown:'Hörerzahl nicht verfügbar',
+  live:'Live', standby:'Bereit', offline:'Daten fehlen', audience:'Live-Audioverbindungen', audienceUnknown:'Hörerzahl nicht verfügbar',
   cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Foto wechseln', photoOnly:'Nur Foto', showArtwork:'Artwork zeigen',
   busPlace:'Irgendwo im Wald', busLine:'Hier gibt es keine Playlist. Du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket ↗',
   places:['Unter freiem Himmel den eigenen Rhythmus finden und dem Tag seine Zeit lassen.','Das Gefühl, dass immer mehr möglich ist: Etwas beginnt, und du möchtest dabei sein!','Pałac auf dem Höhepunkt. Dieser gemeinsame Moment, in dem sich alle ganz dem Tanzen hingeben und alles andere warten kann.','Pałac, mit dem Blick nach innen. Sehnsucht, Zärtlichkeit, Melancholie: diesen Gefühlen Raum geben, während du weitertanzt.','Die Tracks, die mir am Herzen liegen und zu denen ich immer wieder zurückkehre, zu verschiedenen Zeiten aus verschiedenen Gründen.','Der Keller. Sich ganz dem Tempo und der Intensität hingeben, ob düster oder voller Freude.','Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.'],
@@ -255,6 +255,9 @@ $('stations-sheet').addEventListener('click', event => {
 $('stations-sheet').addEventListener('close', () => $('open-stations').setAttribute('aria-expanded', 'false'));
 $('bus-link').addEventListener('click', closeStations);
 mobileLayout.addEventListener('change', arrangeStations);
+function step(dir) {
+  selectMood(moods[(moods.indexOf(currentMood) + dir + moods.length) % moods.length].id);
+}
 let swipe = null;
 $('poster').addEventListener('pointerdown', event => {
   if (event.pointerType==='touch' && !event.isPrimary) {swipe=null;return;}
@@ -268,20 +271,20 @@ $('poster').addEventListener('pointerup', event => {
   if (!start || event.pointerId!==start.id) return;
   const x=event.clientX-start.x,y=event.clientY-start.y;
   if (Math.abs(x)<60 || Math.abs(x)<Math.abs(y)*1.5) return;
-  const index=(moods.indexOf(currentMood)+(x<0?1:-1)+moods.length)%moods.length;
-  selectMood(moods[index].id);
+  step(x<0?1:-1);
 });
 
 function metadata(value) {
   track = value;
   $('player-title').textContent = track ? track.title || text('untitled') : currentMood.stage ? text('noTrack') : text('notOnAir');
-  $('player-artist').textContent = track ? track.artist || text('unknownArtist') : plain(currentMood);
+  $('player-artist').textContent = track ? track.artist || text('unknownArtist') : '';
   $('player-album').textContent = track?.album || '';
   if ('mediaSession' in navigator && 'MediaMetadata' in window) {
     navigator.mediaSession.metadata = track ? new MediaMetadata({
       title: track.title || text('untitled'), artist: track.artist || '', album: plain(currentMood),
     }) : null;
   }
+  tabTitle();
   announceRadio();
 }
 
@@ -316,7 +319,7 @@ function renderScene() {
   $('photo-count').hidden = $('change-photo').hidden;
   $('photo-controls').hidden = bus;
   showPhoto(photo);
-  document.title = `${bus ? 'The Bus' : plain(currentMood)} · Pavoia Radio`;
+  tabTitle();
   const nextScene = bus ? 'bus' : currentMood.id;
   if (nextScene !== sceneID) {
     const title = $('mood-name');
@@ -331,6 +334,12 @@ function renderScene() {
   $('station-position').textContent = `${index+1} / ${moods.length}`;
   $('station-position').setAttribute('aria-label', `${text('stationPosition')} ${index+1} / ${moods.length}: ${plain(currentMood)}`);
   $('station-position').hidden = bus;
+}
+// The tab names the record while it plays, and the stage otherwise.
+function tabTitle() {
+  const name = playbackState === 'playing' && track ? `▶ ${track.title || text('untitled')} · ${track.artist || text('unknownArtist')}`
+    : location.hash === '#bus' ? 'The Bus' : plain(currentMood);
+  document.title = `${name} · Pavoia Radio`;
 }
 window.addEventListener('hashchange', renderScene);
 window.addEventListener('popstate', renderScene);
@@ -351,18 +360,21 @@ function render() {
   button.disabled = !currentMood.stage;
   document.querySelector(`input[value="${currentMood.id}"]`).checked = true;
   metadata(null);
+  $('player-stage').textContent = plain(currentMood);
   if (currentMood.stage) $('player-title').textContent = text('loading');
 }
 
 function state(value, status) {
   playbackState=value; playbackText=status;
-  document.querySelector('.player').dataset.state = value;
+  Object.assign(document.querySelector('.player').dataset, { state: value, status });
   document.body.toggleAttribute('data-playing', value === 'playing');
   document.body.toggleAttribute('data-wanted', wanted);
-  button.setAttribute('aria-pressed', String(wanted));
-  button.setAttribute('aria-label', wanted ? text('pause') : value === 'error' ? text('retry') : text('play'));
+  const label = wanted ? text('pause') : value === 'error' ? text('retry') : text('play');
+  button.setAttribute('aria-label', label);
+  button.title = `${label} (${text('space')})`;
   $('playback-status').textContent = text(status);
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = value === 'playing' ? 'playing' : 'paused';
+  tabTitle();
   announceRadio();
 }
 
@@ -390,7 +402,8 @@ function fail(token, blocked = false) {
   release();
   if (blocked || retries >= delays.length) {
     wanted = false;
-    state('error', blocked ? 'blocked' : 'error');
+    if (blocked) state('paused', 'blocked');
+    else state('error', 'error');
     return;
   }
   const delay = delays[retries++];
@@ -451,9 +464,29 @@ function play() {
 }
 
 
-button.addEventListener('click', () => wanted ? pause() : play());
+const toggle = () => wanted ? pause() : play();
+button.addEventListener('click', toggle);
+// Space plays from anywhere and the arrows repeat the swipe. Typing keeps its keys, and so do the
+// keyboard-focused controls that Space activates. A held Space toggles once and never scrolls or clicks.
+// Chromium marks the target :focus-visible as soon as a key goes down, so keep how the target got focus.
+// Space keeps its native action on a control the keyboard reached, and on a station not yet selected.
+// A control last pressed with the mouse or a finger does not capture it, even if Tab reached it first.
+let keyboardFocus = false;
+document.addEventListener('focusin', event => { keyboardFocus = event.target.matches(':focus-visible'); });
+document.addEventListener('pointerdown', () => { keyboardFocus = false; }, true);
+document.addEventListener('keydown', event => {
+  const target = event.target;
+  if (event.ctrlKey || event.metaKey || event.altKey || target.matches('input:not([type=range],[type=radio]), textarea, select, [contenteditable]')) return;
+  if (event.code === 'Space') {
+    if ((keyboardFocus && target.matches('button, summary')) || target.matches('[type=radio]:not(:checked)')) return;
+    event.preventDefault();
+    if (!event.repeat && !window.Pavoia.stopPreview?.()) toggle();
+  } else if (!event.repeat && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !document.querySelector('dialog[open]') && !target.matches('[type=radio], [type=range]')) {
+    step(event.key === 'ArrowLeft' ? -1 : 1);
+  }
+});
 if ('mediaSession' in navigator) {
-  for (const [action, handler] of Object.entries({ play, pause, stop: pause })) {
+  for (const [action, handler] of Object.entries({ play, pause, stop: pause, previoustrack: () => step(-1), nexttrack: () => step(1) })) {
     try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* Unsupported action. */ }
   }
 }
@@ -565,7 +598,7 @@ function renderStatus() {
   if (!dataFresh) {
     $('live-text').textContent=text('offline');
     $('live-text').removeAttribute('aria-label');
-    if (!track) $('player-title').textContent=text('unavailableTrack');
+    if (!track) $('player-title').textContent=plain(currentMood);
     return;
   }
   const { listeners: count, measuredAt, available }=audienceData || {};
@@ -606,4 +639,4 @@ function announceRadio() {
   if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('pavoia:radio'));
 }
 window.Pavoia = { stations: moods.map(m => ({id:m.stage, name:plain(m)})), getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
-  play, pause, renderScene, toggle: () => wanted ? pause() : play() };
+  play, pause, renderScene, toggle };
