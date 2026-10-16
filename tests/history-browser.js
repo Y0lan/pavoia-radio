@@ -56,7 +56,7 @@ async page => {
   await page.locator('#go-deeper').click();
   await page.locator('.explorer-nav a[href="#statistics"]').click();
   await page.waitForFunction(()=>document.querySelector('.music-summary'));
-  assert(await page.locator('#explorer-title').innerText()==='Musikstatistik','Statistics heading not translated');
+  assert(await page.locator('.explorer-nav a[aria-current]').innerText()==='Statistik','Statistics tab not translated');
   await page.screenshot({path:'output/playwright/music-statistics-de-320.png'});
   await page.keyboard.press('Escape');
   await page.locator('#language [value=en]').dispatchEvent('click');

@@ -459,6 +459,7 @@ button.addEventListener('click', toggle);
 // Chromium marks the target :focus-visible as soon as a key goes down, so keep how the target got focus.
 // Space keeps its native action on a control the keyboard reached, and on a station not yet selected.
 // A control last pressed with the mouse or a finger does not capture it, even if Tab reached it first.
+// The arrows stay with a modal dialog, the stations sheet; the explorer leaves the player and its keys in reach.
 let keyboardFocus = false;
 document.addEventListener('focusin', event => { keyboardFocus = event.target.matches(':focus-visible'); });
 document.addEventListener('pointerdown', () => { keyboardFocus = false; }, true);
@@ -469,7 +470,7 @@ document.addEventListener('keydown', event => {
     if ((keyboardFocus && target.matches('button, summary')) || target.matches('[type=radio]:not(:checked)')) return;
     event.preventDefault();
     if (!event.repeat && !window.Pavoia.stopPreview?.()) toggle();
-  } else if (!event.repeat && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !document.querySelector('dialog[open]') && !target.matches('[type=radio], [type=range]')) {
+  } else if (!event.repeat && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !document.querySelector('dialog:modal') && !target.matches('[type=radio], [type=range]')) {
     step(event.key === 'ArrowLeft' ? -1 : 1);
   }
 });
@@ -550,7 +551,8 @@ function selectMood(id) {
   closeStations();
   leaveBus();
   if (next === currentMood) return;
-  window.Pavoia?.cancelPreview?.();
+  // A preview paused the radio: when it was on before, the new station plays.
+  if (window.Pavoia?.cancelPreview?.()) wanted = true;
   clearTimeout(retryTimer);
   release();
   retries = 0;

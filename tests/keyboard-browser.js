@@ -63,6 +63,20 @@ async page => {
   await page.keyboard.type('a b');
   assert(await page.locator('#discovery-query').inputValue() === 'a b', 'Space types a space in the search');
   assert(!(await wanted()), 'while the radio stays paused');
+
+  // The explorer is a plain dialog: Space and the arrows still reach the radio from it, and Escape leaves it.
+  const explorerOpen = () => page.locator('#explorer').evaluate(dialog => dialog.open);
+  await page.locator('#explorer').click({ position: { x: 4, y: 4 } });
+  await space();
+  assert(await wanted(), 'Space plays from the explorer');
+  await space();
+  assert(!(await wanted()), 'and pauses');
+  const inside = await stage();
+  await page.keyboard.press('ArrowRight');
+  assert(await stage() !== inside && await explorerOpen(), 'the arrows change stage behind the open explorer');
   await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('explorer').open);
+  assert(await page.evaluate(() => location.hash) === '', 'Escape leaves the explorer for the radio page');
+  assert(!(await page.locator('main').evaluate(main => main.inert)), 'and gives the page back');
   return 'keyboard ok';
 }

@@ -8,6 +8,7 @@
 :root {
   color-scheme: dark;
   --ink: #0b0a09; --cream: #f0ede5; --soft: rgb(240 237 229 / .78); --muted: rgb(240 237 229 / .55); --line: rgb(240 237 229 / .14);
+  --surface: #141210; --raised: rgb(240 237 229 / .06);
   --red: #ee1f09;
   --serif: 'Instrument Serif', serif; --mono: 'JetBrains Mono', ui-monospace, monospace;
   --ease: cubic-bezier(.22, 1, .36, 1);
@@ -16,6 +17,8 @@
   font-family: Inter, sans-serif; font-synthesis: none; background: var(--ink);
 }
 * { box-sizing: border-box; }
+/* A dialog locks the page scroll; the scrollbar's room stays, so the player bar under it does not shift. */
+html { scrollbar-gutter:stable; }
 [hidden] { display: none !important; }
 body { margin: 0; background: var(--ink); color: var(--cream); padding-bottom: var(--bar); }
 img { display: block; }
@@ -45,15 +48,15 @@ body[data-on-air] .dot { background:var(--red); }
 .poster { min-width:0; }
 .station-switcher, .station-position, .mood-preview, .sheet-line, .change-photo svg { display:none; }
 .spotify-caption, .special-name { display:none; }
-#stations-sheet { margin:auto 0 0; width:100%; max-width:none; max-height:calc(100dvh - 24px); padding:0 20px max(12px,env(safe-area-inset-bottom)); border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0; background:#141210; color:var(--cream); overscroll-behavior:contain; opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
+#stations-sheet { margin:auto 0 0; width:100%; max-width:none; max-height:calc(100dvh - 24px); padding:0 20px max(12px,env(safe-area-inset-bottom)); border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0; background:var(--surface); color:var(--cream); overscroll-behavior:contain; opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
 #stations-sheet[open] { opacity:1; transform:none; }
 #stations-sheet::backdrop { background:rgb(11 10 9 / .72); opacity:0; transition:opacity var(--panel) ease, display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
 #stations-sheet[open]::backdrop { opacity:1; }
 @starting-style { #stations-sheet[open] { opacity:0; transform:translateY(12px); } #stations-sheet[open]::backdrop { opacity:0; } }
-.stations-heading { position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; min-height:64px; background:#141210; border-bottom:1px solid var(--line); }
+.stations-heading { position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; min-height:64px; background:var(--surface); border-bottom:1px solid var(--line); }
 .stations-heading h2 { font:28px var(--serif); }
-#close-stations { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; color:var(--cream); background:transparent; cursor:pointer; }
-body:has(#stations-sheet[open]) { overflow:hidden; }
+#close-stations, #explorer #explorer-close { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; color:var(--cream); background:transparent; cursor:pointer; }
+body:has(dialog[open]) { overflow:hidden; }
 .photo { position:absolute; inset:0; z-index:-4; width:100%; height:100%; object-fit:cover; object-position:var(--focus); }
 .photo-back { z-index:-5; }
 .bottom { width:fit-content; max-width:100%; }
@@ -249,27 +252,35 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 }
 
 .eyebrow { font:11px/1.7 var(--mono); letter-spacing:.09em; text-transform:uppercase; color:var(--soft); }
-#explorer { width:calc(100% - 32px); max-width:1700px; height:calc(100dvh - 32px); max-height:none; padding:28px; border:1px solid var(--line); background:#141210; color:var(--cream); opacity:0; transform:translateY(8px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
+/* A plain dialog that stops above the player bar; its shadow dims the inert page around it. */
+#explorer { position:fixed; inset:16px 16px calc(var(--bar) + 16px); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain; padding:28px; border:1px solid var(--line); background:var(--surface); color:var(--cream); box-shadow:0 0 0 100vmax rgb(11 10 9 / .8); opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete; }
 #explorer[open] { opacity:1; transform:none; }
-#explorer::backdrop { background:rgb(0 0 0 / .8); opacity:0; transition:opacity var(--panel) ease, display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
-#explorer[open]::backdrop { opacity:1; }
-@starting-style { #explorer[open] { opacity:0; transform:translateY(8px); } #explorer[open]::backdrop { opacity:0; } }
-.explorer-top { display:flex; justify-content:space-between; align-items:center; gap:24px; border-bottom:1px solid var(--line); padding-bottom:20px; }
-.explorer-top h2 { font:36px var(--serif); margin-top:5px; }
-.explorer-controls { display:flex; gap:12px; flex-wrap:wrap; }
+@starting-style { #explorer[open] { opacity:0; transform:translateY(12px); } }
+/* One header row: the tabs, the search on the Roots tab, and ✕ at the far end. */
+.explorer-top { display:flex; align-items:center; gap:24px; padding-bottom:12px; border-bottom:1px solid var(--line); }
 #explorer button, #explorer input { font:inherit; color:var(--cream); border:1px solid #4b4640; background:transparent; min-height:44px; padding:10px 14px; }
 #explorer button { cursor:pointer; }
-#explorer button:hover { background:#2c2722; }
-.discovery-search { display:grid; gap:10px; margin-top:22px; font:11px var(--mono); }
-.discovery-search>div { display:flex; gap:10px; }
-.discovery-search input { width:100%; min-width:0; }
-.explore-workspace { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr); gap:24px; }
+#explorer button:hover { background:var(--raised); }
+/* The actions: Try again, Older tracks and the preview buttons. */
+#explorer :is(#music-status button, #history-more, .preview-button, #preview-stop) { padding:10px 16px; border-color:var(--soft); font:14px Inter,sans-serif; }
+#explorer :is(#music-status button, #history-more, .preview-button, #preview-stop):hover { border-color:var(--cream); }
+/* 16px keeps iOS from zooming into the field. */
+#explorer input { border-color:var(--muted); font:16px Inter,sans-serif; }
+#explorer input::placeholder { color:var(--muted); opacity:1; }
+/* ✕ in the header leaves the explorer; the browser's own clear mark would be a second one. */
+#discovery-query::-webkit-search-cancel-button { appearance:none; }
+#explorer :is(input, select):focus-visible { outline-offset:-1px; }
+.discovery-search { flex:0 1 360px; min-width:0; }
+.discovery-search input { width:100%; min-width:0; text-overflow:ellipsis; }
+.explore-workspace { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr); gap:24px; margin-top:32px; }
 .explore-workspace.is-basic { grid-template-columns:minmax(0,1fr); max-width:640px; }
 .connection-map { position:sticky; top:0; align-self:start; min-width:0; border:1px solid var(--line); }
 #connection-map { position:relative; aspect-ratio:640/450; }
 #connection-map svg { width:100%; height:100%; }
 #connection-map line { stroke:#6b6258; stroke-width:1; }
 #connection-map .map-node { position:absolute; transform:translate(-50%,-50%); width:clamp(66px,9vw,130px); background:#211c17; padding:8px; font-size:11px; overflow-wrap:anywhere; }
+/* The lines end under the nodes, so a hovered node keeps its fill under the raised tint. */
+#connection-map .map-node:hover { background:linear-gradient(var(--raised),var(--raised)) #211c17; }
 .map-node small, .map-center small { display:block; color:#c4b9ab; font:11px var(--mono); text-transform:uppercase; margin-bottom:6px; }
 .map-center { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:28%; padding:12px 8px; border:1px solid #a99a89; background:#29221b; text-align:center; font:20px/1.2 var(--serif); overflow-wrap:anywhere; }
 .map-caption { padding:16px; border-top:1px solid var(--line); font:11px/1.6 var(--mono); color:var(--soft); }
@@ -291,7 +302,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer .connection-row { display:flex; align-items:center; gap:14px; border:0; border-top:1px solid var(--line); width:100%; text-align:left; padding:12px 0; font-size:13px; }
 .relation-kind { width:84px; flex-shrink:0; color:#c4b9ab; font:11px var(--mono); }
 .connection-row>span:nth-child(2) { flex:1; overflow-wrap:anywhere; }
-.discovery-results { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; }
+.discovery-results { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-top:16px; }
 .search-result { display:grid; gap:8px; text-align:left; }
 .search-result small { color:var(--soft); font:11px var(--mono); }
 .preview-banner { position:sticky; bottom:0; display:flex; align-items:center; justify-content:space-between; gap:20px; background:#29221b; border:1px solid #a99a89; padding:14px; margin-top:20px; }
@@ -365,11 +376,10 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   #track-clock { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
   .player:not([data-status=paused],[data-status=playing]) #playback-status { position:absolute; inset:auto 0 100%; padding:8px 12px; background:var(--ink); font:12px Inter,sans-serif; pointer-events:none; }
   .explore-workspace { grid-template-columns:1fr; }
-  #explorer { width:100%; height:100dvh; margin:0; padding:18px; border:0; }
-  .explorer-top { align-items:start; gap:12px; }
-  .explorer-top h2 { font-size:28px; }
-  .explorer-controls { justify-content:end; gap:6px; }
-  #explorer .explorer-controls button { font-size:11px; padding:8px; }
+  #explorer { inset:0 0 var(--bar); padding:18px; border:0; }
+  /* The tabs and ✕ share the row; the search takes the full width under them. */
+  .explorer-top { flex-wrap:wrap; gap:12px; }
+  .discovery-search { order:1; flex-basis:100%; }
   .entity-inspector { border-left:0; border-top:1px solid var(--line); padding:24px 0 0; }
   .connection-map { position:relative; }
   #connection-map .map-node { width:80px; font-size:11px; }
@@ -379,14 +389,14 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 @media (max-width:374px) { .station-position svg { display:none; } }
 @media (max-width:360px) { .top { padding-inline:16px; } .wordmark { width:108px; height:41px; } .wordmark img { width:89px; } .station-status { gap:6px; } }
 
-.explorer-nav { display:flex; flex-wrap:wrap; gap:12px 28px; }
+.explorer-nav { display:flex; flex-wrap:wrap; flex-shrink:0; gap:12px 28px; margin-right:auto; }
 .explorer-nav a { color:var(--soft); text-underline-offset:7px; padding:12px 0; min-height:44px; }
 .explorer-nav a:hover, .explorer-nav a[aria-current] { color:var(--cream); }
-.explorer-nav { border-bottom:1px solid var(--line); margin-bottom:24px; }
-.explorer-nav a[aria-current] { text-decoration-thickness:2px; }
+/* The current tab takes the checked stage's 1px underline. */
+.explorer-nav a[aria-current] { text-decoration-line:underline; }
 .music-filters { display:flex; gap:20px; flex-wrap:wrap; margin:24px 0; }
 .music-filters label { display:grid; gap:8px; color:var(--soft); font-size:13px; }
-#explorer select { min-height:44px; padding:10px 32px 10px 12px; border:1px solid #4b4640; background:#141210; color:var(--cream); font:inherit; max-width:100%; }
+#explorer select { min-height:44px; padding:10px 32px 10px 12px; border:1px solid var(--muted); background:var(--surface); color:var(--cream); font:inherit; max-width:100%; }
 #music-status { margin:16px 0; }
 #explorer .history-row { display:grid; grid-template-columns:minmax(150px, .7fr) minmax(0,2fr) minmax(90px,.6fr); width:100%; text-align:left; gap:20px; border:0; border-top:1px solid var(--line); padding:16px 8px; }
 .history-row time, .history-row small { color:var(--soft); font:12px/1.6 var(--mono); }
@@ -419,5 +429,4 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .music-filters label { width:100%; }
   .explorer-nav { gap:6px 20px; font-size:13px; }
 }
-#music-view .collection-note { color:var(--soft); font-size:13px; line-height:1.6; max-width:75ch; margin:12px 0; }
-.explorer-nav a[aria-current] { text-decoration-line:underline; }
+#explorer .collection-note { color:var(--soft); font-size:13px; line-height:1.6; max-width:75ch; margin:12px 0; }

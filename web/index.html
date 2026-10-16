@@ -94,7 +94,7 @@
           <path d="M209 117c-8 18-27 22-30 41M126 143c-28-6-52 5-73-1M154 210c-5-20-26-27-30-43M87 248c-2 23-21 32-23 58M217 243c-21 8-34 8-48 23M136 315l-17 27M186 317l18 20M265 256c20 4 31 17 35 33M570 82c12-16 39-11 54-21M738 113c-9 20 14 29 16 42M815 148c25-1 36 10 52 10M766 169c-4 20 18 37 15 59M853 193l27 22M693 244c-22 6-21 29-33 36M821 303c-2-21 17-29 22-48M648 331l-23 21M793 342l-5 15"/>
         </g>
       </svg>
-      <button type="button" id="go-deeper" class="roots-button" data-journey="deeper">See the roots it's built on</button>
+      <button type="button" id="go-deeper" class="roots-button" data-journey="deeper">See the roots it’s built on</button>
     </div>
   </footer>
 
@@ -103,14 +103,16 @@
     <div id="station-sheet-list"></div>
   </dialog>
   <dialog id="explorer" aria-labelledby="explorer-title">
-    <header class="explorer-top"><div><p class="eyebrow">PÂVOIA / <span data-journey="exploreLabel">EXPLORE</span></p><h2 id="explorer-title" data-journey="connections">Follow the music.</h2></div><div class="explorer-controls"><button id="explorer-play" type="button" data-journey="playRadio">Play radio</button><button id="explorer-close" type="button" data-journey="backListen">Back to listening ↙</button></div></header>
-    <nav class="explorer-nav" aria-label="Explore"><a href="#explore" data-journey="exploreTab">Explore</a><a href="#history" data-journey="history">History</a><a href="#statistics" data-journey="statistics">Music statistics</a></nav>
+    <header class="explorer-top"><h2 id="explorer-title" class="visually-hidden" data-journey="roots">The roots</h2>
+      <nav class="explorer-nav" aria-label="Explore"><a href="#explore" id="roots-tab" data-journey="exploreTab">Roots</a><a href="#history" data-journey="history">History</a><a href="#statistics" data-journey="statistics">Statistics</a></nav>
+      <form id="discovery-search" class="discovery-search" role="search"><label for="discovery-query" class="visually-hidden" data-journey="searchLabel">Artist, track, release or label</label><input id="discovery-query" type="search" maxlength="100" autocomplete="off" enterkeyhint="search" placeholder="Search artists, tracks, releases, labels"></form>
+      <button id="explorer-close" type="button" aria-label="Back to listening" title="Back to listening"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
+    </header>
     <section id="music-view" hidden aria-label="Music collection">
       <form id="music-filters" class="music-filters"><label><span data-journey="stage">Stage</span><select id="music-stage"></select></label><label id="history-period-label"><span data-journey="period">Period</span><select id="history-period"><option value="1" data-journey="day">Last 24 hours</option><option value="7" selected data-journey="week">Last 7 days</option><option value="30" data-journey="month">Last 30 days</option><option value="all" data-journey="allHistory">All recorded history</option></select></label></form>
       <p id="music-status" class="collection-note" role="status"></p>
       <div id="music-content"></div><button id="history-more" type="button" data-journey="older" hidden>Older tracks</button>
     </section>
-    <form id="discovery-search" class="discovery-search" role="search"><label for="discovery-query" data-journey="searchLabel">Artist, track, release or label</label><div><input id="discovery-query" type="search" maxlength="100" autocomplete="off"><button type="submit" data-journey="search">Search</button></div></form>
     <p id="discovery-status" class="collection-note" role="status"></p>
     <div id="discovery-results" class="discovery-results" hidden></div>
     <div class="explore-workspace" id="explore-workspace" hidden><section class="connection-map" aria-label="Connections"><div id="connection-map"></div><p class="map-caption" data-journey="mapNote">Choose a connection to continue exploring.</p></section><section id="entity-inspector" class="entity-inspector" aria-label="Details"></section></div>

@@ -62,7 +62,7 @@
     } catch { /* Visualization is optional; native playback remains independent. */ }
   }
   document.addEventListener('click', event => {
-    if (event.target.closest('#play, #explorer-play')) enable();
+    if (event.target.closest('#play')) enable();
   }, { capture: true });
   document.addEventListener('keydown', event => { if (event.code === 'Space') enable(); }, { capture: true });
   audio.addEventListener('playing', start);

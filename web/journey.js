@@ -28,35 +28,35 @@
     ['essentials','Essentials','5X4mHMKyWISt9RldrxuDb8'],
   ];
   const copy = {
-    en:{ deeper:"See the roots it's built on",explore:'Explore',exploreLabel:'EXPLORE',connections:'Follow the music.',
+    en:{ deeper:'See the roots it’s built on',roots:'The roots',back:'Back to listening',
       spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day',volume:'Volume',
-      searchLabel:'Artist, track, release or label',search:'Search',
-      playRadio:'Play radio',pauseRadio:'Pause radio',backListen:'Back to listening ↙',mapNote:'Choose a connection to continue exploring.',
+      searchLabel:'Artist, track, release or label',searchPlaceholder:'Search artists, tracks, releases, labels',nothingOnAir:'Nothing on air right now. Search to start.',
+      mapNote:'Choose a connection to continue exploring.',
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
       artist:'Artist',track:'Track',release:'Release',label:'Label',playlist:'Playlist',primary:'Artist',featured:'Featuring',remixer:'Remixed by',
       similar:'Similar artist',related:'Related artist',collaboration:'Collaboration',remix:'Remix',shared_release:'Shared release','musicbrainz:member of band':'Band member','musicbrainz:is person':'Identity','musicbrainz:collaboration':'Collaboration',
-      selected:'Selected for radio',favorite:'Essentials favorite',moreBio:'Read the biography',bioSource:'Biography source',
+      favorite:'Essentials favorite',moreBio:'Read the biography',bioSource:'Biography source',
       bioEnglish:'Biography in English',held:'Artist details are being checked.',relatedTitle:'Connections',tracks:'Tracks in the selection',
       preview:'Listen · 60 seconds',previewPending:'No audio preview available yet.',stopPreview:'Stop preview',previewError:'The preview could not play. Try again.',
-      results:'results',firstResults:'Showing up to 40 matches.',limited:'Showing the nearest connections. Search to explore further.',
-      basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',source:'Source',
+      results:'results',firstResults:'Showing up to 40 matches.',
+      basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',
     },
-    de:{ deeper:'Entdecke die Wurzeln dahinter',explore:'Entdecken',exploreLabel:'ENTDECKEN',connections:'Folge der Musik.',
+    de:{ deeper:'Entdecke die Wurzeln dahinter',roots:'Die Wurzeln',back:'Zurück zum Radio',
       spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',
-      searchLabel:'Künstler, Track, Veröffentlichung oder Label',search:'Suchen',
-      playRadio:'Radio abspielen',pauseRadio:'Radio pausieren',backListen:'Zurück zum Radio ↙',mapNote:'Wähle eine Verbindung und entdecke mehr.',
+      searchLabel:'Künstler, Track, Veröffentlichung oder Label',searchPlaceholder:'Künstler, Tracks, Alben, Labels suchen',nothingOnAir:'Gerade läuft nichts. Suche, um anzufangen.',
+      mapNote:'Wähle eine Verbindung und entdecke mehr.',
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
       artist:'Künstler',track:'Track',release:'Veröffentlichung',label:'Label',playlist:'Playlist',primary:'Künstler',featured:'Mit',remixer:'Remix von',
       similar:'Ähnlicher Künstler',related:'Verwandter Künstler',collaboration:'Zusammenarbeit',remix:'Remix',shared_release:'Gemeinsame Veröffentlichung','musicbrainz:member of band':'Bandmitglied','musicbrainz:is person':'Identität','musicbrainz:collaboration':'Zusammenarbeit',
-      selected:'Für das Radio ausgewählt',favorite:'Essentials-Favorit',moreBio:'Biografie lesen',bioSource:'Quelle der Biografie',
+      favorite:'Essentials-Favorit',moreBio:'Biografie lesen',bioSource:'Quelle der Biografie',
       bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',relatedTitle:'Verbindungen',tracks:'Tracks in der Auswahl',
       preview:'Anhören · 60 Sekunden',previewPending:'Noch keine Hörprobe verfügbar.',stopPreview:'Hörprobe stoppen',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
-      results:'Treffer',firstResults:'Bis zu 40 Treffer werden angezeigt.',limited:'Die nächsten Verbindungen werden angezeigt. Suche, um mehr zu entdecken.',
-      basicDetails:'Für diesen Track gibt es noch keine Künstler- und Veröffentlichungsprofile.',cover:'Cover der Veröffentlichung',portrait:'Künstlerporträt',source:'Quelle',
+      results:'Treffer',firstResults:'Bis zu 40 Treffer werden angezeigt.',
+      basicDetails:'Für diesen Track gibt es noch keine Künstler- und Veröffentlichungsprofile.',cover:'Cover der Veröffentlichung',portrait:'Künstlerporträt',
     },
   };
-  Object.assign(copy.en, {exploreTab:'Explore',history:'History',statistics:'Music statistics',stage:'Stage',period:'Period',day:'Last 24 hours',week:'Last 7 days',month:'Last 30 days',allHistory:'All recorded history',older:'Older tracks',radioSelection:'All radio selections',library:'Whole music library',historyNote:'Confirmed broadcast starts. Times use your local timezone.',noHistory:'No broadcasts recorded in this period.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',plays:'plays',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
-  Object.assign(copy.de, {exploreTab:'Entdecken',history:'Verlauf',statistics:'Musikstatistik',stage:'Bühne',period:'Zeitraum',day:'Letzte 24 Stunden',week:'Letzte 7 Tage',month:'Letzte 30 Tage',allHistory:'Gesamter Verlauf',older:'Ältere Tracks',radioSelection:'Alle Radioauswahlen',library:'Gesamte Musikbibliothek',historyNote:'Bestätigte Sendestarts. Die Zeiten entsprechen deiner lokalen Zeitzone.',noHistory:'In diesem Zeitraum wurden keine Sendestarts erfasst.',musicLoading:'Musik wird geladen…',noOverlap:'Keine gemeinsamen Tracks.',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',selection:'Tracks in der Auswahl',artistCredits:'Künstlerangaben',releases:'Veröffentlichungen',hours:'Stunden Musik',topArtists:'Künstler in der Auswahl',years:'Erscheinungsjahre',labels:'Labels',genres:'Track-Tags',overlap:'Gemeinsam mit anderen Bühnen',stageSizes:'Tracks je Bühne',coverage:'Tracks mit Metadaten',missingMetadata:'Noch keine Metadaten verfügbar.',snapshot:'Auswahl geprüft',definitions:'Jeder Track zählt einmal pro Auswahl. Künstlerangaben bleiben einschließlich Zusammenarbeiten erhalten. Gemeinsame Tracks können auf mehreren Bühnen erscheinen.',broadcasts:'Sendestarts',differentTracks:'Verschiedene gespielte Tracks',unplayed:'Ausgewählte, nicht gespielte Tracks',frequent:'Am häufigsten gespielt · letzte 30 Tage',broadcastNote:'Sendestatistiken zeigen die letzten 30 Tage oder den kürzeren verfügbaren Verlauf. Sie zählen Starts, keine vollständigen Hörvorgänge.',recordingSince:'Frühester erfasster Start',broadcastError:'Sendestatistiken sind nicht verfügbar. Die Auswahlstatistiken stehen unten.',noPlays:'Noch keine Sendestarts erfasst.',plays:'Starts',topNote:'Alle bekannten Erscheinungsjahre, neueste zuerst. Andere Diagramme zeigen bis zu 12 Einträge. Fehlende Metadaten werden nicht mitgezählt.',statisticsNote:'Auswahlstatistiken enthalten Playlist-Tracks. Ein Sender kann nur Tracks mit verfügbaren Audiodateien abspielen.'});
+  Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',period:'Period',day:'Last 24 hours',week:'Last 7 days',month:'Last 30 days',allHistory:'All recorded history',older:'Older tracks',radioSelection:'All radio selections',library:'Whole music library',historyNote:'Confirmed broadcast starts. Times use your local timezone.',noHistory:'No broadcasts recorded in this period.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',plays:'plays',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
+  Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',stage:'Bühne',period:'Zeitraum',day:'Letzte 24 Stunden',week:'Letzte 7 Tage',month:'Letzte 30 Tage',allHistory:'Gesamter Verlauf',older:'Ältere Tracks',radioSelection:'Alle Radioauswahlen',library:'Gesamte Musikbibliothek',historyNote:'Bestätigte Sendestarts. Die Zeiten entsprechen deiner lokalen Zeitzone.',noHistory:'In diesem Zeitraum wurden keine Sendestarts erfasst.',musicLoading:'Musik wird geladen…',noOverlap:'Keine gemeinsamen Tracks.',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',selection:'Tracks in der Auswahl',artistCredits:'Künstlerangaben',releases:'Veröffentlichungen',hours:'Stunden Musik',topArtists:'Künstler in der Auswahl',years:'Erscheinungsjahre',labels:'Labels',genres:'Track-Tags',overlap:'Gemeinsam mit anderen Bühnen',stageSizes:'Tracks je Bühne',coverage:'Tracks mit Metadaten',missingMetadata:'Noch keine Metadaten verfügbar.',snapshot:'Auswahl geprüft',definitions:'Jeder Track zählt einmal pro Auswahl. Künstlerangaben bleiben einschließlich Zusammenarbeiten erhalten. Gemeinsame Tracks können auf mehreren Bühnen erscheinen.',broadcasts:'Sendestarts',differentTracks:'Verschiedene gespielte Tracks',unplayed:'Ausgewählte, nicht gespielte Tracks',frequent:'Am häufigsten gespielt · letzte 30 Tage',broadcastNote:'Sendestatistiken zeigen die letzten 30 Tage oder den kürzeren verfügbaren Verlauf. Sie zählen Starts, keine vollständigen Hörvorgänge.',recordingSince:'Frühester erfasster Start',broadcastError:'Sendestatistiken sind nicht verfügbar. Die Auswahlstatistiken stehen unten.',noPlays:'Noch keine Sendestarts erfasst.',plays:'Starts',topNote:'Alle bekannten Erscheinungsjahre, neueste zuerst. Andere Diagramme zeigen bis zu 12 Einträge. Fehlende Metadaten werden nicht mitgezählt.',statisticsNote:'Auswahlstatistiken enthalten Playlist-Tracks. Ein Sender kann nur Tracks mit verfügbaren Audiodateien abspielen.'});
   const word = key => copy[radio.getState().language][key] || key;
   const node = (tag,cls,value) => {const n=document.createElement(tag);if(cls)n.className=cls;if(value)n.textContent=value;return n;};
   const entityID = value => /^(?:(?:art|trk|rel|lab|pl)_[a-f0-9]{12}|plex_[0-9]{1,32})$/.test(value || '');
@@ -82,8 +82,18 @@
     load();
   }
   function action(title,handler,cls='entity-link') {const b=node('button',cls,title);b.type='button';b.addEventListener('click',handler);return b;}
-  let enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, currentLanguage='', renderedPlayer='';
-  const dialog=$('explorer');
+  let enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, currentLanguage='', renderedPlayer='', shownQuery='', typing=null;
+  // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
+  // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
+  // or ✕ always lands on the page in one step.
+  const dialog=$('explorer'),behind=document.querySelectorAll('main, .roots-footer');
+  // An entry this page opened carries this page's life in its state, so Back and Forward, which keep
+  // the page, keep it too; any other explorer entry is marked as found, not owned.
+  const life=performance.timeOrigin||Date.now();
+  let landing=false,closing=false;
+  function open() {if(dialog.open)return;dialog.show();for(const n of behind)n.inert=true;}
+  // The record on air, as the roots know it, or as the radio does until they answer.
+  const nowID=()=>{const t=radio.getState().track;return enriched?.entity.id||(t?'plex_'+t.id:'');};
   async function request(path,signal) {
     const res=await fetch(path,{signal,cache:'no-cache'});
     if(!res.ok)throw new Error('unavailable');
@@ -113,7 +123,6 @@
     if(imagePath(cover))image(dock,cover,word('cover'));
     else if(dock.getAttribute('src')!==thumb){dock.onload=dock.onerror=null;dock.alt='';dock.src=thumb;dock.hidden=false;}
     image($('painted-artist'),portraits[0]?.image||t?.artistImageUrl,'');
-    $('explorer-play').textContent=s.wanted?word('pauseRadio'):word('playRadio');
     const key=JSON.stringify([s.stage,s.language,t,enriched]);
     // Playback and audience updates must not replace focused record controls.
     if (key !== renderedPlayer) {
@@ -121,7 +130,7 @@
       const pl=playlists.find(p=>p[0]===s.stage);
       $('stage-spotify').hidden=!pl;
       if(pl){$('stage-spotify').href='https://open.spotify.com/playlist/'+pl[2];}
-      const root=e?.id||(t?'plex_'+t.id:'');
+      const root=nowID();
       if(entityID(root))$('player-title').href='#explore/'+root;else $('player-title').removeAttribute('href');
       const spotify=e?.links?.find(l=>l.kind==='spotify'&&external(l.url));
       $('track-spotify').hidden=!spotify;if(spotify)$('track-spotify').href=spotify.url;
@@ -158,24 +167,35 @@
     $('track-progress').setAttribute('aria-label',radio.getState().language==='de'?'Fortschritt des Live-Tracks':'Live track progress');
   }
   function localise() {
+    shownQuery='';// Results drawn in the old language are searched again.
     for(const n of document.querySelectorAll('[data-journey]'))n.textContent=word(n.dataset.journey);
     $('stage-spotify').setAttribute('aria-label',word('spotifyStage'));
     $('stage-spotify').title=word('spotifyStage');
     $('track-spotify').setAttribute('aria-label',word('spotifyTrack'));
     $('track-spotify').title=word('spotifyTrack');
+    $('explorer-close').setAttribute('aria-label',word('back'));
+    $('explorer-close').title=word('back');
+    $('discovery-query').placeholder=word('searchPlaceholder');
     renderPlayer();if(selected)renderEntity(selected);
-    $('explorer-title').textContent=word(view==='explore'?'connections':view);
     if(dialog.open&&view!=='explore'){fillStages($('music-stage').value);loadMusic();}
   }
-  function navigate(id) {history.pushState(null,'','#explore/'+id);radio.renderScene();loadEntity(id);}
-  function openEntity(id) {if(!entityID(id))return;if(!dialog.open)dialog.showModal();navigate(id);}
+  // Every move into or inside the explorer comes through go(): opening adds the explorer's one entry,
+  // and a move inside replaces it.
+  function go(hash) {
+    if(closing||(dialog.open&&hash===location.hash))return;
+    if(dialog.open)history.replaceState(history.state,'',hash);
+    else history.pushState({explorer:life},'',hash);
+    radio.renderScene();restore();
+  }
+  function navigate(id) {go('#explore/'+id);}
+  function openEntity(id) {if(entityID(id))navigate(id);}
   async function loadEntity(id) {
     setView('explore');
     selected=null;explorerRequest?.abort();const controller=new AbortController();explorerRequest=controller;
     $('discovery-status').textContent=word('loading');$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
     const timeout=setTimeout(()=>controller.abort(),10000);
     try{const data=await request('/api/discovery/entity/'+id,controller.signal);
-      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(null,'','#explore/'+data.entity.id);radio.renderScene();}selected=data;renderEntity(data);$('discovery-status').textContent='';
+      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}selected=data;renderEntity(data);$('discovery-status').textContent='';
     }catch{if(explorerRequest===controller)$('discovery-status').textContent=word('unavailable');}
     finally{clearTimeout(timeout);}
   }
@@ -226,18 +246,22 @@
     const center=node('div','map-center');center.append(node('small','',word(e.type)),node('span','',e.title));map.append(center);
     for(const p of coords){const b=action('',()=>navigate(p.v.id),'map-node');b.style.left=(p.x/640*100)+'%';b.style.top=(p.y/450*100)+'%';b.append(node('small','',word(p.v.type)),node('span','',p.v.title));map.append(b);}
   }
-  async function search(event) {
-    event.preventDefault();selected=null;explorerRequest?.abort();const c=new AbortController();explorerRequest=c;
-    $('discovery-status').textContent=word('loading');$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
+  // Results stay in place while the next ones load. The URL holds the query (#explore?q=…), so each
+  // history entry keeps its own search, and the Roots tab points to the last one.
+  const searchPage=query=>{history.replaceState(history.state,'',query?'#explore?q='+encodeURIComponent(query):'#explore');$('roots-tab').setAttribute('href',location.hash);};
+  async function search() {
+    clearTimeout(typing);selected=null;explorerRequest?.abort();const c=new AbortController(),query=$('discovery-query').value;explorerRequest=c;
+    searchPage(query);
+    $('discovery-status').textContent=word('loading');$('explore-workspace').hidden=true;
     const timeout=setTimeout(()=>c.abort(),10000);
-    try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent($('discovery-query').value),{signal:c.signal});if(!res.ok)throw new Error();
+    try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent(query),{signal:c.signal});if(!res.ok)throw new Error();
       const data=await res.json();if(explorerRequest!==c)return;if(!Array.isArray(data.items))throw new Error();
       $('discovery-results').replaceChildren(...data.items.map(e=>{const b=action('',()=>navigate(e.id),'search-result');b.append(node('small','',word(e.type)),node('span','',e.title));return b;}));
-      $('discovery-results').hidden=false;$('discovery-status').textContent=data.items.length?word('firstResults'):word('empty');
-    }catch{if(explorerRequest===c)$('discovery-status').textContent=word('unavailable');}finally{clearTimeout(timeout);}
+      shownQuery=query;$('discovery-results').hidden=false;$('discovery-status').textContent=data.items.length?word('firstResults'):word('empty');
+    }catch{if(explorerRequest===c){$('discovery-results').hidden=true;$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
   }
   function cancelPreview() {
-    preview=null;const audio=$('preview-audio');audio.pause();audio.removeAttribute('src');audio.load();$('preview-banner').hidden=true;
+    const resume=preview?.resume;preview=null;const audio=$('preview-audio');audio.pause();audio.removeAttribute('src');audio.load();$('preview-banner').hidden=true;return resume;
   }
   async function startPreview(e) {
     const resume=preview?preview.resume:radio.getState().wanted;
@@ -252,17 +276,46 @@
   $('preview-audio').addEventListener('ended',finishPreview);
   $('preview-audio').addEventListener('error',()=>{if(preview){$('discovery-status').textContent=word('previewError');finishPreview();}});
   $('preview-stop').addEventListener('click',finishPreview);
-  $('explorer-play').addEventListener('click',radio.toggle);
   try{const saved=parseFloat(localStorage.getItem('pavoia-volume'));if(saved>=0&&saved<=1)$('volume').value=saved;}catch{/* Storage is optional. */}
   // Where the stylesheet hides the slider, the device sets the level, so a remembered low volume cannot silence the radio.
   const fixedVolume=matchMedia('(max-width:760px), (pointer:coarse)');
   const volume=()=>{$('audio').volume=$('preview-audio').volume=fixedVolume.matches?1:Number($('volume').value);};volume();
   fixedVolume.addEventListener('change',volume);
   $('volume').addEventListener('input',()=>{volume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
-  $('go-deeper').addEventListener('click',()=>{if(enriched)openEntity(enriched.entity.id);else location.hash='explore';});
-  function close(){explorerRequest?.abort();musicRequest?.abort();finishPreview();dialog.close();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();}
-  $('explorer-close').addEventListener('click',close);dialog.addEventListener('cancel',event=>{event.preventDefault();close();});
-  $('discovery-search').addEventListener('submit',search);
+  // The footer opens the record on air; only with nothing on air does it open the search.
+  $('go-deeper').addEventListener('click',()=>{if(entityID(nowID()))openEntity(nowID());else go('#explore');});
+  // ✕ and Escape. An entry this page opened, a shared link included, goes back to the page's entry
+  // right under it, and restore() then closes the dialog; until then, work stops and moves wait. Any
+  // other (a reload, a restored session, a typed URL) closes in place, since the entry under it may
+  // not be this page. A plain dialog fires no cancel event, so Escape is caught below.
+  const halt=()=>{clearTimeout(typing);explorerRequest?.abort();explorerRequest=null;musicRequest?.abort();musicRequest=null;};
+  const close=()=>{
+    if(!dialog.open||closing)return;
+    halt();
+    if(history.state?.explorer===life){closing=true;history.back();return;}
+    shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();
+  };
+  function shut(){closing=false;halt();finishPreview();for(const n of behind)n.inert=false;dialog.close();}
+  $('explorer-close').addEventListener('click',close);
+  // Explorer links, in the explorer or the player bar, go through go(). Ctrl, Cmd, Shift and middle
+  // clicks keep opening them in a new tab or window.
+  document.addEventListener('click',event=>{
+    if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
+    const href=event.target.closest?.('a[href^="#"]')?.getAttribute('href')||'';
+    if(!/^#(?:explore|history|statistics)(?:[/?]|$)/.test(href))return;
+    event.preventDefault();go(href);
+  });
+  // Escape over the modal stations sheet closes that sheet only. Closing keeps the typed query, which
+  // Escape would otherwise clear in the search field.
+  document.addEventListener('keydown',event=>{if(event.key==='Escape'&&!event.isComposing&&!event.defaultPrevented&&dialog.open&&!document.querySelector('dialog:modal')){event.preventDefault();close();}});
+  $('discovery-search').addEventListener('submit',event=>{event.preventDefault();search();});
+  // Under two characters the search page empties, and a search still loading is dropped with it.
+  $('discovery-query').addEventListener('input',()=>{
+    clearTimeout(typing);
+    if($('discovery-query').value.trim().length>=2){typing=setTimeout(search,300);return;}
+    if(!/^#explore(?:\?|$)/.test(location.hash))return;
+    searchPage('');explorerRequest?.abort();explorerRequest=null;shownQuery='';$('discovery-results').hidden=true;$('discovery-status').textContent='';
+  });
   let view='explore',musicRequest=null,historyPage=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
   const date = value => new Date(value).toLocaleString(radio.getState().language, {dateStyle:'medium',timeStyle:'short'});
@@ -274,12 +327,12 @@
     $('music-stage').value=options.some(([id])=>id===value)?value:radio.getState().stage;
   }
   function setView(next) {
-    view=next;musicRequest?.abort();
+    view=next;clearTimeout(typing);musicRequest?.abort();
     $('music-view').hidden=next==='explore';$('discovery-search').hidden=next!=='explore';
     $('discovery-status').hidden=next!=='explore';
-    $('explorer-title').textContent=word(next==='explore'?'connections':next);
     for(const link of document.querySelectorAll('.explorer-nav a')) {
-      if(link.getAttribute('href')==='#'+next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
+      // The Roots link carries the last search (#explore?q=…); its route alone names the tab.
+      if(link.getAttribute('href').split('?')[0]==='#'+next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
     }
     if(next!=='explore'){
       explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
@@ -344,22 +397,41 @@
   $('music-filters').addEventListener('submit',event=>event.preventDefault());
   $('music-stage').addEventListener('change',()=>loadMusic());$('history-period').addEventListener('change',()=>loadMusic());
   $('history-more').addEventListener('click',()=>loadMusic(true));
+  // Touch screens keep their keyboard down until the listener asks for it.
+  const finePointer=matchMedia('(pointer:fine)');
   function restore(){
-    const candidate=location.hash.startsWith('#explore/')?location.hash.slice(9):'';
+    landing=false;
+    const [path,params='']=location.hash.split('?');
+    const candidate=path.startsWith('#explore/')?path.slice(9):'';
     const id=entityID(candidate)?candidate:null;
-    const section=location.hash.slice(1);
-    if(id){if(!dialog.open)dialog.showModal();loadEntity(id);}
-    else if(['explore','history','statistics'].includes(section)){
-      if(!dialog.open)dialog.showModal();setView(section);
-      if(section!=='explore')loadMusic();else{
-        explorerRequest?.abort();explorerRequest=null;selected=null;
-        $('discovery-status').textContent='';$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
-        $('discovery-query').focus();
-      }
-    }else if(dialog.open){explorerRequest?.abort();musicRequest?.abort();finishPreview();dialog.close();}
+    const section=path.slice(1);
+    if(!id&&!['explore','history','statistics'].includes(section)){if(dialog.open)shut();return;}
+    // Going back landed on another explorer entry, so the page was not right under: close in place.
+    if(closing){shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();return;}
+    // An entry the browser added itself, such as a typed URL, may not sit right above the page.
+    if(!history.state?.explorer)history.replaceState({...history.state,explorer:true},'');
+    open();
+    if(id)return loadEntity(id);
+    setView(section);
+    if(section!=='explore')return loadMusic();
+    // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
+    explorerRequest?.abort();explorerRequest=null;selected=null;$('explore-workspace').hidden=true;
+    const query=new URLSearchParams(params).get('q')||'';$('discovery-query').value=query;
+    const again=Boolean(query.trim())&&query===shownQuery&&$('discovery-results').children.length>0;
+    $('discovery-results').hidden=!again;$('discovery-status').textContent=again?word('firstResults'):'';
+    if(finePointer.matches)$('discovery-query').focus();
+    if(again)return;
+    if(query.trim())search();
+    else if(entityID(nowID())){history.replaceState(history.state,'','#explore/'+nowID());loadEntity(nowID());}
+    // Until a record is on air the page waits for one: the radio's next answer with a track lands it.
+    else{landing=true;if(radio.getState().dataFresh)$('discovery-status').textContent=word('nothingOnAir');}
   }
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
-  window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();});
+  window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
+    if(landing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
+  // An explorer URL loaded without the explorer's state, such as a shared link, gets the radio page
+  // right under it, so ✕ and Back land on the radio. A reload keeps its entries, Forward ones included.
+  if(/^#(?:explore|history|statistics)/.test(location.hash)&&!history.state?.explorer){const hash=location.hash;history.replaceState(null,'',location.pathname+location.search);history.pushState({explorer:life},'',hash);}
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
 })();

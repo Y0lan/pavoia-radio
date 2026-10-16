@@ -14,7 +14,7 @@ async page => {
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
   assert(await page.locator('#audio').evaluate(a=>!a.paused),'Entity navigation stopped live playback');
   await page.locator('#discovery-query').fill('Jimi Jules');
-  await page.locator('#discovery-search button').click();
+  await page.locator('#discovery-query').press('Enter');
   await page.waitForFunction(()=>!document.getElementById('discovery-results').hidden);
   await page.locator('.search-result').filter({hasText:'Jimi Jules'}).first().click();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
@@ -26,7 +26,7 @@ async page => {
   assert(await page.locator('#audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Preview left live stream open');
   await page.locator('#preview-stop').click();
   await page.waitForFunction(()=>!document.getElementById('audio').paused&&document.getElementById('audio').currentTime>1);
-  await page.locator('#explorer-play').click();
+  await page.locator('#play').click();
   await page.locator('.preview-button').click();
   await page.waitForFunction(()=>document.getElementById('preview-audio').currentTime>0.5);
   assert(await page.evaluate(()=>navigator.mediaSession.playbackState==='playing'),'Preview media state is not playing');

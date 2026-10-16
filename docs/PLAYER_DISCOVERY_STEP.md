@@ -167,7 +167,6 @@ missing portraits disappear. Credit buttons and Go deeper remain interactive.
 The three old Listen accordions (catalogue, changes, audience history) were removed,
 along with their script include and styles. Catalogue search remains in Explore.
 History and audience data/APIs remain intact; their replacement UI is pending.
-The old `web/explore.js` remains on disk as previous source but is not loaded.
 
 ### Spotify-only playlist message
 

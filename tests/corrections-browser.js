@@ -70,8 +70,13 @@ async page => {
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
   assert((await page.locator('#entity-inspector').innerText()).includes('Recondite'),'Basic link failed on reload');
   assert(await page.locator('#audio').evaluate(a=>a.paused),'Reload unexpectedly autoplayed');
-  await page.locator('.explorer-nav a[href="#explore"]').click();
-  assert(await page.locator('#explore-workspace').isHidden(),'Explore root retained old details');
+  // Roots lands on the record on air, or says that nothing is on air. The player's link to that record
+  // can turn from plex_ to trk_ while it loads, so both sides are read together, in the page.
+  await page.locator('#roots-tab').click();
+  await page.waitForFunction(()=>{
+    const onAir=document.getElementById('player-title').getAttribute('href');
+    return onAir?location.hash===onAir&&!document.getElementById('explore-workspace').hidden:document.getElementById('discovery-status').textContent!=='';
+  },null,{timeout:15000});
   await page.evaluate(()=>window.Pavoia.openTrack('143095'));
   await page.waitForFunction(()=>/^#explore\/trk_/.test(location.hash)&&!document.getElementById('explore-workspace').hidden);
   assert(await page.locator('.entity-connections').count()===1,'Rich connections lost');
@@ -81,7 +86,7 @@ async page => {
   await page.evaluate(()=>window.Pavoia.openTrack('128670'));
   await page.waitForFunction(()=>document.getElementById('entity-inspector').textContent.includes('Veröffentlichungsprofile'));
   await page.locator('.explorer-nav a[href="#history"]').click();
-  assert(await page.locator('#explorer-title').textContent()==='Verlauf','History translation missing');
+  assert(await page.locator('.explorer-nav a[aria-current]').textContent()==='Verlauf','History translation missing');
   await page.locator('#explorer-close').click();
   await page.locator('#language [value=en]').dispatchEvent('click');
   assert(!errors.length,errors.join('; '));
