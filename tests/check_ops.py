@@ -25,6 +25,9 @@ class OpsChecks(unittest.TestCase):
             change = patch.object(manage, name, value)
             change.start()
             self.addCleanup(change.stop)
+        (self.root / "web-prod").mkdir()
+        for name in manage.WEBSITE_FILES:
+            (self.root / "web-prod" / name).write_text("release\n")
 
     def test_foreign_container_is_rejected(self):
         foreign = [{"Config": {"Labels": {"project": "another-service"}}}]
@@ -157,6 +160,17 @@ class OpsChecks(unittest.TestCase):
         status.write_text(json.dumps({"attemptAt": recent, "checkedAt": recent, "result": "ok", "cursor": 53669}))
         self.assertTrue(manage.catalogue_status().startswith("ok | attempt 10m ago | checked 10m ago | published never | cursor 53669"))
 
+    def test_configure_refuses_to_leave_production_without_a_website(self):
+        (self.root / "web-prod/app.js").unlink()
+        with self.assertRaisesRegex(RuntimeError, "web-prod is missing or incomplete"):
+            manage.configure()
+        for name in manage.WEBSITE_FILES:
+            (self.root / "web-prod" / name).unlink(missing_ok=True)
+        (self.root / "web-prod").rmdir()
+        with self.assertRaisesRegex(RuntimeError, "web-prod is missing or incomplete"):
+            manage.configure()
+        self.assertFalse(manage.NGINX.exists())
+
     def test_generated_nginx_has_no_persistent_log(self):
         music = self.root / "files/plex_music_library/opus"
         music.mkdir(parents=True)
@@ -178,9 +192,8 @@ class OpsChecks(unittest.TestCase):
         self.assertNotIn("auth_basic", config)
         self.assertIn("location ^~ /internal/ { return 404; }", config)
         self.assertIn("location = /healthz { return 404; }", config)
-        self.assertIn("location / { return 404; }", config)
         routes = dict(re.findall(r"location = (\S+) \{\n(.*?)\n    \}", config, re.S))
-        expected = {"/", "/index.html", "/app.js", "/journey.js", "/waveform.js", "/explore.js", "/style.css", "/api/library/catalogue", "/api/library/statistics", "/api/audience"}
+        expected = {"/api/library/catalogue", "/api/library/statistics", "/api/audience"}
         self.assertIn("location ^~ /api/discovery/ {", config)
         for scene in manage.SCENES:
             for suffix in ("", "/stats", "/catalogue", "/changes", "/history", "/music"):
@@ -194,30 +207,29 @@ class OpsChecks(unittest.TestCase):
             self.assertIn("limit_conn_status 503;", routes[path])
         self.assertIn("map $server_port $pavoia_stream_key { default pavoia; }", config)
         self.assertIn("limit_conn_zone $pavoia_stream_key zone=pavoia_streams:32k;", config)
-        for path, body in routes.items():
+        for path in expected:
             if not path.startswith("/stream/"):
-                self.assertNotIn("limit_conn pavoia_streams", body)
-        self.assertEqual(set(routes), expected)
-        for route in routes.values():
-            self.assertIn('proxy_set_header Authorization "";', route)
-            self.assertIn("limit_except GET { deny all; }", route)
-        # Dev: the same headers, streams and APIs as prod; the site itself comes from the static release.
-        self.assertIn("listen 0.0.0.0:14520;", dev)
-        self.assertIn("server_name pavoia-dev.gaende.box.ca;", dev)
-        self.assertNotIn("14502;\n      proxy_set_header Authorization \"\";\n      proxy_read_timeout 5s;", dev)
-        for line in prod.splitlines():
-            if line.startswith("    add_header"):
-                self.assertIn(line, dev)
-        dev_routes = dict(re.findall(r"location = (\S+) \{\n(.*?)\n    \}", dev, re.S))
-        self.assertEqual(set(dev_routes), expected - set(manage.WEB_FILES) | {"/"})
-        for path in expected - set(manage.WEB_FILES):
-            self.assertEqual(dev_routes[path], routes[path])
+                self.assertNotIn("limit_conn pavoia_streams", routes[path])
+            self.assertIn('proxy_set_header Authorization "";', routes[path])
+            self.assertIn("limit_except GET { deny all; }", routes[path])
+        self.assertEqual(set(routes), expected | {"/"})
+        # Both sites: the same headers, streams and APIs; each page comes from its own static release.
         types = "types { text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; font/woff2 woff2; font/ttf ttf; text/plain txt; }"
         charset = "charset utf-8;\n      charset_types text/css text/javascript text/plain image/svg+xml;"
-        site = f"limit_except GET {{ deny all; }}\n      root {self.root / 'web-dev'};\n      try_files FILES =404;\n      {types}\n      {charset}\n      expires epoch;"
-        self.assertEqual(dev_routes["/"].strip(), site.replace("FILES", "/index.html"))
-        self.assertIn("    location / {\n      " + site.replace("FILES", "$uri") + "\n    }", dev)
-        self.assertNotIn("location / { return 404; }", dev)
+        for env, block, port, host in (("prod", prod, 14500, "pavoia.gaende.box.ca"), ("dev", dev, 14520, "pavoia-dev.gaende.box.ca")):
+            self.assertIn(f"listen 0.0.0.0:{port};", block)
+            self.assertIn(f"server_name {host};", block)
+            for line in prod.splitlines():
+                if line.startswith("    add_header"):
+                    self.assertIn(line, block)
+            block_routes = dict(re.findall(r"location = (\S+) \{\n(.*?)\n    \}", block, re.S))
+            self.assertEqual(set(block_routes), expected | {"/"})
+            for path in expected:
+                self.assertEqual(block_routes[path], routes[path])
+            site = f"limit_except GET {{ deny all; }}\n      root {self.root / f'web-{env}'};\n      try_files FILES =404;\n      {types}\n      {charset}\n      expires epoch;"
+            self.assertEqual(block_routes["/"].strip(), site.replace("FILES", "/index.html"))
+            self.assertIn("    location / {\n      " + site.replace("FILES", "$uri") + "\n    }", block)
+            self.assertNotIn("proxy_pass http://127.0.0.1:14502;\n      proxy_set_header Authorization \"\";\n      proxy_read_timeout 5s;", block)
         self.assertEqual((self.root / "secrets/preview-access.txt").read_text(), "URL=https://pavoia.gaende.box.ca/\n")
         credentials = self.root / "secrets/credentials.json"
         values = json.loads(credentials.read_text())

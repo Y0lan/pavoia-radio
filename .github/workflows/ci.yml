@@ -1,6 +1,6 @@
 # Tests on every push and pull request. A green push to main publishes the website to
-# pavoia-dev.gaende.box.ca. Only static website files are deployed; the stations, Go
-# controllers and audio are untouched. Production keeps its reviewed release process.
+# pavoia-dev.gaende.box.ca; a green push to production publishes it to pavoia.gaende.box.ca.
+# Only static website files are deployed; the stations, Go controllers and audio are untouched.
 name: CI
 
 on:
@@ -36,12 +36,12 @@ jobs:
 
   deploy:
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/production')
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
-      name: dev
-      url: https://pavoia-dev.gaende.box.ca/
+      name: ${{ github.ref == 'refs/heads/production' && 'prod' || 'dev' }}
+      url: ${{ github.ref == 'refs/heads/production' && 'https://pavoia.gaende.box.ca/' || 'https://pavoia-dev.gaende.box.ca/' }}
     # No concurrency group: GitHub keeps only one pending job per group, so an older commit could cancel
     # a newer deploy. The server lock and the "newer than live" rule order deploys instead.
     steps:
@@ -51,8 +51,9 @@ jobs:
           KEY: ${{ secrets.WHATBOX_DEPLOY_KEY }}
           KNOWN_HOSTS: ${{ secrets.WHATBOX_KNOWN_HOSTS }}
           TARGET: ${{ secrets.WHATBOX_SSH_TARGET }}
+          ENV: ${{ github.ref == 'refs/heads/production' && 'prod' || 'dev' }}
         run: |
           install -d -m 700 ~/.ssh
           printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
           printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
-          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$TARGET" "dev $GITHUB_SHA"
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$TARGET" "$ENV $GITHUB_SHA"

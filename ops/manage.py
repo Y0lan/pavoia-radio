@@ -11,6 +11,8 @@ import signal
 import subprocess
 import xml.etree.ElementTree as ET
 
+from deploy_web import REQUIRED as WEBSITE_FILES
+
 ROOT = Path(__file__).resolve().parents[1]
 LABEL = "pavoia.pilot"
 SCENES = (
@@ -30,9 +32,9 @@ NAMES = ["pavoia-pilot-icecast"] + [
 ]
 LIQUIDSOAP = "docker.io/savonet/liquidsoap@sha256:c30745e4f3e5b80a3ee2a05d65fe2b203373e238f600581d5f741ec64e928ed5"
 NGINX = ROOT / "nginx/nginx.conf"
-WEB_FILES = ("/", "/index.html", "/app.js", "/journey.js", "/waveform.js", "/explore.js", "/style.css")
-# The dev site serves ROOT/web-dev, a static release of branch main (ops/deploy_web.py), on top of the live stations.
-DEV = {"host": "pavoia-dev.gaende.box.ca", "port": 14520}
+# Each site serves ROOT/web-<env>, a static release (ops/deploy_web.py) of branch production or main,
+# on top of the same live stations.
+SITES = (("prod", "pavoia.gaende.box.ca", 14500), ("dev", "pavoia-dev.gaende.box.ca", 14520))
 
 
 def run(args, **kwargs):
@@ -51,6 +53,8 @@ def private_write(path, content):
 
 
 def configure():
+    if not all((ROOT / "web-prod" / name).is_file() for name in WEBSITE_FILES):
+        raise RuntimeError("web-prod is missing or incomplete: on a first install run ops/deploy_web.py prepare prod <sha> first")
     for name in ["secrets", "icecast", "nginx", "artifacts", "bin", *(scene["state"] for scene in SCENES)]:
         (ROOT / name).mkdir(exist_ok=True, mode=0o700)
     credential_file = ROOT / "secrets/credentials.json"
@@ -160,19 +164,12 @@ def configure():
       proxy_read_timeout 15s;
     }}
 ''' for path, port in artwork_scenes)
-    static_locations = "".join(f'''    location ^~ /{folder}/ {{
-      limit_except GET {{ deny all; }}
-      proxy_pass http://127.0.0.1:14502;
-      proxy_set_header Authorization "";
-      proxy_read_timeout 5s;
-    }}
-''' for folder in ("assets", "photos", "fonts"))
-    controller_site = controller_locations([(path, 14502) for path in WEB_FILES]) + static_locations + "    location / { return 404; }\n"
     # Browsers refuse scripts and styles with a wrong type because the site sends nosniff, and
-    # nginx's built-in type map lacks js, css, svg and fonts; the Go controller sets them for prod.
-    static_site = "".join(f'''    location {match} {{
+    # nginx's built-in type map lacks js, css, svg and fonts.
+    def static_site(env):
+        return "".join(f'''    location {match} {{
       limit_except GET {{ deny all; }}
-      root {ROOT / "web-dev"};
+      root {ROOT / f"web-{env}"};
       try_files {files} =404;
       types {{ text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; font/woff2 woff2; font/ttf ttf; text/plain txt; }}
       charset utf-8;
@@ -208,7 +205,7 @@ http {{
   client_body_temp_path {ROOT}/nginx/client_body;
   proxy_temp_path {ROOT}/nginx/proxy;
   keepalive_timeout 15;
-{server("pavoia.gaende.box.ca", 14500, controller_site)}{server(DEV["host"], DEV["port"], static_site)}}}
+{"".join(server(host, port, static_site(env)) for env, host, port in SITES)}}}
 ''')
     print("Configuration ready; public URL in secrets/preview-access.txt")
 

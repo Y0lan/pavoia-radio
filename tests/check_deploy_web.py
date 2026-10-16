@@ -54,8 +54,10 @@ class DeployWebChecks(unittest.TestCase):
         self.addCleanup(change.stop)
 
     def urlopen(self, request, timeout):
-        name = request.full_url.split(":", 2)[2].split("/", 1)[1] or "index.html"
-        body = self.served if self.served is not None else (self.root / "web-dev" / name).read_bytes()
+        port, path = request.full_url.split(":", 2)[2].split("/", 1)
+        env = {"14520": "dev", "14500": "prod"}[port]
+        body = self.served if self.served is not None else (self.root / f"web-{env}" / (path or "index.html")).read_bytes()
+        name = path or "index.html"
         return Response(body, self.content_type or TYPES[Path(name).suffix] + "; charset=utf-8")
 
     def commit(self, version, extra=None):
@@ -80,16 +82,43 @@ class DeployWebChecks(unittest.TestCase):
             code = deploy_web.main()
         return code, errors.getvalue()
 
-    def serving(self):
-        return (self.root / "web-dev" / "app.js").read_text().split()[1]
+    def serving(self, env="dev"):
+        return (self.root / f"web-{env}" / "app.js").read_text().split()[1]
 
     def test_ssh_accepts_only_one_exact_dev_deploy(self):
         sha = self.commit("one")
-        for command in ("", f"dev {sha} extra", f"dev {sha};id", f"dev {sha[:12]}", "dev main", f"prod {sha}", "rollback dev", f"dev  {sha}", f"dev {sha}\n"):
+        for command in ("", f"dev {sha} extra", f"dev {sha};id", f"dev {sha[:12]}", "dev main", f"stage {sha}", "rollback dev", f"dev  {sha}", f"dev {sha}\n"):
             self.assertEqual(self.run_command(ssh=command)[0], 2, command)
         self.assertFalse((self.root / "web-dev").exists())
         self.assertEqual(self.run_command(ssh=f"dev {sha}")[0], 0)
         self.assertEqual(self.serving(), "one")
+
+    def test_production_publishes_only_commits_on_production(self):
+        live = self.commit("zero")
+        git(self.repo, "branch", "production", live)
+        sha = self.commit("one")
+        code, errors = self.run_command(ssh=f"prod {sha}")
+        self.assertEqual(code, 1)
+        self.assertIn("not on production", errors)
+        self.assertFalse((self.root / "web-prod").exists())
+        git(self.repo, "branch", "--force", "production", sha)
+        self.assertEqual(self.run_command(ssh=f"prod {sha}")[0], 0)
+        self.assertEqual(self.serving("prod"), "one")
+        self.assertFalse((self.root / "web-dev").exists(), "production never touches dev")
+
+    def test_first_install_prepares_production_before_nginx_serves_it(self):
+        sha = self.commit("one")
+        git(self.repo, "branch", "production", sha)
+        self.served = b"Nginx is not configured for web-prod yet"
+        self.assertEqual(self.run_command("prod", sha)[0], 1, "a normal deploy cannot bootstrap")
+        self.assertFalse((self.root / "web-prod").exists())
+        self.assertEqual(self.run_command(ssh=f"prepare prod {sha}")[0], 2, "the deploy key cannot prepare")
+        self.assertEqual(self.run_command("prepare", "prod", sha)[0], 0)
+        self.assertEqual(self.serving("prod"), "one")
+        self.assertEqual(self.run_command("prepare", "prod", sha)[0], 1, "prepare is for a first install only")
+        self.served = None  # manage.py configure and the Nginx reload happen here
+        self.assertEqual(self.run_command("prod", sha)[0], 0)
+        self.assertEqual(self.serving("prod"), "one")
 
     def test_only_newer_commits_on_main_deploy(self):
         first = self.commit("one")

@@ -1,14 +1,17 @@
 #!/usr/bin/env python3
-"""Publish the website of one GitHub commit on pavoia-dev, without restarting any service.
+"""Publish the website of one GitHub commit, without restarting any service.
 
-Nginx serves ROOT/web-dev, a symlink to an unpacked release folder, so a deploy or a
-rollback is one atomic symlink swap. Only static files are copied: nothing from the
-repository is executed here. Production keeps its reviewed release process for now.
+dev serves branch main at pavoia-dev.gaende.box.ca; prod serves branch production at
+pavoia.gaende.box.ca. Nginx serves ROOT/web-<env>, a symlink to an unpacked release
+folder, so a deploy or a rollback is one atomic symlink swap. Only static files are
+copied: nothing from the repository is executed here.
 
 GitHub Actions reaches this through an SSH key restricted to `deploy_web.py --ssh`,
-which accepts exactly "dev <sha>" in SSH_ORIGINAL_COMMAND. A commit deploys only if it
-is on branch main and newer than the live release.
-Local use: deploy_web.py dev <sha> | deploy_web.py rollback dev
+which accepts exactly "dev <sha>" or "prod <sha>" in SSH_ORIGINAL_COMMAND. A commit
+deploys only if it is on that environment's branch and newer than its live release.
+Local use: deploy_web.py <dev|prod> <sha> | deploy_web.py rollback <dev|prod>
+First install: deploy_web.py prepare <env> <sha>, then manage.py configure and an Nginx
+reload, then deploy_web.py <env> <sha> to check what Nginx serves.
 """
 import argparse
 import fcntl
@@ -25,7 +28,7 @@ ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path.home() / "pavoia-radio-src"
 REPO = "https://github.com/Y0lan/pavoia-radio.git"
 LFS_URL = "https://github.com/Y0lan/pavoia-radio.git/info/lfs"
-TARGETS = {"dev": ("main", 14520)}
+TARGETS = {"dev": ("main", 14520), "prod": ("production", 14500)}
 KEEP = 5
 REQUIRED = ("index.html", "app.js", "style.css")
 TYPES = {"/": "text/html", "/app.js": "text/javascript", "/style.css": "text/css"}
@@ -190,6 +193,18 @@ def deploy(env, sha):
     print(f"{env} now serves {sha[:12]} from {release.name}.")
 
 
+def prepare(env, sha):
+    """First install only: unpack and link a release before Nginx is configured to serve it."""
+    if resolved(link(env)):
+        raise Refused(f"{env} already has a live release; deploy it normally")
+    branch = TARGETS[env][0]
+    if not ancestor(sha, fetch(branch)):
+        raise Refused(f"{sha[:12]} is not on {branch}")
+    point(link(env), build(env, sha))
+    record(env, sha, "prepared")
+    print(f"{env} prepared {sha[:12]}. Next: manage.py configure, reload Nginx, then deploy_web.py {env} {sha}.")
+
+
 def rollback(env):
     release = resolved(ROOT / f".web-{env}.previous")
     if not release:
@@ -208,7 +223,8 @@ def main():
     envs = "|".join(TARGETS)
     deploying = re.fullmatch(rf"({envs}) ([0-9a-f]{{40}})", command)
     rolling = None if args.ssh else re.fullmatch(rf"rollback ({envs})", command)
-    if not (deploying or rolling):
+    preparing = None if args.ssh else re.fullmatch(rf"prepare ({envs}) ([0-9a-f]{{40}})", command)
+    if not (deploying or rolling or preparing):
         print(f"Refused: expected '<{envs}> <40-hex sha>'.", file=sys.stderr)
         return 2
     (ROOT / "secrets").mkdir(exist_ok=True, mode=0o700)
@@ -217,6 +233,8 @@ def main():
         try:
             if deploying:
                 deploy(*deploying.groups())
+            elif preparing:
+                prepare(*preparing.groups())
             else:
                 rollback(rolling.group(1))
         except (Refused, subprocess.CalledProcessError, OSError) as error:

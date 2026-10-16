@@ -152,19 +152,23 @@ This verifies restoration of the saved snapshot, not recovery of changes made af
 ## Publishing the website
 
 Every push runs the checks in GitHub Actions. When they pass on `main`, the
-website of that commit goes live on https://pavoia-dev.gaende.box.ca/. Both sites
-play the same live stations; only the page differs. A later commit always wins: a
-delayed job for an older commit never moves dev back. Production still receives the
-website through the reviewed release, which rebuilds the Go controllers.
+website of that commit goes live on https://pavoia-dev.gaende.box.ca/. Merging `main`
+into `production` publishes it on https://pavoia.gaende.box.ca/ the same way. Both
+sites play the same live stations; only the page differs. A later commit always wins:
+a delayed job for an older commit never moves a site back.
 
 A website deploy never restarts anything. `ops/deploy_web.py` unpacks the commit's
-`web/` folder into `releases/` on Whatbox, switches the `web-dev` link to
+`web/` folder into `releases/` on Whatbox, switches the `web-dev` or `web-prod` link to
 it, checks that Nginx serves the new files and switches back if not. Changes to the Go
 controllers, Liquidsoap or Icecast still follow the reviewed release process, because
 they restart services.
 
-To undo the last dev deploy on Whatbox: `python3 ops/deploy_web.py rollback dev`.
+To undo the last deploy on Whatbox: `python3 ops/deploy_web.py rollback prod` (or `dev`).
+
+A first install has no release yet, and `manage.py configure` refuses to leave production
+without one. Run `python3 ops/deploy_web.py prepare prod <sha>` (and `dev`) once, then
+`configure`, reload Nginx, and `python3 ops/deploy_web.py prod <sha>` to check what it serves.
 
 GitHub reaches Whatbox with one SSH key whose `authorized_keys` entry is restricted to
-`deploy_web.py --ssh`. That key can only ask to publish a commit of `main` on dev. It
-cannot open a shell or run anything else.
+`deploy_web.py --ssh`. That key can only ask to publish a commit of `main` on dev or a
+commit of `production` on prod. It cannot open a shell or run anything else.
