@@ -31,7 +31,7 @@ async page => {
   assert(await page.locator('#mood-name').innerText() === 'The Bus', 'Wrong Bus title');
   assert(await page.locator('#mood-place').innerText() === 'Somewhere in the forest', 'Wrong Bus subtitle');
   assert(await page.locator('.bus-line').innerText() === 'No playlist here. You have to be there.', 'Wrong Bus message');
-  const ticket = page.getByRole('link', { name: 'Get your Pavoia ticket ↗', exact: true });
+  const ticket = page.getByRole('link', { name: 'Get your Pavoia ticket', exact: true });
   assert(await ticket.getAttribute('href') === 'https://pavoia.com/#tickets', 'Wrong ticket URL');
   assert(await ticket.getAttribute('target') === '_blank', 'Ticket navigation would replace the radio');
   assert(await page.locator('#photo').getAttribute('src') === 'photos/bus-stage.jpg', 'Wrong Bus photo');

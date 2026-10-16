@@ -11,7 +11,7 @@
   ];
   const copy = {
     en:{ deeper:"See the roots it's built on",explore:'Explore',exploreLabel:'EXPLORE',connections:'Follow the music.',
-      spotifyTrack:'Open track on Spotify ↗',spotifyStage:'Follow this playlist on Spotify ↗',spotifyDaily:'I add new tracks every day.',volume:'Volume',
+      spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day.',volume:'Volume',
       searchLabel:'Artist, track, release or label',search:'Search',
       playRadio:'Play radio',pauseRadio:'Pause radio',backListen:'Back to listening ↙',mapNote:'Choose a connection to continue exploring.',
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
@@ -24,7 +24,7 @@
       basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',source:'Source',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',explore:'Entdecken',exploreLabel:'ENTDECKEN',connections:'Folge der Musik.',
-      spotifyTrack:'Track auf Spotify öffnen ↗',spotifyStage:'Folge dieser Playlist auf Spotify ↗',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu.',volume:'Lautstärke',
+      spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu.',volume:'Lautstärke',
       searchLabel:'Künstler, Track, Veröffentlichung oder Label',search:'Suchen',
       playRadio:'Radio abspielen',pauseRadio:'Radio pausieren',backListen:'Zurück zum Radio ↙',mapNote:'Wähle eine Verbindung und entdecke mehr.',
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
@@ -90,7 +90,11 @@
     const cover=e?.image||t?.coverUrl;
     const people=all.filter(v=>v.type==='artist'&&(e?.connections||[]).some(c=>c.id===v.id&&['primary','featured','remixer'].includes(c.relation)));
     const portraits=people.filter(a=>a.image);
-    image($('hero-cover'),cover,word('cover'));image($('dock-cover'),cover,word('cover'));
+    image($('hero-cover'),cover,word('cover'));
+    // Without a cover the bar shows the stage, so the record cell never starts on an empty square.
+    const dock=$('dock-cover'),thumb=radio.stations.find(v=>v.id===s.stage).thumb;
+    if(imagePath(cover))image(dock,cover,word('cover'));
+    else if(dock.getAttribute('src')!==thumb){dock.onload=dock.onerror=null;dock.alt='';dock.src=thumb;dock.hidden=false;}
     image($('painted-artist'),portraits[0]?.image||t?.artistImageUrl,'');
     image($('painted-artist-secondary'),portraits[1]?.image,'');
     $('explorer-play').textContent=s.wanted?word('pauseRadio'):word('playRadio');
@@ -101,6 +105,8 @@
       const pl=playlists.find(p=>p[0]===s.stage);
       $('stage-spotify').hidden=!pl;
       if(pl){$('stage-spotify').href='https://open.spotify.com/playlist/'+pl[2];}
+      const root=e?.id||(t?'plex_'+t.id:'');
+      if(entityID(root))$('player-title').href='#explore/'+root;else $('player-title').removeAttribute('href');
       const spotify=e?.links?.find(l=>l.kind==='spotify'&&external(l.url));
       $('track-spotify').hidden=!spotify;if(spotify)$('track-spotify').href=spotify.url;
       const release=all.find(v=>v.type==='release' && entityID(v.id) && e?.connections?.some(c=>c.id===v.id && c.relation==='release'));
@@ -176,8 +182,8 @@
     if(e.bio){const details=node('details','entity-bio');details.append(node('summary','',word('moreBio')));
       if(radio.getState().language==='de')details.append(node('small','',word('bioEnglish')));
       const bio=node('p','',e.bio);bio.lang='en';details.append(bio);
-      if(external(e.bioUrl))details.append(link(word('bioSource')+' ↗',e.bioUrl));panel.append(details);}
-    const links=node('div','entity-links');for(const l of (e.links||[]).slice(0,8)){if(external(l.url))links.append(link(l.kind.replaceAll('_',' ')+' ↗',l.url));}panel.append(links);
+      if(external(e.bioUrl))details.append(link(word('bioSource'),e.bioUrl));panel.append(details);}
+    const links=node('div','entity-links');for(const l of (e.links||[]).slice(0,8)){if(external(l.url))links.append(link(l.kind.replaceAll('_',' '),l.url));}panel.append(links);
     if(e.type==='track'&&!e.basicDetails){
       if(/^\/api\/discovery\/preview\/trk_[a-f0-9]{12}$/.test(e.previewUrl||''))panel.append(action(word('preview'),()=>startPreview(e),'preview-button'));
       else panel.append(node('p','collection-note',word('previewPending')));
@@ -231,7 +237,10 @@
   $('preview-stop').addEventListener('click',finishPreview);
   $('explorer-play').addEventListener('click',radio.toggle);
   try{const saved=parseFloat(localStorage.getItem('pavoia-volume'));if(saved>=0&&saved<=1)$('volume').value=saved;}catch{/* Storage is optional. */}
-  const volume=()=>{$('audio').volume=$('preview-audio').volume=Number($('volume').value);};volume();
+  // Where the stylesheet hides the slider, the device sets the level, so a remembered low volume cannot silence the radio.
+  const fixedVolume=matchMedia('(max-width:760px), (pointer:coarse)');
+  const volume=()=>{$('audio').volume=$('preview-audio').volume=fixedVolume.matches?1:Number($('volume').value);};volume();
+  fixedVolume.addEventListener('change',volume);
   $('volume').addEventListener('input',()=>{volume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
   $('go-deeper').addEventListener('click',()=>{if(enriched)openEntity(enriched.entity.id);else location.hash='explore';});
   function close(){explorerRequest?.abort();musicRequest?.abort();finishPreview();dialog.close();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();}

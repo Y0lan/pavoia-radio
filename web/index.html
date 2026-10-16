@@ -19,9 +19,9 @@
       <svg class="icon-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M7 4.5v15l13-7.5z" fill="currentColor"/></svg>
       <svg class="icon-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z" fill="currentColor"/></svg>
     </button>
-    <div class="now"><em id="player-title">Loading track…</em><a id="player-album"></a></div>
-    <div class="player-credits"><span id="player-artist"></span><div id="credited-artists" class="credited-artists"></div><span id="label-note" class="label-note" hidden></span></div>
-    <a id="track-spotify" class="track-spotify" target="_blank" rel="noopener noreferrer" hidden><span class="spotify-caption" data-journey="track">Track</span></a>
+    <a id="player-title">Loading track…</a>
+    <div class="player-credits"><span id="player-artist"></span><div id="credited-artists" class="credited-artists"></div></div>
+    <p class="player-release"><a id="player-album" hidden></a><span id="label-note" class="label-note" hidden></span><a id="track-spotify" target="_blank" rel="noopener noreferrer" hidden>Spotify</a></p>
     <div class="transport-track">
       <div class="transport-time"><span id="playback-status" role="status">Paused</span><span id="player-stage">Lost in Feelings</span><span id="track-clock">—</span></div>
       <canvas id="waveform" aria-hidden="true"></canvas>
@@ -44,7 +44,7 @@
         <p class="place" id="mood-place">The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.</p>
         <div id="bus-copy" hidden>
           <p class="bus-line" data-copy="busLine">No playlist here. You have to be there.</p>
-          <a class="bus-ticket" href="https://pavoia.com/#tickets" target="_blank" rel="noopener noreferrer" data-copy="busTicket">Get your Pavoia ticket ↗</a>
+          <a class="bus-ticket" href="https://pavoia.com/#tickets" target="_blank" rel="noopener noreferrer" data-copy="busTicket">Get your Pavoia ticket</a>
         </div>
       </div>
         <div id="station-selector-home"><fieldset class="moods" id="station-selector">
@@ -65,7 +65,7 @@
           <output id="photo-count" aria-live="polite" aria-atomic="true"></output>
           <button type="button" id="artwork-toggle" class="change-photo artwork-toggle"></button>
         </div>
-        <a id="stage-spotify" class="stage-spotify" target="_blank" rel="noopener noreferrer" hidden><span data-journey="spotifyStage">Follow this playlist on Spotify ↗</span><span class="spotify-caption" data-journey="playlist">Playlist</span><span class="spotify-daily" data-journey="spotifyDaily">I add new tracks every day.</span></a>
+        <a id="stage-spotify" class="stage-spotify" target="_blank" rel="noopener noreferrer" hidden><span data-journey="spotifyStage">Follow this playlist on Spotify</span><span class="spotify-caption" data-journey="playlist">Playlist</span><span class="spotify-daily" data-journey="spotifyDaily">I add new tracks every day.</span></a>
           </div>
         </div>
     </section>

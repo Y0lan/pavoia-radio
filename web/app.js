@@ -82,7 +82,7 @@ const words = {
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
   live:'Live', standby:'Standby', offline:'Data unavailable', audience:'live audio connections', audienceUnknown:'Audience unavailable',
   cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Change photo', photoOnly:'Photo only', showArtwork:'Show artwork',
-  busPlace:'Somewhere in the forest', busLine:'No playlist here. You have to be there.', busTicket:'Get your Pavoia ticket ↗',
+  busPlace:'Somewhere in the forest', busLine:'No playlist here. You have to be there.', busTicket:'Get your Pavoia ticket',
   places:['Finding your own rhythm in the open air, with no pressure to rush the day.','A growing sense of possibility: something is beginning, and you want to be part of it!','Pałac at its peak. The shared moment when everyone commits to the dance and everything else can wait.','The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.','The tracks I keep close and always come back to, at different times for different reasons.','The basement. Giving yourself fully to the speed and intensity, whether the feeling is dark or joyful.','The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.'],
   lines:['Sunny, groovy and easygoing records for warm ups and the open air.','Bright, melodic and a little energetic, building toward the dance floor.','Physical, driving, peak time. Built to move a room.','Melancholic, hypnotic and deep. Night music with a focus on feeling.','The tracks I keep coming back to.','Hard techno and hard trance from the basement. Dark or happy, always fast and full of energy.','Happy house for daylight dancing and relaxed afternoons.'] },
  de: { promise:'Damit es niemals aufhört.', choose:'Wähle ein Radio', letterTitle:'Das Festival endet.', letterEnd:'Die Musik bleibt.',
@@ -94,7 +94,7 @@ const words = {
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
   live:'Live', standby:'Bereit', offline:'Daten fehlen', audience:'Live-Audioverbindungen', audienceUnknown:'Hörerzahl nicht verfügbar',
   cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Foto wechseln', photoOnly:'Nur Foto', showArtwork:'Artwork zeigen',
-  busPlace:'Irgendwo im Wald', busLine:'Hier gibt es keine Playlist. Du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket ↗',
+  busPlace:'Irgendwo im Wald', busLine:'Hier gibt es keine Playlist. Du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket',
   places:['Unter freiem Himmel den eigenen Rhythmus finden und dem Tag seine Zeit lassen.','Das Gefühl, dass immer mehr möglich ist: Etwas beginnt, und du möchtest dabei sein!','Pałac auf dem Höhepunkt. Dieser gemeinsame Moment, in dem sich alle ganz dem Tanzen hingeben und alles andere warten kann.','Pałac, mit dem Blick nach innen. Sehnsucht, Zärtlichkeit, Melancholie: diesen Gefühlen Raum geben, während du weitertanzt.','Die Tracks, die mir am Herzen liegen und zu denen ich immer wieder zurückkehre, zu verschiedenen Zeiten aus verschiedenen Gründen.','Der Keller. Sich ganz dem Tempo und der Intensität hingeben, ob düster oder voller Freude.','Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.'],
   lines:['Sonnige, groovige und entspannte Musik zum Aufwärmen und für draußen.','Melodisch und zunehmend energiegeladen, auf dem Weg zur Tanzfläche.','Kraftvoll und treibend. Musik für die volle Tanzfläche.','Melancholisch, hypnotisch und tief. Nachtmusik mit Gefühl.','Die Tracks, zu denen ich immer wieder zurückkehre.','Hard Techno und Hard Trance aus dem Keller. Dunkel oder fröhlich, immer schnell und voller Energie.','Fröhlicher House zum Tanzen bei Tageslicht und für entspannte Nachmittage.'] }
 };
@@ -279,6 +279,7 @@ function metadata(value) {
   $('player-title').textContent = track ? track.title || text('untitled') : currentMood.stage ? text('noTrack') : text('notOnAir');
   $('player-artist').textContent = track ? track.artist || text('unknownArtist') : '';
   $('player-album').textContent = track?.album || '';
+  $('player-album').hidden = !track?.album;
   if ('mediaSession' in navigator && 'MediaMetadata' in window) {
     navigator.mediaSession.metadata = track ? new MediaMetadata({
       title: track.title || text('untitled'), artist: track.artist || '', album: plain(currentMood),
@@ -638,5 +639,5 @@ $('language').addEventListener('change',()=>{
 function announceRadio() {
   if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('pavoia:radio'));
 }
-window.Pavoia = { stations: moods.map(m => ({id:m.stage, name:plain(m)})), getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
+window.Pavoia = { stations: moods.map(m => ({id:m.stage, name:plain(m), thumb:m.photos[0].src})), getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
   play, pause, renderScene, toggle };

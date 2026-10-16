@@ -2,8 +2,9 @@ const assert = require('node:assert/strict');
 const { test } = require('node:test');
 const { readFileSync } = require('node:fs');
 const { resolve } = require('node:path');
-const { runInNewContext } = require('node:vm');
-const source = readFileSync(resolve(__dirname, '../web/app.js'), 'utf8');
+const { runInNewContext, runInContext } = require('node:vm');
+const web = name => readFileSync(resolve(__dirname, '../web/'+name), 'utf8');
+const source = web('app.js');
 const flush = async () => { for (let i=0;i<8;i++) await Promise.resolve(); };
 // One clock for the page under test and the measurements it receives; tests move it forward by hand.
 const clock = {now: Date.now()};
@@ -28,15 +29,19 @@ function cssMatches(list, el) {
 }
 // A focused element as the key handler sees it. Chromium reports :focus-visible during any keydown.
 const control=(tag,attrs={},focusVisible=false)=>{const el={tag,attrs,focusVisible};el.matches=selector=>cssMatches(selector,el);return el;};
-// Top-level rules of the stylesheet, as selector -> declarations.
-const topRules=()=>{
-  const css=readFileSync(resolve(__dirname,'../web/style.css'),'utf8').replace(/\/\*[\s\S]*?\*\//g,'');let flat='',depth=0,media=false;
-  for(let i=0;i<css.length;i++){const c=css[i];if(!depth&&c==='@')media=true;if(c==='{')depth++;if(!media)flat+=c;if(c==='}'&&!--depth)media=false;}
-  return new Map([...flat.matchAll(/([^{}]+)\{([^}]*)\}/g)].map(([,selector,body])=>[selector.trim(),body]));
+// Stylesheet rules as selector -> declarations: the top level, or every @media block with this exact condition.
+const blocks=css=>{const out=[];let depth=0,start=0,open=0;for(let i=0;i<css.length;i++){if(css[i]==='{'&&!depth++)open=i;else if(css[i]==='}'&&!--depth){out.push([css.slice(start,open).trim(),css.slice(open+1,i)]);start=i+1;}}return out;};
+const cssRules=(media='')=>{
+  const found=new Map();
+  for(const [prelude,body] of blocks(web('style.css').replace(/\/\*[\s\S]*?\*\//g,''))){
+    if(!media&&!prelude.startsWith('@'))found.set(prelude,body);
+    else if(media&&prelude==='@media '+media)for(const [selector,declarations] of blocks(body))found.set(selector,declarations);
+  }
+  return found;
 };
 const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date(clock.now).toISOString()}});
 
-function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storage={getItem:()=>null,setItem(){}}}={}) {
+function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storage={getItem:()=>null,setItem(){}},journey=false,media=[]}={}) {
   const imageRequests=[];
   class Element {
     constructor(){this.dataset={};this.events={};this.children=[];this.attrs={};this.textContent='';this.complete=true;this.naturalWidth=100;this.classList={add(){},remove(){}};this.style={setProperty(key,value){this[key]=value;}};}
@@ -57,10 +62,13 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     decode(){return deferImages ? new Promise((resolve,reject)=>imageRequests.push({src:this.src,resolve,reject})) : Promise.resolve();}
     getAnimations(){return [];}
     animate(){return {cancel(){},finished:Promise.resolve()};}
+    pause(){}
+    load(){}
   }
   const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','player-stage','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-controls','photo-count','change-photo','artwork-toggle','bus-link','bus-copy','live-text','language','wordmark','signed'];
   const nodes=ids.map(id=>Object.assign(new Element(),{id}));
-  const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id)});
+  // Any other id gets a plain element, so journey.js finds every node it wires.
+  const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id) || (nodes.push(Object.assign(new Element(),{id})),nodes.at(-1))});
   elements.photo.src='photos/selected/p005.jpg';
   elements['station-selector'].scrollWidth=elements['station-selector'].clientWidth=0;
   const body=new Element();
@@ -79,9 +87,11 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     querySelectorAll:()=>[]});
   class MediaMetadata{constructor(value){Object.assign(this,value);}}
   const window=new Element(),location={hash,pathname:'/',search:''};
-  window.MediaMetadata=MediaMetadata;
+  window.MediaMetadata=MediaMetadata;window.dispatchEvent=event=>window.emit(event.type,event);
   const history={pushState(_state,_title,url){location.hash=url.includes('#')?url.slice(url.indexOf('#')):'';}};
-  const env={clock,elements,audio,actions,timers,mediaSession,document,window,location,imageRequests,requests:[],response:status('First'),
+  // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
+  const queries=new Map();
+  const env={clock,elements,audio,actions,timers,mediaSession,document,window,location,imageRequests,queries,requests:[],response:status('First'),
     click:()=>elements.play.emit('click'),
     focus:target=>document.emit('focusin',{target}),
     pointer:()=>document.emit('pointerdown',{}),
@@ -96,16 +106,18 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     fire(delay){const entry=[...timers].find(([,v])=>v.delay===delay);assert.ok(entry,`Missing ${delay}ms timer`);timers.delete(entry[0]);entry[1].fn();},
     complete(index,data){const r=this.requests[index];r.resolve({ok:true,json:async()=>({...data,stage:{id:r.url.split('/').pop()}})});},
   };
-  runInNewContext(source,{Date:FakeDate,performance:{now:()=>clock.now},document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
-    matchMedia:()=>({matches:false,addEventListener(){}}),Image:class extends Element {constructor(){super();env.preloader=this;}},
+  const context={Date:FakeDate,URL,CustomEvent:class{constructor(type){this.type=type;}},performance:{now:()=>clock.now},document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
+    matchMedia:query=>queries.get(query)||queries.set(query,{matches:media.includes(query),listeners:[],addEventListener(_name,fn){this.listeners.push(fn);},change(matches){this.matches=matches;for(const fn of this.listeners)fn();}}).get(query),Image:class extends Element {constructor(){super();env.preloader=this;}},
     localStorage:storage,
-    fetch:(url,{signal})=>url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience})) : new Promise((resolve,reject)=>{
+    fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? Promise.resolve({ok:Boolean(env.discovery),json:async()=>env.discovery}) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience})) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
     }),
     setTimeout:(fn,delay)=>{timers.set(++timerID,{fn,delay});return timerID;},clearTimeout:id=>timers.delete(id),
     setInterval:fn=>intervals.push(fn),
-  });
+  };
+  runInNewContext(source,context);
+  if(journey)runInContext(web('journey.js'),context);
   return env;
 }
 
@@ -352,7 +364,7 @@ test('a blocked autoplay is a neutral pause and only transient states show words
  assert.deepEqual({...player.dataset},{state:'paused',status:'blocked'},'blocked is not the red error state');
  assert.equal(e.elements['playback-status'].textContent,'Press play to start');assert.equal(e.elements.play.getAttribute('aria-label'),'Play');
  e.click();e.playing();assert.deepEqual({...player.dataset},{state:'playing',status:'playing'});
- const rules=topRules(),reveal=rules.get('.player:not([data-status=paused],[data-status=playing]) #playback-status');
+ const rules=cssRules(),reveal=rules.get('.player:not([data-status=paused],[data-status=playing]) #playback-status');
  assert.match(rules.get('#playback-status'),/clip-path:inset\(50%\)/,'paused and playing keep the status out of sight at every width');
  assert.match(reveal,/clip-path:none/,'a transient state shows its words');
  assert.match(rules.get('.player:not([data-status=paused],[data-status=playing]) #player-stage'),/display:none/,'and takes the stage name\'s place');
@@ -370,4 +382,91 @@ test('the bar names the stage, the tab names the record and Play names its key',
  assert.equal(e.elements['player-artist'].textContent,'','the artist line does not repeat it');
  e.elements.language.value='de';e.elements.language.emit('change');assert.equal(e.elements.play.title,'Pause (Leertaste)');
  e.click();assert.equal(e.elements.play.title,'Abspielen (Leertaste)');assert.equal(e.document.title,'Night in Motion · Pavoia Radio');
+});
+
+test('the record title opens its roots, and the stage photo stands in for a missing cover',async()=>{
+ const e=setup({journey:true});await flush();const title=e.elements['player-title'],dock=e.elements['dock-cover'];
+ assert.equal(title.getAttribute('href'),'#explore/plex_123','before the roots load, the title opens the radio track');
+ assert.deepEqual([dock.src,dock.hidden,dock.alt],['photos/selected/p005.jpg',false,''],'no cover: the stage photo, as decoration');
+ e.discovery={entity:{id:'trk_0123456789ab',type:'track',title:'First'},included:[]};await e.poll();await flush();
+ assert.equal(title.getAttribute('href'),'#explore/trk_0123456789ab','once known, the title opens the track in the roots');
+ const cover='/api/radio/palac-feel/artwork/123/cover?v=0123456789abcdef',first=status('First');
+ e.response={...first,track:{...first.track,coverUrl:cover}};await e.poll();await flush();assert.equal(dock.src,cover,'a real cover replaces the photo');
+ e.response={track:null,audience:{available:false,listeners:null}};await e.poll();await flush();
+ assert.equal(title.getAttribute('href'),null,'no track, no link');assert.equal(dock.src,'photos/selected/p005.jpg');
+ e.change('03');await flush();assert.equal(dock.src,'photos/selected/p250.jpg','the photo follows the stage');
+});
+
+test('the record cell reads title, artists, then a release line that ends on Spotify',async()=>{
+ const html=web('index.html'),cell=html.slice(html.indexOf('</button>'),html.indexOf('<div class="transport-track">'));
+ assert.deepEqual([...cell.matchAll(/id="([a-z-]+)"/g)].map(m=>m[1]),['player-title','player-artist','credited-artists','player-album','label-note','track-spotify']);
+ assert.match(cell,/<a id="player-title"/,'every name is a link, the title too');
+ assert.match(cell,/<p class="player-release">.*<a id="track-spotify"[^>]*>Spotify<\/a><\/p>/,'Spotify is a word at the end of the release line');
+ const rules=cssRules();
+ assert.match(rules.get('.player-release > :not([hidden]) ~ :not([hidden])::before'),/content:'·'/,'a dot separates the shown release items, whichever are hidden');
+ assert.match(rules.get('.player .artist-credit:not(:last-child)::after'),/content:',\\a0' \/ ''/,'artists read as a list, without a spoken comma');
+ assert.equal([...rules.keys()].some(selector=>selector.includes('label-note::before')),false,'the old label dot is gone');
+ const logos=[...rules,...cssRules('(max-width:760px)')].filter(([,body])=>body.includes('spotify.svg')).map(([selector])=>selector);
+ assert.ok(logos.length&&logos.every(selector=>selector.startsWith('.stage-spotify')),'the green logo lives on the hero playlist link only: '+logos);
+ const e=setup();await flush();assert.equal(e.elements['player-album'].hidden,true,'no album, so no dangling separator');
+ const first=status('First');e.response={...first,track:{...first.track,album:'Salewa'}};await e.poll();
+ assert.deepEqual([e.elements['player-album'].hidden,e.elements['player-album'].textContent],[false,'Salewa']);
+});
+
+test('names in the bar are quiet until a pointer or the keyboard reaches them',()=>{
+ const rules=cssRules(),names=/#player-title|#player-album|#track-spotify|\.artist-credit|\.label-note/;
+ for(const [selector,body] of rules)if(names.test(selector)&&/text-decoration:underline/.test(body))assert.match(selector,/:hover.*:focus-visible/,'underlined at rest: '+selector);
+ const reached=[...rules].find(([selector])=>/#player-title\[href\].*:hover, :focus-visible/.test(selector));
+ assert.ok(reached,'a rule underlines the names on hover and focus');assert.match(reached[0],/\.artist-credit:is\(:hover, :focus-visible\)>span>span/);
+ assert.match(reached[1],/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px/);
+ assert.match(rules.get('.player .credited-artists'),/display:block; min-width:0; flex:1 1 0;.*white-space:nowrap; overflow:clip; overflow-clip-margin:6px; text-overflow:ellipsis/,'whole names in order, one ellipsis at the end, no scrollbar, and room for the 5px focus ring');
+ assert.match(rules.get('.player .artist-credit'),/display:inline-flex;.*max-width:calc\(100% - 1em\)/,'one long name ellipsizes itself and leaves room for the row ellipsis');
+ assert.match(rules.get('.player .credited-artists:has(:focus-visible)'),/display:flex/,'with the keyboard in the row, every name keeps a visible share, so focus is never out of sight');
+ assert.match(rules.get('#player-title'),/justify-self:start; max-width:100%/,'the title link, its ring and its click area end with its words');
+ assert.match(rules.get('.player .label-note'),/flex-shrink:0; max-width:50%/,'a long album gives way before the label');
+ assert.match(rules.get('.player .artist-credit'),/font:inherit/,'artist names use Inter, not the button default');
+});
+
+test('the bar is opaque, keeps 96px on desktop and fits 120px on a phone',()=>{
+ const player=cssRules().get('.player'),phone=cssRules('(max-width:760px)');
+ assert.match(player,/position:fixed;.*height:var\(--bar\);.*grid-template-columns:48px 44px minmax\(220px,1.3fr\) minmax\(120px,1fr\) 88px; grid-template-rows:23px 24px 24px;/);
+ assert.match(cssRules().get('.player .artist-credit'),/min-height:24px/,'desktop artist links keep a 24px target');
+ assert.match(player,/background:var\(--ink\);/,'the page never shows through the bar');
+ const rows=body=>/grid-template-rows:([^;]+)/.exec(body)[1].split(' ').reduce((sum,row)=>sum+parseFloat(row),0);
+ assert.ok(rows(player)+12+12+1<=96,'desktop rows, padding and border fit the 96px bar');
+ assert.match(phone.get(':root'),/--bar:calc\(120px \+ env\(safe-area-inset-bottom\)\)/);
+ assert.match(phone.get('.player'),/grid-template-columns:44px 44px minmax\(0,1fr\);.*padding:12px 12px calc\(11px \+ env\(safe-area-inset-bottom\)\)/);
+ assert.equal(rows(phone.get('.player'))+12+11+1,120,'phone rows, padding and border fill the bar exactly, so the page above stays clear');
+ assert.match(phone.get('.dock-cover, .dock-artwork'),/width:44px; height:44px/,'the cover matches the play button');
+ assert.match(phone.get('.player .player-release'),/grid-column:1 \/ -1; grid-row:3/,'the release line takes the full width');
+ assert.match(phone.get('.player .artist-credit'),/min-height:24px/,'artist links keep a 24px target');
+});
+
+test('the volume is a thin line, and leaves where a page cannot set it',()=>{
+ const rules=cssRules();
+ assert.match(rules.get('.volume-control input'),/appearance:none/);
+ assert.match(rules.get('.volume-control input::-webkit-slider-runnable-track'),/height:2px; background:var\(--soft\)/);
+ assert.match(rules.get('.volume-control input::-webkit-slider-thumb'),/width:12px; height:12px;.*border-radius:50%; background:var\(--cream\)/);
+ assert.match(rules.get('.volume-control input::-moz-range-thumb'),/width:12px; height:12px;.*background:var\(--cream\)/);
+ assert.match(cssRules('(max-width:760px), (pointer:coarse)').get('.player .volume-control'),/display:none/,'phones and tablets use their own volume keys');
+});
+
+test('a remembered volume only applies where its slider is shown',async()=>{
+ const query='(max-width:760px), (pointer:coarse)',storage={getItem:key=>key==='pavoia-volume'?'0':null,setItem(){}};
+ assert.ok(cssRules(query).has('.player .volume-control'),'the stylesheet hides the slider under the same query');
+ const desktop=setup({journey:true,storage});await flush();assert.equal(desktop.audio.volume,0,'the slider on screen keeps its muted level');
+ const phone=setup({journey:true,storage,media:[query]});await flush();assert.equal(phone.audio.volume,1,'no slider on screen, so the device sets the level');
+ phone.queries.get(query).change(false);assert.equal(phone.audio.volume,0,'a window widened past the phone layout gets its slider level back');
+ desktop.queries.get(query).change(true);assert.equal(desktop.audio.volume,1,'a window narrowed to the phone layout is never left silent');
+});
+
+test('external links carry a drawn arrow that screen readers skip',()=>{
+ assert.match(cssRules().get('a[target="_blank"]:not(.stage-spotify)::after, .stage-spotify>span:first-child::after'),/content:'\\2009↗' \/ ''/);
+ for(const name of ['index.html','app.js','journey.js'])assert.doesNotMatch(web(name),/↗/,name+' types no arrow into a label');
+});
+
+test('every class in the stylesheet is used by the page',()=>{
+ const css=web('style.css').replace(/\/\*[\s\S]*?\*\//g,'').replace(/url\([^)]*\)/g,''),page=['index.html','app.js','journey.js','waveform.js'].map(web).join('\n');
+ const unused=[...new Set([...css.matchAll(/\.([a-z][a-z0-9-]*)/g)].map(m=>m[1]))].filter(name=>!new RegExp('(?<![\\w-])'+name+'(?![\\w-])').test(page));
+ assert.deepEqual(unused,[]);
 });
