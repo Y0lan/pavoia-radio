@@ -14,8 +14,13 @@ import urllib.error
 from unittest.mock import patch
 
 
+OPS = Path(__file__).resolve().parents[1] / "ops"
+# The ops scripts import their siblings (manage, deploy_web), as they do when run as scripts.
+sys.path.insert(0, str(OPS))
+
+
 def load(name):
-    spec = importlib.util.spec_from_file_location(name, Path(__file__).resolve().parents[1] / "ops" / (name + ".py"))
+    spec = importlib.util.spec_from_file_location(name, OPS / (name + ".py"))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
