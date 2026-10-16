@@ -2,6 +2,24 @@
 (() => {
   const $ = id => document.getElementById(id);
   const radio = window.Pavoia;
+  // The artist row in the bar scrolls sideways when names do not fit. A plain mouse wheel scrolls it
+  // too, until its end, and data-before and data-more fade each edge where names wait.
+  const credits = $('credited-artists');
+  const moreCredits = () => {
+    credits.toggleAttribute('data-before', credits.scrollLeft>1);
+    credits.toggleAttribute('data-more', credits.scrollWidth-credits.scrollLeft-credits.clientWidth>1);
+  };
+  credits.addEventListener('scroll', moreCredits, {passive:true});
+  window.addEventListener('resize', moreCredits);
+  credits.addEventListener('wheel', event => {
+    // Ctrl+wheel and pinch stay the browser's zoom. deltaMode counts pixels, lines or pages.
+    // The browser clamps scrollLeft at both ends, fractional ones too: the page keeps the wheel
+    // whenever the row did not move. An event the page cannot cancel is the page's, so both never move.
+    if (!event.cancelable || event.ctrlKey || Math.abs(event.deltaX)>=Math.abs(event.deltaY)) return;
+    const before=credits.scrollLeft;
+    credits.scrollLeft=before+event.deltaY*[1,16,credits.clientWidth][event.deltaMode];
+    if (credits.scrollLeft!==before) event.preventDefault();
+  }, {passive:false});
   const playlists = [
     ['bermuda-day','Under the Sun','72rXpksfahfeQ7h1Xge02n'],
     ['bermuda-evening','As Night Begins','1OIvw3QkFGru27JDgXK49d'],
@@ -119,6 +137,7 @@
         if(a.image){const img=node('img');img.width=52;img.height=52;image(img,a.image,word('portrait'));b.append(img);}
         const text=node('span');text.append(node('small','',word(role)),node('span','',a.title));b.append(text);return b;
       }));
+      $('credited-artists').scrollLeft=0;moreCredits();
     }
     if('mediaSession' in navigator && 'MediaMetadata' in window){
       const playing=preview?.entity||(s.dataFresh?t:null),art=preview?.entity.image||cover;

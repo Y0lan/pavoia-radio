@@ -173,14 +173,16 @@ body[data-wanted] .icon-pause { display:block; }
 .player-credits { grid-column:3; grid-row:2; display:flex; align-items:center; min-width:0; font:12px Inter,sans-serif; color:var(--soft); }
 .player-credits #player-artist { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .player-credits:has(.artist-credit) #player-artist { display:none; }
-/* Whole names in reading order, then one ellipsis for those that do not fit. The row spans the column so a name's
-   max-width is measured against it, the clip margin keeps the 5px focus ring, and while the keyboard is in the row
-   every name gets a share of it, so focus never lands out of sight. */
-.player .credited-artists { display:block; min-width:0; flex:1 1 0; padding:0; gap:0; flex-wrap:nowrap; white-space:nowrap; overflow:clip; overflow-clip-margin:6px; text-overflow:ellipsis; }
-.player .credited-artists:has(:focus-visible) { display:flex; }
-.player .artist-credit { display:inline-flex; vertical-align:top; min-width:0; max-width:calc(100% - 1em); min-height:24px; gap:0; color:inherit; font:inherit; }
+/* Names that do not fit scroll sideways, by finger, trackpad, wheel or Tab, never cut. The 6px
+   padding holds the 5px focus ring inside the scroller; a fade marks each side where names wait. */
+.player .credited-artists { display:block; min-width:0; flex:1 1 0; padding:6px; margin:-6px; gap:0; flex-wrap:nowrap; white-space:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
+.player .credited-artists:is([data-before], [data-more]) { --before:#000; --more:#000; mask-image:linear-gradient(to right, var(--before) 6px, #000 40px, #000 calc(100% - 40px), var(--more) calc(100% - 6px)); }
+.player .credited-artists[data-before] { --before:transparent; }
+.player .credited-artists[data-more] { --more:transparent; }
+.player .credited-artists:has(:focus-visible) { mask-image:none; }
+.player .artist-credit { display:inline-flex; vertical-align:top; min-height:24px; gap:0; color:inherit; font:inherit; }
 .player .artist-credit:not(:last-child)::after { content:',\a0' / ''; }
-.player .artist-credit span { display:block; line-height:24px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.player .artist-credit span { display:block; line-height:24px; white-space:nowrap; }
 .player .artist-credit small { display:none; }
 .player-release { grid-column:3; grid-row:3; display:flex; align-items:center; min-width:0; font:12px/24px Inter,sans-serif; color:var(--muted); white-space:nowrap; }
 .player-release>* { min-width:0; }

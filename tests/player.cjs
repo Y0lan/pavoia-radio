@@ -487,15 +487,39 @@ test('the record cell reads title, artists, then a release line that ends on Spo
  assert.deepEqual([e.elements['player-album'].hidden,e.elements['player-album'].textContent],[false,'Salewa']);
 });
 
+test('artist names that do not fit scroll sideways, by wheel too, and a fade shows more wait',async()=>{
+ const e=setup({journey:true});await flush();const row=e.elements['credited-artists'];
+ // Like a browser, the row clamps its position to the real limit, which can be fractional.
+ let left=0;row.limit=100;Object.defineProperty(row,'scrollLeft',{get:()=>left,set:v=>{left=Math.max(0,Math.min(row.limit,v));}});
+ Object.assign(row,{scrollWidth:300,clientWidth:200});row.emit('scroll');
+ assert.deepEqual([row.getAttribute('data-before'),row.getAttribute('data-more')],[null,''],'names wait to the right only');
+ let stopped=0;const wheel=(deltaY,deltaX=0,more={})=>row.emit('wheel',{deltaY,deltaX,deltaMode:0,cancelable:true,preventDefault(){stopped++;},...more});
+ wheel(60,0,{cancelable:false});assert.deepEqual([row.scrollLeft,stopped],[0,0],'a wheel event the page cannot cancel scrolls the page alone');
+ wheel(60,0,{ctrlKey:true});assert.deepEqual([row.scrollLeft,stopped],[0,0],'Ctrl+wheel and pinch stay the browser zoom');
+ wheel(1,0,{deltaMode:1});assert.equal(row.scrollLeft,16,'a wheel counting lines moves a line');
+ wheel(0.25,0,{deltaMode:2});assert.equal(row.scrollLeft,66,'a wheel counting pages moves by the row width');
+ row.scrollLeft=0;stopped=0;
+ wheel(60);assert.deepEqual([row.scrollLeft,stopped],[60,1],'a plain mouse wheel scrolls the row');
+ wheel(-1,40);assert.deepEqual([row.scrollLeft,stopped],[60,1],'a sideways trackpad gesture keeps its native scroll');
+ wheel(500);assert.equal(row.scrollLeft,100,'the wheel stops at the last name');row.emit('scroll');
+ assert.deepEqual([row.getAttribute('data-before'),row.getAttribute('data-more')],['',null],'at the end the fade moves to the start');
+ wheel(60);assert.equal(stopped,2,'past the end the page gets the wheel back');
+ row.limit=99.5;row.scrollLeft=500;wheel(60);assert.deepEqual([row.scrollLeft,stopped],[99.5,2],'a fractional end gives the wheel back too');
+ wheel(-60);assert.deepEqual([row.scrollLeft,stopped],[39.5,3],'and the wheel scrolls back from it');
+ row.limit=0;row.clientWidth=300;row.scrollLeft=0;wheel(60);assert.deepEqual([row.scrollLeft,stopped],[0,3],'a row that fits never takes the wheel');
+});
+
 test('names in the bar are quiet until a pointer or the keyboard reaches them',()=>{
  const rules=cssRules(),names=/#player-title|#player-album|#track-spotify|\.artist-credit|\.label-note/;
  for(const [selector,body] of rules)if(names.test(selector)&&/text-decoration:underline/.test(body))assert.match(selector,/:hover.*:focus-visible/,'underlined at rest: '+selector);
  const reached=[...rules].find(([selector])=>/#player-title\[href\].*:hover, :focus-visible/.test(selector));
  assert.ok(reached,'a rule underlines the names on hover and focus');assert.match(reached[0],/\.artist-credit:is\(:hover, :focus-visible\)>span>span/);
  assert.match(reached[1],/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px/);
- assert.match(rules.get('.player .credited-artists'),/display:block; min-width:0; flex:1 1 0;.*white-space:nowrap; overflow:clip; overflow-clip-margin:6px; text-overflow:ellipsis/,'whole names in order, one ellipsis at the end, no scrollbar, and room for the 5px focus ring');
- assert.match(rules.get('.player .artist-credit'),/display:inline-flex;.*max-width:calc\(100% - 1em\)/,'one long name ellipsizes itself and leaves room for the row ellipsis');
- assert.match(rules.get('.player .credited-artists:has(:focus-visible)'),/display:flex/,'with the keyboard in the row, every name keeps a visible share, so focus is never out of sight');
+ assert.match(rules.get('.player .credited-artists'),/display:block; min-width:0; flex:1 1 0; padding:6px; margin:-6px;.*white-space:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:none/,'whole names in order, scrolled sideways without a scrollbar, with room for the 5px focus ring');
+ assert.match(rules.get('.player .credited-artists:is([data-before], [data-more])'),/mask-image:linear-gradient\(to right, var\(--before\) 6px.*var\(--more\) calc\(100% - 6px\)\)/,'one fade per side where names wait');
+ assert.match(rules.get('.player .credited-artists:has(:focus-visible)'),/mask-image:none/,'a focused name is never faded, nor its ring');
+ assert.match(rules.get('.player .credited-artists[data-before]'),/--before:transparent/);assert.match(rules.get('.player .credited-artists[data-more]'),/--more:transparent/);
+ for(const [selector,body] of rules)if(/artist-credit|credited-artists/.test(selector))assert.doesNotMatch(body,/text-overflow|overflow:clip/,'no name is cut: '+selector);
  assert.match(rules.get('#player-title'),/justify-self:start; max-width:100%/,'the title link, its ring and its click area end with its words');
  assert.match(rules.get('.player .label-note'),/flex-shrink:0; max-width:50%/,'a long album gives way before the label');
  assert.match(rules.get('.player .artist-credit'),/font:inherit/,'artist names use Inter, not the button default');
