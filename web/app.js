@@ -489,7 +489,18 @@ async function poll() {
   }
 }
 
-async function pollListeners() {
+// The live count is polled every 2 s after anything that can change it (page shown, station change,
+// playback start, a new count) and twice as rarely each time it stays the same, up to every 30 s.
+// A hidden page polls nothing. The schedule uses the monotonic clock, so a system clock correction
+// cannot stall it.
+const AUDIENCE_FAST = 2000, AUDIENCE_SLOW = 30000;
+let audienceDelay = AUDIENCE_FAST, audienceDue = 0;
+function tickListeners() {
+  if (performance.now() >= audienceDue) return pollListeners();
+}
+
+async function pollListeners(urgent = false) {
+  if (urgent === true) audienceDelay = AUDIENCE_FAST;
   if (document.hidden || audienceController) return;
   const controller=new AbortController(),stage=currentMood.stage;
   audienceController=controller;
@@ -499,12 +510,16 @@ async function pollListeners() {
     if (!response.ok) throw new Error('status');
     const value=await response.json();
     if (!value || typeof value.available!=='boolean' || (value.available && (!Number.isInteger(value.listeners) || value.listeners<0 || !Number.isFinite(Date.parse(value.measuredAt))))) throw new Error('audience');
-    if (audienceController===controller && currentMood.stage===stage) audienceData=value;
+    if (audienceController===controller && currentMood.stage===stage) {
+      const same=audienceData && value.available===audienceData.available && value.listeners===audienceData.listeners;
+      audienceDelay=same ? Math.min(audienceDelay*2, AUDIENCE_SLOW) : AUDIENCE_FAST;
+      audienceData=value;
+    }
   } catch {
-    if (audienceController===controller) audienceData=null;
+    if (audienceController===controller) {audienceData=null;audienceDelay=Math.min(audienceDelay*2, AUDIENCE_SLOW);}
   } finally {
     clearTimeout(timeout);
-    if (audienceController===controller) {audienceController=null;renderStatus();}
+    if (audienceController===controller) {audienceController=null;audienceDue=performance.now()+audienceDelay;renderStatus();}
   }
 }
 
@@ -528,20 +543,20 @@ function selectMood(id) {
   if (wanted) connect();
   else state('paused', next.stage ? 'paused' : 'soon');
   poll();
-  pollListeners();
+  pollListeners(true);
 }
 $('moods').addEventListener('change', event => selectMood(event.target.value));
 
-document.addEventListener('visibilitychange', () => { if (!document.hidden) {poll();pollListeners();} else {audienceController?.abort();} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) {poll();pollListeners(true);} else {audienceController?.abort();} });
 arrangeStations();
 localise();
 render();
 state('paused', 'paused');
 poll();
 setInterval(poll, 10000);
-pollListeners();
-setInterval(pollListeners, 1000);
-audio.addEventListener('playing',pollListeners);
+pollListeners(true);
+setInterval(tickListeners, 1000);
+audio.addEventListener('playing', () => pollListeners(true));
 
 function renderStatus() {
   document.body.toggleAttribute('data-on-air',Boolean(dataFresh && track));
@@ -554,7 +569,7 @@ function renderStatus() {
     return;
   }
   const { listeners: count, measuredAt, available }=audienceData || {};
-  const fresh=Number.isFinite(Date.parse(measuredAt)) && Math.abs(Date.now()-Date.parse(measuredAt))<=5000;
+  const fresh=Number.isFinite(Date.parse(measuredAt)) && Math.abs(Date.now()-Date.parse(measuredAt))<=AUDIENCE_SLOW+5000;
   const known=fresh && available && Number.isInteger(count) && count>=0;
   $('live-text').textContent=track ? known ? `${text('live')} · ${count}` : text('live') : text('standby');
   const hint=known ? `${count} ${text('audience')}: ${plain(currentMood)}` : text('audienceUnknown');

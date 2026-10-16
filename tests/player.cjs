@@ -5,7 +5,9 @@ const { resolve } = require('node:path');
 const { runInNewContext } = require('node:vm');
 const source = readFileSync(resolve(__dirname, '../web/app.js'), 'utf8');
 const flush = async () => { for (let i=0;i<8;i++) await Promise.resolve(); };
-const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date().toISOString()}});
+// One clock for the page under test and the measurements it receives; tests move it forward by hand.
+const clock = {now: Date.now()};
+const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date(clock.now).toISOString()}});
 
 function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storage={getItem:()=>null,setItem(){}}}={}) {
   const imageRequests=[];
@@ -41,6 +43,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   audio.load=()=>{audio.readyState=0;audio.error=null;audio.ended=false;};
   audio.play=()=>{audio.paused=false;return new Promise((resolve,reject)=>audio.calls.push({resolve,reject,src:audio.src}));};
   const actions={},timers=new Map(),intervals=[];let timerID=0;
+  clock.now=Date.now();
+  let wallOffset=0;
+  class FakeDate extends Date {static now(){return clock.now+wallOffset;}}
   const mediaSession={setActionHandler(name,fn){actions[name]=fn;}};
   const document={body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:()=>new Element(),createElementNS:()=>new Element(),
     querySelector:selector=> selector.startsWith('input') ? new Element() : elements[selector.slice(1)],
@@ -49,19 +54,22 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   const window=new Element(),location={hash,pathname:'/',search:''};
   window.MediaMetadata=MediaMetadata;
   const history={pushState(_state,_title,url){location.hash=url.includes('#')?url.slice(url.indexOf('#')):'';}};
-  const env={elements,audio,actions,timers,mediaSession,document,window,location,imageRequests,requests:[],response:status('First'),
+  const env={clock,elements,audio,actions,timers,mediaSession,document,window,location,imageRequests,requests:[],response:status('First'),
     click:()=>elements.play.emit('click'),change:id=>elements.moods.emit('change',{target:{value:id}}),
     playing:()=>{audio.readyState=4;audio.emit('playing');},
     error:()=>{audio.error={code:2};audio.emit('error');},
     poll:()=>intervals[0](),
-    pollAudience:()=>intervals[1](),
+    pollAudience:()=>{clock.now+=30000;return intervals[1]();},
+    tickAudience:()=>intervals[1](),
+    setWall:offset=>{wallOffset=offset;},
+    audienceCalls:0,
     fire(delay){const entry=[...timers].find(([,v])=>v.delay===delay);assert.ok(entry,`Missing ${delay}ms timer`);timers.delete(entry[0]);entry[1].fn();},
     complete(index,data){const r=this.requests[index];r.resolve({ok:true,json:async()=>({...data,stage:{id:r.url.split('/').pop()}})});},
   };
-  runInNewContext(source,{document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
+  runInNewContext(source,{Date:FakeDate,performance:{now:()=>clock.now},document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
     matchMedia:()=>({matches:false,addEventListener(){}}),Image:class extends Element {constructor(){super();env.preloader=this;}},
     localStorage:storage,
-    fetch:(url,{signal})=>url.startsWith('/api/audience?') ? Promise.resolve({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}) : new Promise((resolve,reject)=>{
+    fetch:(url,{signal})=>url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience})) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
     }),
@@ -89,6 +97,20 @@ test('the start says Connecting; only a stall during play says Buffering',async(
  assert.equal(e.elements['playback-status'].textContent,'Connecting');
  e.playing();e.audio.readyState=2;e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering');
  e.change('03');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Connecting','a new station connects again');
+});
+
+test('the live count polls fast after a change and backs off while it stays the same',async()=>{
+ const e=setup();await flush();assert.equal(e.audienceCalls,1);
+ for (const [wait,calls] of [[0,1],[2000,2],[2000,2],[2000,3],[7999,3],[1,4],[16000,5],[29999,5],[1,6],[30000,7]]) {
+  e.clock.now+=wait;await e.tickAudience();assert.equal(e.audienceCalls,calls,`${calls} polls expected after +${wait} ms`);
+ }
+ e.audio.emit('playing');await flush();assert.equal(e.audienceCalls,8,'starting playback polls at once');
+ e.clock.now+=4000;await e.tickAudience();assert.equal(e.audienceCalls,9,'and restarts the fast rhythm');
+ e.audienceResponse=status('Count',5).audience;e.clock.now+=8000;await e.tickAudience();assert.equal(e.audienceCalls,10);
+ e.clock.now+=2000;await e.tickAudience();assert.equal(e.audienceCalls,11,'a new count makes it fast again');
+ e.document.hidden=true;e.clock.now+=60000;await e.tickAudience();assert.equal(e.audienceCalls,11,'a hidden page polls nothing');
+ e.document.hidden=false;e.change('03');await flush();assert.equal(e.audienceCalls,12,'a station change polls at once');
+ e.setWall(-3600000);e.clock.now+=4000;await e.tickAudience();assert.equal(e.audienceCalls,13,'a system clock correction cannot stall polling');
 });
 
 test('gesture, pause/resume races and media controls release the source',async()=>{
