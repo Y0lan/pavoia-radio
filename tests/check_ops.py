@@ -166,7 +166,9 @@ class OpsChecks(unittest.TestCase):
         with patch.object(manage.Path, "home", return_value=self.root), patch.object(manage, "run") as commands:
             manage.configure()
             commands.assert_not_called()
-        config = manage.NGINX.read_text()
+        full = manage.NGINX.read_text()
+        prod, dev = re.findall(r"  server \{\n(.*?)\n  \}\n", full, re.S)
+        config = full.replace(dev, "")
         self.assertIn("error_log /dev/null warn;", config)
         self.assertIn("access_log off;", config)
         self.assertNotIn("error.log", config)
@@ -188,16 +190,34 @@ class OpsChecks(unittest.TestCase):
             path = f"/stream/{scene['id']}.mp3"
             expected.add(path)
             self.assertIn(f"proxy_pass http://127.0.0.1:14501/{scene['id']}.mp3;", routes[path])
-            self.assertIn("limit_conn pavoia_audio 90;", routes[path])
+            self.assertIn("limit_conn pavoia_streams 90;", routes[path])
             self.assertIn("limit_conn_status 503;", routes[path])
-        self.assertIn("limit_conn_zone $server_name zone=pavoia_audio:32k;", config)
+        self.assertIn("map $server_port $pavoia_stream_key { default pavoia; }", config)
+        self.assertIn("limit_conn_zone $pavoia_stream_key zone=pavoia_streams:32k;", config)
         for path, body in routes.items():
             if not path.startswith("/stream/"):
-                self.assertNotIn("limit_conn pavoia_audio", body)
+                self.assertNotIn("limit_conn pavoia_streams", body)
         self.assertEqual(set(routes), expected)
         for route in routes.values():
             self.assertIn('proxy_set_header Authorization "";', route)
             self.assertIn("limit_except GET { deny all; }", route)
+        # Dev: the same headers, streams and APIs as prod; the site itself comes from the static release.
+        self.assertIn("listen 0.0.0.0:14520;", dev)
+        self.assertIn("server_name pavoia-dev.gaende.box.ca;", dev)
+        self.assertNotIn("14502;\n      proxy_set_header Authorization \"\";\n      proxy_read_timeout 5s;", dev)
+        for line in prod.splitlines():
+            if line.startswith("    add_header"):
+                self.assertIn(line, dev)
+        dev_routes = dict(re.findall(r"location = (\S+) \{\n(.*?)\n    \}", dev, re.S))
+        self.assertEqual(set(dev_routes), expected - set(manage.WEB_FILES) | {"/"})
+        for path in expected - set(manage.WEB_FILES):
+            self.assertEqual(dev_routes[path], routes[path])
+        types = "types { text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; font/woff2 woff2; font/ttf ttf; text/plain txt; }"
+        charset = "charset utf-8;\n      charset_types text/css text/javascript text/plain image/svg+xml;"
+        site = f"limit_except GET {{ deny all; }}\n      root {self.root / 'web-dev'};\n      try_files FILES =404;\n      {types}\n      {charset}\n      expires epoch;"
+        self.assertEqual(dev_routes["/"].strip(), site.replace("FILES", "/index.html"))
+        self.assertIn("    location / {\n      " + site.replace("FILES", "$uri") + "\n    }", dev)
+        self.assertNotIn("location / { return 404; }", dev)
         self.assertEqual((self.root / "secrets/preview-access.txt").read_text(), "URL=https://pavoia.gaende.box.ca/\n")
         credentials = self.root / "secrets/credentials.json"
         values = json.loads(credentials.read_text())

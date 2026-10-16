@@ -1,0 +1,58 @@
+# Tests on every push and pull request. A green push to main publishes the website to
+# pavoia-dev.gaende.box.ca. Only static website files are deployed; the stations, Go
+# controllers and audio are untouched. Production keeps its reviewed release process.
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Go
+        run: go vet ./... && go test -race ./...
+      - name: Player
+        run: node --test tests/player.cjs
+      - name: Operations
+        # check_played.py and check_queue.py need Liquidsoap and Podman; they run on Whatbox releases.
+        run: |
+          for check in ops deploy_web discovery_sync load catalogue_inventory; do
+            python3 tests/check_$check.py
+          done
+
+  deploy:
+    needs: test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: dev
+      url: https://pavoia-dev.gaende.box.ca/
+    # No concurrency group: GitHub keeps only one pending job per group, so an older commit could cancel
+    # a newer deploy. The server lock and the "newer than live" rule order deploys instead.
+    steps:
+      - name: Publish this commit's website
+        # The key is restricted on Whatbox to `deploy_web.py --ssh`: it can only ask for this exact deploy.
+        env:
+          KEY: ${{ secrets.WHATBOX_DEPLOY_KEY }}
+          KNOWN_HOSTS: ${{ secrets.WHATBOX_KNOWN_HOSTS }}
+          TARGET: ${{ secrets.WHATBOX_SSH_TARGET }}
+        run: |
+          install -d -m 700 ~/.ssh
+          printf '%s\n' "$KEY" > ~/.ssh/deploy && chmod 600 ~/.ssh/deploy
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes "$TARGET" "dev $GITHUB_SHA"

@@ -30,6 +30,9 @@ NAMES = ["pavoia-pilot-icecast"] + [
 ]
 LIQUIDSOAP = "docker.io/savonet/liquidsoap@sha256:c30745e4f3e5b80a3ee2a05d65fe2b203373e238f600581d5f741ec64e928ed5"
 NGINX = ROOT / "nginx/nginx.conf"
+WEB_FILES = ("/", "/index.html", "/app.js", "/journey.js", "/waveform.js", "/explore.js", "/style.css")
+# The dev site serves ROOT/web-dev, a static release of branch main (ops/deploy_web.py), on top of the live stations.
+DEV = {"host": "pavoia-dev.gaende.box.ca", "port": 14520}
 
 
 def run(args, **kwargs):
@@ -121,7 +124,7 @@ def configure():
     # Remove/revise after Whatbox confirms sufficient website + audio capacity.
     stream_locations = "".join(f'''    location = /stream/{scene['id']}.mp3 {{
       limit_except GET {{ deny all; }}
-      limit_conn pavoia_audio 90;
+      limit_conn pavoia_streams 90;
       limit_conn_status 503;
       proxy_pass http://127.0.0.1:14501/{scene['id']}.mp3;
       proxy_http_version 1.1;
@@ -135,10 +138,11 @@ def configure():
       add_header Cache-Control "no-store" always;
     }}
 ''' for scene in SCENES)
-    routes = [(path, 14502) for path in ("/", "/index.html", "/app.js", "/journey.js", "/waveform.js", "/explore.js", "/style.css", "/api/library/catalogue", "/api/library/statistics", "/api/audience")]
+    routes = [(path, 14502) for path in ("/api/library/catalogue", "/api/library/statistics", "/api/audience")]
     routes += [(f"/api/radio/{scene['id']}{suffix}", scene["port"])
                for scene in SCENES for suffix in ("", "/stats", "/catalogue", "/changes", "/history", "/music")]
-    controller_locations = "".join(f'''    location = {path} {{
+    def controller_locations(routes):
+        return "".join(f'''    location = {path} {{
       limit_except GET {{ deny all; }}
       proxy_pass http://127.0.0.1:{port};
       proxy_set_header Authorization "";
@@ -163,12 +167,40 @@ def configure():
       proxy_read_timeout 5s;
     }}
 ''' for folder in ("assets", "photos", "fonts"))
+    controller_site = controller_locations([(path, 14502) for path in WEB_FILES]) + static_locations + "    location / { return 404; }\n"
+    # Browsers refuse scripts and styles with a wrong type because the site sends nosniff, and
+    # nginx's built-in type map lacks js, css, svg and fonts; the Go controller sets them for prod.
+    static_site = "".join(f'''    location {match} {{
+      limit_except GET {{ deny all; }}
+      root {ROOT / "web-dev"};
+      try_files {files} =404;
+      types {{ text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; font/woff2 woff2; font/ttf ttf; text/plain txt; }}
+      charset utf-8;
+      charset_types text/css text/javascript text/plain image/svg+xml;
+      expires epoch;
+    }}
+''' for match, files in (("= /", "/index.html"), ("/", "$uri")))
+
+    def server(host, port, site):
+        return f'''  server {{
+    listen 0.0.0.0:{port};
+    listen [::]:{port};
+    server_name {host};
+    add_header X-Robots-Tag "noindex, nofollow" always;
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy no-referrer always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'" always;
+    location ^~ /internal/ {{ return 404; }}
+    location = /healthz {{ return 404; }}
+{stream_locations}{controller_locations(routes)}{artwork_locations}{site}  }}
+'''
     private_write(NGINX, f'''worker_processes 1;
 pid {ROOT}/nginx/nginx.pid;
 error_log /dev/null warn;
 events {{ worker_connections 1024; }}
 http {{
-  limit_conn_zone $server_name zone=pavoia_audio:32k;
+  map $server_port $pavoia_stream_key {{ default pavoia; }}
+  limit_conn_zone $pavoia_stream_key zone=pavoia_streams:32k;
   access_log off;
   default_type application/octet-stream;
   server_tokens off;
@@ -176,19 +208,7 @@ http {{
   client_body_temp_path {ROOT}/nginx/client_body;
   proxy_temp_path {ROOT}/nginx/proxy;
   keepalive_timeout 15;
-  server {{
-    listen 0.0.0.0:14500;
-    listen [::]:14500;
-    server_name pavoia.gaende.box.ca;
-    add_header X-Robots-Tag "noindex, nofollow" always;
-    add_header X-Content-Type-Options nosniff always;
-    add_header Referrer-Policy no-referrer always;
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self'; media-src 'self'; connect-src 'self'; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'" always;
-    location ^~ /internal/ {{ return 404; }}
-    location = /healthz {{ return 404; }}
-{stream_locations}{controller_locations}{artwork_locations}{static_locations}    location / {{ return 404; }}
-  }}
-}}
+{server("pavoia.gaende.box.ca", 14500, controller_site)}{server(DEV["host"], DEV["port"], static_site)}}}
 ''')
     print("Configuration ready; public URL in secrets/preview-access.txt")
 

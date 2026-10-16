@@ -85,6 +85,7 @@ python3 tests/check_ops.py
 python3 tests/check_load.py
 python3 tests/check_catalogue_inventory.py
 python3 tests/check_discovery_sync.py
+python3 tests/check_deploy_web.py
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -o bin/pavoia .
 ```
 
@@ -147,3 +148,23 @@ It starts temporary controllers with isolated state, unreachable test upstreams 
 random local ports. It checks database integrity, catalogue reads, playback/daily
 counts and rebuilt fallback playlists. Production services and music stay unchanged.
 This verifies restoration of the saved snapshot, not recovery of changes made after it.
+
+## Publishing the website
+
+Every push runs the checks in GitHub Actions. When they pass on `main`, the
+website of that commit goes live on https://pavoia-dev.gaende.box.ca/. Both sites
+play the same live stations; only the page differs. A later commit always wins: a
+delayed job for an older commit never moves dev back. Production still receives the
+website through the reviewed release, which rebuilds the Go controllers.
+
+A website deploy never restarts anything. `ops/deploy_web.py` unpacks the commit's
+`web/` folder into `releases/` on Whatbox, switches the `web-dev` link to
+it, checks that Nginx serves the new files and switches back if not. Changes to the Go
+controllers, Liquidsoap or Icecast still follow the reviewed release process, because
+they restart services.
+
+To undo the last dev deploy on Whatbox: `python3 ops/deploy_web.py rollback dev`.
+
+GitHub reaches Whatbox with one SSH key whose `authorized_keys` entry is restricted to
+`deploy_web.py --ssh`. That key can only ask to publish a commit of `main` on dev. It
+cannot open a shell or run anything else.
