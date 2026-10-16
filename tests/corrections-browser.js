@@ -3,7 +3,7 @@ async page => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.goto(new URL('/',page.url()).href);
   await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   assert(await page.locator('.collection-nav').count()===0,'Detached navigation remains');
   assert(await page.locator('#go-deeper').textContent()==="See the roots it's built on",'Unclear Explore entry');
   const subtitles={
@@ -14,7 +14,7 @@ async page => {
     await page.setViewportSize({width,height:width===1440?1000:844});
     assert(await page.locator('#bus-link').evaluate(n=>n===n.parentElement.lastElementChild&&n.previousElementSibling.classList.contains('mood-essentials')),'Bus is not last');
     for(const language of ['en','de']){
-      await page.locator('#language').selectOption(language);
+      await page.locator(`#language [value=${language}]`).dispatchEvent('click');
       for(const name of ['Ambiance','Closing']){
         if(width<=760)await page.locator('#open-stations').click();
         await page.getByRole('radio',{name,exact:true}).check();
@@ -24,7 +24,7 @@ async page => {
       }
     }
   }
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.locator('#audio').evaluate(a=>{a.volume=0;});
   await page.locator('#play').click();
   await page.waitForFunction(()=>window.Pavoia.getState().playbackState==='playing');
@@ -77,13 +77,13 @@ async page => {
   assert(await page.locator('.entity-connections').count()===1,'Rich connections lost');
   await page.screenshot({path:'output/playwright/corrections-rich-320.png'});
   await page.locator('#explorer-close').click();
-  await page.locator('#language').selectOption('de');
+  await page.locator('#language [value=de]').dispatchEvent('click');
   await page.evaluate(()=>window.Pavoia.openTrack('128670'));
   await page.waitForFunction(()=>document.getElementById('entity-inspector').textContent.includes('Veröffentlichungsprofile'));
   await page.locator('.explorer-nav a[href="#history"]').click();
   assert(await page.locator('#explorer-title').textContent()==='Verlauf','History translation missing');
   await page.locator('#explorer-close').click();
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   assert(!errors.length,errors.join('; '));
   return {busLast:true,subtitles:['en','de'],viewports:[1440,390,320],historyFallback:true,directLinkReload:true,richProfile:true,libraryArtwork:true,yearCount:years.length,newestYear:years[0],playbackPreserved:true,errors};
 }

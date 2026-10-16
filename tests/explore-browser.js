@@ -4,7 +4,7 @@ async page => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion:'reduce' });
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.locator('#catalogue-panel summary').click();
   await page.waitForFunction(() => document.querySelectorAll('#catalogue-tracks li').length === 30);
   const first = await page.locator('.catalogue-title').first().textContent();
@@ -29,7 +29,7 @@ async page => {
   await page.locator('#changes-panel summary').click();
   await page.locator('#audience-panel summary').click();
   await page.waitForFunction(() => !document.getElementById('audience-table').hidden);
-  await page.locator('#language').selectOption('de');
+  await page.locator('#language [value=de]').dispatchEvent('click');
   assert(await page.locator('#catalogue-panel summary').textContent() === 'Die Auswahl entdecken', 'Catalogue language');
   assert(await page.locator('#audio').evaluate(a => !a.paused), 'Catalogue/language stopped playback');
   await page.locator('#play').click();
@@ -40,7 +40,7 @@ async page => {
   await page.setViewportSize({width:390,height:844});
   await page.locator('#audience-panel').scrollIntoViewIfNeeded();
   await page.screenshot({path:'collection-mobile-de.png'});
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.setViewportSize({width:1440,height:1000});
   await page.locator('#catalogue-panel summary').scrollIntoViewIfNeeded();
   await page.screenshot({path:'collection-desktop.png'});

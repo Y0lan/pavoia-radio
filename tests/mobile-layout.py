@@ -35,7 +35,7 @@ with sync_playwright() as p:
  page.goto('https://pavoia.gaende.box.ca/',wait_until='domcontentloaded')
  page.evaluate('document.fonts.ready')
  wait_for('window.Pavoia?.stations.length===9')
- page.locator('#language').select_option('en')
+ page.locator('#language [value=en]').dispatch_event('click')
  def loaded():
   wait_for("!document.body.hasAttribute('data-photo-loading') && document.getElementById('photo').naturalWidth>0")
  def shot(name,full=False):
@@ -89,12 +89,12 @@ with sync_playwright() as p:
   shot(f'sheet-{width}')
   page.keyboard.press('Escape')
   assert page.locator('#open-stations').evaluate('n=>document.activeElement===n')
-  page.locator('#language').select_option('de')
+  page.locator('#language [value=de]').dispatch_event('click')
   for identifier in ('02','04','08','09'):
    select(identifier);no_overflow()
    assert page.locator('#station-position').inner_text()==f'{order.index(identifier)+1} / 9'
   shot(f'german-{width}')
-  page.locator('#language').select_option('en')
+  page.locator('#language [value=en]').dispatch_event('click')
  for width in (1024,1440):
   page.set_viewport_size({'width':width,'height':1000})
   wait_for("document.getElementById('station-selector').parentElement.id==='station-selector-home'")
@@ -139,10 +139,10 @@ with sync_playwright() as p:
   page.locator('#change-photo').click();loaded()
   assert page.locator('#photo').get_attribute('src')!=previous_photo
   assert page.locator('#audio').get_attribute('src')==source
-  page.locator('#language').select_option('de')
-  assert page.locator('#change-photo').get_attribute('aria-label')=='Foto wechseln'
+  page.locator('#language [value=de]').dispatch_event('click')
+  assert page.locator('#change-photo').get_attribute('aria-label').startswith('Nächstes Foto, ')
   assert page.locator('#audio').evaluate('a=>!a.paused')
-  page.locator('#language').select_option('en')
+  page.locator('#language [value=en]').dispatch_event('click')
   swipe_photo(-160);stage_is('etage-zero')
   wait_for('window.Pavoia.getState().playbackState==="playing"')
   assert page.locator('#audio').get_attribute('src')=='/stream/etage-zero.mp3'
@@ -154,7 +154,7 @@ with sync_playwright() as p:
   wait_for('getComputedStyle(document.getElementById("stations-sheet")).display==="none"')
   loaded();shot('bus-390')
   assert not page.locator('#station-position').is_visible()
-  assert page.locator('#mood-place').inner_text()=='Somewhere in the forest'
+  assert page.locator('#mood-place').inner_text()=='Somewhere in the forest. No playlist here, you have to be there.'
   assert not page.locator('.swipe-hint').is_visible()
   assert page.locator('#audio').get_attribute('src')==source and page.locator('#audio').evaluate('a=>!a.paused')
   select('04');assert not page.url.endswith('#bus')
@@ -178,7 +178,7 @@ with sync_playwright() as p:
   page.locator('#play').click()
   page.goto('https://pavoia.gaende.box.ca/#bus',wait_until='domcontentloaded')
   loaded();assert page.locator('#audio').evaluate('a=>a.paused&&!a.getAttribute("src")')
-  assert page.locator('#mood-place').inner_text()=='Somewhere in the forest'
+  assert page.locator('#mood-place').inner_text()=='Somewhere in the forest. No playlist here, you have to be there.'
   select('04')
   assert page.locator('#mood-place').is_visible()
   assert not [failure for failure in failed if failure['reason']!='net::ERR_ABORTED'],failed

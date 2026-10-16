@@ -12,7 +12,7 @@ async page => {
    {trackingSince:'2026-10-07T00:00:00Z',changes:before?[entry(1,'added','Earlier test track')]:[entry(3,'added','New test track'),entry(2,'removed','Removed test track')],next:before?null:'2'};
   await route.fulfill({status:mode==='error'?503:200,json:data}).catch(()=>{});
  });
- await page.locator('#language').selectOption('en');
+ await page.locator('#language [value=en]').dispatchEvent('click');
  await page.locator('#changes-panel summary').click();
  await page.waitForFunction(()=>document.getElementById('changes-status').textContent.startsWith('No changes'));
  assert((await page.locator('#changes-since').textContent()).includes('Tracking since'),'Missing baseline date');
@@ -23,7 +23,7 @@ async page => {
  await page.locator('#changes-more').click();
  await page.waitForFunction(()=>document.querySelectorAll('#changes-list li').length===3);
  assert(await page.locator('#changes-more').isHidden(),'Final page cursor not cleared');
- await page.locator('#language').selectOption('de');
+ await page.locator('#language [value=de]').dispatchEvent('click');
  assert((await page.locator('#changes-list').textContent()).includes('Hinzugefügt'),'Added not translated');
  assert((await page.locator('#changes-list').textContent()).includes('Entfernt'),'Removed not translated');
  for(const width of [320,390,760,1440]){
@@ -33,7 +33,7 @@ async page => {
  await page.setViewportSize({width:390,height:844});
  await page.locator('#changes-panel').scrollIntoViewIfNeeded();
  await page.screenshot({path:'changes-fixture-mobile-de.png'});
- await page.locator('#language').selectOption('en');
+ await page.locator('#language [value=en]').dispatchEvent('click');
  await page.setViewportSize({width:1440,height:1000});
  await page.locator('#changes-panel').scrollIntoViewIfNeeded();
  await page.screenshot({path:'changes-fixture-desktop.png'});

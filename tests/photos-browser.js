@@ -11,7 +11,7 @@ async page => {
     const image = document.getElementById('photo');
     return !document.body.hasAttribute('data-photo-loading') && image.complete && image.naturalWidth > 0;
   });
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await loaded();
   await page.locator('#audio').evaluate(audio => { audio.volume = 0; });
   await page.locator('#play').click();
@@ -24,10 +24,10 @@ async page => {
   const after = await page.locator('#audio').evaluate(audio => ({ time: audio.currentTime, src: audio.currentSrc, paused: audio.paused }));
   assert(!after.paused && after.src === before.src && after.time >= before.time, 'Manual photo change interrupted playback');
   const stablePhoto = await photo.getAttribute('src');
-  await page.locator('#language').selectOption('de');
-  assert(await change.textContent() === 'Foto wechseln', 'Missing German button label');
+  await page.locator('#language [value=de]').dispatchEvent('click');
+  assert(/^Nächstes Foto, \d+ von \d+$/.test(await change.getAttribute('aria-label')), 'Missing German button label');
   assert(await photo.getAttribute('src') === stablePhoto, 'Language change advanced the photo');
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await change.focus();
   await page.keyboard.press('Enter');
   await loaded();

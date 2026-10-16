@@ -52,14 +52,14 @@ async page => {
   await page.getByRole('button',{name:'Try again',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('.history-row').length===50);
   await page.locator('#explorer-close').click();
-  await page.locator('#language').selectOption('de');
+  await page.locator('#language [value=de]').dispatchEvent('click');
   await page.locator('#go-deeper').click();
   await page.locator('.explorer-nav a[href="#statistics"]').click();
   await page.waitForFunction(()=>document.querySelector('.music-summary'));
   assert(await page.locator('#explorer-title').innerText()==='Musikstatistik','Statistics heading not translated');
   await page.screenshot({path:'output/playwright/music-statistics-de-320.png'});
   await page.keyboard.press('Escape');
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.locator('#play').click();
   assert(errors.length===0,errors.join('; '));
   return {stations:9,historyPagination:true,period:true,entityNavigation:true,retry:true,statistics:true,mobile:true,languages:['en','de'],playbackPreserved:true,errors};

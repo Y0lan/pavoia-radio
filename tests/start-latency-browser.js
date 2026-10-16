@@ -2,7 +2,7 @@
 async page => {
   const results=[];
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   for(const [mood,stage] of [['04','palac-feel'],['03','palac-dance'],['01','bermuda-day'],['02','bermuda-evening'],['05','essentials'],['06','etage-zero'],['07','fontanna']]) {
     if(await page.locator('#open-stations').isVisible())await page.locator('#open-stations').click();
     await page.locator(`input[name="mood"][value="${mood}"]`).check();

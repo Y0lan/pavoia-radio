@@ -6,7 +6,7 @@ async (page) => {
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'reduce' });
   if (page.url() !== root) await page.goto(root);
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.waitForFunction(() => /^Live/.test(document.getElementById('live-text').textContent));
   assert(await page.locator('#audio').getAttribute('src') === null, 'Must not autoplay');
   const live = [];
@@ -24,13 +24,13 @@ async (page) => {
       if (expectedCover) await page.waitForFunction(() => [...document.querySelectorAll('#hero-cover,#dock-cover')].some(i => i.complete && i.naturalWidth > 0 && !i.hidden));
       live.push({ stage, title, decodedSeconds: seconds, coverLoaded: expectedCover });
     }
-    await page.locator('#language').selectOption('de');
+    await page.locator('#language [value=de]').dispatchEvent('click');
     assert(await page.locator('#play').getAttribute('aria-label') === 'Pause', 'Language switch lost playback state');
     assert(await page.locator('#playback-status').textContent() === 'Wiedergabe', 'Playback status not translated');
     assert(await page.locator('html').getAttribute('lang') === 'de', 'Document language not changed');
     await page.locator('#play').click();
     assert(await page.locator('#audio').getAttribute('src') === null, 'Pause did not release stream');
-    await page.locator('#language').selectOption('en');
+    await page.locator('#language [value=en]').dispatchEvent('click');
     await choose('04');
     assert(await page.locator('#audio').getAttribute('src') === null, 'Paused mood change played audio');
     await page.waitForFunction(() => /^Live/.test(document.getElementById('live-text').textContent));
@@ -42,7 +42,7 @@ async (page) => {
     await page.screenshot({ path: 'stage-live-desktop.png', fullPage: true });
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: 'stage-live-mobile.png', fullPage: true });
-    await page.locator('#language').selectOption('de');
+    await page.locator('#language [value=de]').dispatchEvent('click');
     for (const width of [320, 390, 760, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), `German overflow ${width}`);
@@ -51,7 +51,7 @@ async (page) => {
     await page.screenshot({ path: 'stage-live-mobile-de.png', fullPage: true });
     await page.reload();
     assert(await page.locator('html').getAttribute('lang') === 'de', 'Language preference not retained');
-    await page.locator('#language').selectOption('en');
+    await page.locator('#language [value=en]').dispatchEvent('click');
 
   } finally {
     await page.evaluate(() => pause());
@@ -89,7 +89,7 @@ async (page) => {
   });
   await page.route('**/api/audience?**', route => route.fulfill({json: payload('').audience}));
   await page.reload();
-  await page.waitForFunction(() => document.getElementById('live-text').textContent === 'Live · 7');
+  await page.waitForFunction(() => /^Live · 7( listening)?$/.test(document.getElementById('live-text').textContent));
   const first = await page.locator('#player-title').innerText();
   await page.evaluate(() => poll());
   assert(await page.locator('#player-title').innerText() !== first, 'Track did not advance');

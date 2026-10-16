@@ -7,7 +7,7 @@ async page => {
   for(const width of [760,761,800,900,1024,1440]) {
     await page.setViewportSize({width,height:900});
     for(const language of ['en','de']) {
-      await page.locator('#language').selectOption(language);
+      await page.locator(`#language [value=${language}]`).dispatchEvent('click');
       await page.evaluate(()=>{document.getElementById('track-spotify').hidden=false;});
       for(const playback of ['paused','playing','connecting','retrying','blocked']) {
         await page.evaluate(playback=>{state(playback==='blocked'?'paused':playback,playback);document.getElementById('track-clock').textContent='12:34 / 12:34';document.getElementById('track-spotify').hidden=false;},playback);

@@ -4,7 +4,7 @@ async page => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({reducedMotion:'reduce'});
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.locator('#play').click();
   await page.waitForFunction(() => document.getElementById('audio').currentTime > 1);
   await page.locator('#catalogue-panel summary').click();
@@ -19,7 +19,7 @@ async page => {
   await page.waitForFunction(() => /tracks shown/.test(document.getElementById('catalogue-status').textContent));
   assert((await page.locator('#catalogue-tracks').textContent()).toLowerCase().includes('jimi'), 'Library search mismatch');
   assert(await page.locator('#audio').evaluate(a => !a.paused), 'Library browsing stopped audio');
-  await page.locator('#language').selectOption('de');
+  await page.locator('#language [value=de]').dispatchEvent('click');
   assert(await page.locator('#collection-station').textContent() === 'Gesamte Musikbibliothek', 'German library scope');
   assert((await page.locator('#catalogue-freshness').textContent()).includes('90.536'), 'German library total');
   for (const width of [320,390,760,1440]) {
@@ -29,7 +29,7 @@ async page => {
   await page.setViewportSize({width:390,height:844});
   await page.locator('#catalogue-panel summary').scrollIntoViewIfNeeded();
   await page.screenshot({path:'library-mobile-de.png'});
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.setViewportSize({width:1440,height:1000});
   await page.locator('#catalogue-panel summary').scrollIntoViewIfNeeded();
   await page.screenshot({path:'library-desktop.png'});

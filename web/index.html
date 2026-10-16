@@ -33,7 +33,7 @@
       <header class="top">
         <a class="wordmark" href="#" aria-label="Pavoia Radio, home"><svg class="broadcast-mark" viewBox="0 0 160 60" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M12 10Q-2 30 12 50M18 17Q9 30 18 43M24 23Q19 30 24 37M148 10Q162 30 148 50M142 17Q151 30 142 43M136 23Q141 30 136 37"/></svg><img src="assets/wordmark-day.svg" alt="" width="461" height="259"></a>
         <p class="promise" data-copy="promise">So it never ends.</p>
-        <div class="station-status"><p class="live"><span class="dot" aria-hidden="true"></span><span id="live-text">Connecting</span></p><select id="language" aria-label="Language"><option value="en">EN</option><option value="de">DE</option></select></div>
+        <div class="station-status"><p class="live"><span class="dot" aria-hidden="true"></span><span id="live-text" aria-hidden="true"></span><span id="live-label" class="visually-hidden"></span></p><div id="language" role="group" aria-label="Language"><button type="button" value="en" aria-pressed="true">EN</button><button type="button" value="de" aria-pressed="false">DE</button></div></div>
       </header>
     <div class="listen-layout">
     <section class="poster" id="poster" aria-labelledby="mood-name">
@@ -42,10 +42,6 @@
       <div class="bottom">
         <h1 id="mood-name">Lost in <em>Feelings</em></h1>
         <p class="place" id="mood-place">The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.</p>
-        <div id="bus-copy" hidden>
-          <p class="bus-line" data-copy="busLine">No playlist here. You have to be there.</p>
-          <a class="bus-ticket" href="https://pavoia.com/#tickets" target="_blank" rel="noopener noreferrer" data-copy="busTicket">Get your Pavoia ticket</a>
-        </div>
       </div>
         <div id="station-selector-home"><fieldset class="moods" id="station-selector">
           <legend class="visually-hidden" data-copy="choose">Choose a radio</legend>
@@ -59,21 +55,17 @@
         <div class="station-controls" id="station-controls">
           <button class="station-switcher" id="open-stations" type="button" aria-haspopup="dialog" aria-controls="stations-sheet" aria-expanded="false"><span data-copy="stations">Change stage</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></button>
           <span class="station-position" id="station-position" aria-live="polite" aria-atomic="true">4 / 9</span>
-          <div class="station-tools">
-        <div class="photo-controls" id="photo-controls" hidden>
-          <button type="button" id="change-photo" class="change-photo" aria-label="Change photo" title="Change photo" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16H3V3h13v2M8 8h13v13H8zM8 18l4-4 3 3 2-2 4 4M16 3h5m-2-2 2 2-2 2"/><circle cx="17" cy="12" r="1"/></svg><span data-copy="changePhoto">Change photo</span></button>
-          <output id="photo-count" aria-live="polite" aria-atomic="true"></output>
-          <button type="button" id="artwork-toggle" class="change-photo artwork-toggle"></button>
-        </div>
-        <a id="stage-spotify" class="stage-spotify" target="_blank" rel="noopener noreferrer" hidden><span data-journey="spotifyStage">Follow this playlist on Spotify</span><span class="spotify-caption" data-journey="playlist">Playlist</span><span class="spotify-daily" data-journey="spotifyDaily">I add new tracks every day.</span></a>
+          <div class="stage-actions">
+            <span class="stage-action"><a id="stage-spotify" class="stage-spotify" target="_blank" rel="noopener noreferrer" hidden><span data-journey="spotifyStage">Follow this playlist on Spotify</span><span class="spotify-caption" data-journey="playlist">Playlist</span></a><span class="spotify-daily" data-journey="spotifyDaily">I add new tracks every day</span><a class="bus-ticket" href="https://pavoia.com/#tickets" target="_blank" rel="noopener noreferrer" data-copy="busTicket">Get your Pavoia ticket</a></span>
+            <button type="button" id="change-photo" class="change-photo" hidden><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 16H3V3h13v2M8 8h13v13H8zM8 18l4-4 3 3 2-2 4 4M16 3h5m-2-2 2 2-2 2"/><circle cx="17" cy="12" r="1"/></svg><span data-copy="changePhoto">Next photo</span> <output id="photo-count" aria-live="polite" aria-atomic="true"></output></button>
+            <button type="button" id="artwork-toggle" class="change-photo artwork-toggle" aria-pressed="false" data-copy="photoOnly">Photo only</button>
           </div>
         </div>
     </section>
 
     <div class="scene-artwork" aria-hidden="true">
-      <div class="record-sleeve"><img id="hero-cover" width="600" height="600" alt="" hidden><span id="sleeve-empty" hidden></span></div>
+      <div class="record-sleeve"><img id="hero-cover" width="600" height="600" alt="" hidden></div>
       <img id="painted-artist" class="painted-artist" width="800" height="1000" alt="" hidden>
-      <img id="painted-artist-secondary" class="painted-artist secondary" width="800" height="1000" alt="" hidden>
     </div>
     </div>
 

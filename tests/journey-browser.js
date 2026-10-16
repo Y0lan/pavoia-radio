@@ -4,7 +4,7 @@ async page => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/journey.js',route=>route.fallback()); // Disable browser cache for this local code review.
   await page.goto('http://127.0.0.1:14521');
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.waitForFunction(()=>!document.getElementById('go-deeper').disabled);
   await page.locator('#play').click();
   await page.waitForFunction(()=>document.getElementById('audio').currentTime>1);
@@ -45,7 +45,7 @@ async page => {
   await page.waitForFunction(()=>document.getElementById('preview-audio').currentTime>0.5);
   await page.evaluate(()=>{history.pushState(null,'','/');dispatchEvent(new PopStateEvent('popstate'));});
   assert(await page.locator('#preview-audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Back navigation left preview playing');
-  await page.locator('#language').selectOption('de');
+  await page.locator('#language [value=de]').dispatchEvent('click');
   assert((await page.locator('#go-deeper').textContent()).includes('Wurzeln'),'German player missing');
   assert((await page.locator('#stage-spotify').getAttribute('aria-label')).includes('Spotify'),'Spotify action label missing');
   assert(await page.locator('#track-hunt').count()===0,'Track Hunt returned to Listen');
@@ -53,7 +53,7 @@ async page => {
     await page.setViewportSize({width,height:900});
     assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Listen overflow '+width);
   }
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.setViewportSize({width:1440,height:1000});
   await page.evaluate(()=>scrollTo(0,0));
   await page.screenshot({path:'artifacts/player-discovery-step/desktop.png'});

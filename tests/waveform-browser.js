@@ -30,13 +30,13 @@ async page => {
   for(const width of [320,390,760,1440]){
     await page.setViewportSize({width,height:900});
     for(const lang of ['en','de']){
-      await page.locator('#language').selectOption(lang);
+      await page.locator(`#language [value=${lang}]`).dispatchEvent('click');
       assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'Overflow '+width+'/'+lang);
       const boxes=await page.locator('.top .wordmark,.station-status').evaluateAll(ns=>ns.map(n=>({left:n.getBoundingClientRect().left,right:n.getBoundingClientRect().right})));
       assert(boxes[0].right<=boxes[1].left,'Header overlap '+width+'/'+lang);
     }
   }
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   await page.setViewportSize({width:1440,height:1000});
   await page.screenshot({path:'artifacts/player-discovery-step/bar-desktop.png'});
   await page.setViewportSize({width:390,height:844});

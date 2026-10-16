@@ -11,7 +11,7 @@
   ];
   const copy = {
     en:{ deeper:"See the roots it's built on",explore:'Explore',exploreLabel:'EXPLORE',connections:'Follow the music.',
-      spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day.',volume:'Volume',
+      spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day',volume:'Volume',
       searchLabel:'Artist, track, release or label',search:'Search',
       playRadio:'Play radio',pauseRadio:'Pause radio',backListen:'Back to listening ↙',mapNote:'Choose a connection to continue exploring.',
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
@@ -24,7 +24,7 @@
       basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',source:'Source',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',explore:'Entdecken',exploreLabel:'ENTDECKEN',connections:'Folge der Musik.',
-      spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu.',volume:'Lautstärke',
+      spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',
       searchLabel:'Künstler, Track, Veröffentlichung oder Label',search:'Suchen',
       playRadio:'Radio abspielen',pauseRadio:'Radio pausieren',backListen:'Zurück zum Radio ↙',mapNote:'Wähle eine Verbindung und entdecke mehr.',
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
@@ -47,14 +47,13 @@
   function link(label,url) {const a=node('a','',label);a.href=external(url);a.target='_blank';a.rel='noopener noreferrer';return a;}
   function image(element,url,alt) {
     element.alt=alt;
-    const placeholder=element.id==='hero-cover'?$('sleeve-empty'):null;
-    if (!imagePath(url)) {element.hidden=true;element.removeAttribute('src');if(placeholder)placeholder.hidden=false;return;}
+    if (!imagePath(url)) {element.hidden=true;element.removeAttribute('src');return;}
     if (element.getAttribute('src')===url)return;
-    element.hidden=true;if(placeholder)placeholder.hidden=false;
-    element.onload=()=>{element.hidden=false;if(placeholder)placeholder.hidden=true;};
+    element.hidden=true;
+    element.onload=()=>{element.hidden=false;};
     function load(attempt=0) {
       const failed=()=>{
-        element.hidden=true;if(placeholder)placeholder.hidden=false;
+        element.hidden=true;
         if(attempt<2)setTimeout(()=>{
           if(element.isConnected&&element.onerror===failed&&element.getAttribute('src')===url)load(attempt+1);
         },attempt===0?1000:5000);
@@ -96,7 +95,6 @@
     if(imagePath(cover))image(dock,cover,word('cover'));
     else if(dock.getAttribute('src')!==thumb){dock.onload=dock.onerror=null;dock.alt='';dock.src=thumb;dock.hidden=false;}
     image($('painted-artist'),portraits[0]?.image||t?.artistImageUrl,'');
-    image($('painted-artist-secondary'),portraits[1]?.image,'');
     $('explorer-play').textContent=s.wanted?word('pauseRadio'):word('playRadio');
     const key=JSON.stringify([s.stage,s.language,t,enriched]);
     // Playback and audience updates must not replace focused record controls.

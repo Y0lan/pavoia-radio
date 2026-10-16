@@ -65,7 +65,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
     pause(){}
     load(){}
   }
-  const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','player-stage','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-controls','photo-count','change-photo','artwork-toggle','bus-link','bus-copy','live-text','language','wordmark','signed'];
+  const ids=['audio','play','player','player-title','player-artist','player-album','playback-status','player-stage','moods','station-selector','station-selector-home','station-sheet-list','stations-sheet','open-stations','close-stations','station-position','poster','mood-name','mood-place','mood-line','photo','photo-buffer','photo-count','change-photo','artwork-toggle','bus-link','live-text','live-label','language','wordmark','signed'];
   const nodes=ids.map(id=>Object.assign(new Element(),{id}));
   // Any other id gets a plain element, so journey.js finds every node it wires.
   const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id) || (nodes.push(Object.assign(new Element(),{id})),nodes.at(-1))});
@@ -93,6 +93,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   const queries=new Map();
   const env={clock,elements,audio,actions,timers,mediaSession,document,window,location,imageRequests,queries,requests:[],response:status('First'),
     click:()=>elements.play.emit('click'),
+    setLanguage:value=>elements.language.emit('click',{target:{value}}),
     focus:target=>document.emit('focusin',{target}),
     pointer:()=>document.emit('pointerdown',{}),
     key(code,target=control('body'),extra={}){const event={code,key:code==='Space'?' ':code,target,repeat:false,ctrlKey:false,metaKey:false,altKey:false,prevented:false,preventDefault(){event.prevented=true;},...extra};document.emit('keydown',event);return event;},change:id=>elements.moods.emit('change',{target:{value:id}}),
@@ -109,7 +110,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   const context={Date:FakeDate,URL,CustomEvent:class{constructor(type){this.type=type;}},performance:{now:()=>clock.now},document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
     matchMedia:query=>queries.get(query)||queries.set(query,{matches:media.includes(query),listeners:[],addEventListener(_name,fn){this.listeners.push(fn);},change(matches){this.matches=matches;for(const fn of this.listeners)fn();}}).get(query),Image:class extends Element {constructor(){super();env.preloader=this;}},
     localStorage:storage,
-    fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? Promise.resolve({ok:Boolean(env.discovery),json:async()=>env.discovery}) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience})) : new Promise((resolve,reject)=>{
+    fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? Promise.resolve({ok:Boolean(env.discovery),json:async()=>env.discovery}) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
     }),
@@ -121,14 +122,23 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',storag
   return env;
 }
 
-test('photo-only toggle hides artwork, is remembered and works without storage',async()=>{
+test('Photo only keeps its name, says whether it is pressed, is remembered and works without storage',async()=>{
+ assert.match(web('index.html'),/<button type="button" id="artwork-toggle" class="change-photo artwork-toggle" aria-pressed="false" data-copy="photoOnly">Photo only<\/button>/,'one constant, translated label');
  const saved={},storage={getItem:key=>saved[key] ?? null,setItem(key,value){saved[key]=value;}};
  const e=setup({storage});await flush();const toggle=e.elements['artwork-toggle'],body=e.document.body;
- assert.equal(body.getAttribute('data-photo-only'),null);assert.equal(toggle.textContent,'Photo only');
- toggle.emit('click');assert.equal(body.getAttribute('data-photo-only'),'');assert.equal(toggle.textContent,'Show artwork');assert.equal(saved['pavoia-photo-only'],'on');
+ assert.equal(body.getAttribute('data-photo-only'),null);assert.equal(toggle.getAttribute('aria-pressed'),'false');
+ toggle.emit('click');assert.equal(body.getAttribute('data-photo-only'),'');assert.equal(toggle.getAttribute('aria-pressed'),'true');assert.equal(saved['pavoia-photo-only'],'on');
+ assert.equal(toggle.textContent,'','the label never turns into another name');
  const restored=setup({storage});await flush();
- assert.equal(restored.document.body.getAttribute('data-photo-only'),'');assert.equal(restored.elements['artwork-toggle'].textContent,'Show artwork');
- toggle.emit('click');assert.equal(body.getAttribute('data-photo-only'),null);assert.equal(saved['pavoia-photo-only'],'off');
+ assert.equal(restored.document.body.getAttribute('data-photo-only'),'');assert.equal(restored.elements['artwork-toggle'].getAttribute('aria-pressed'),'true');
+ toggle.emit('click');assert.equal(body.getAttribute('data-photo-only'),null);assert.equal(saved['pavoia-photo-only'],'off');assert.equal(toggle.getAttribute('aria-pressed'),'false');
+ const rules=cssRules();
+ assert.match(rules.get('.change-photo'),/color:var\(--muted\); font:12px Inter,sans-serif;/,'both photo buttons are quiet 12px Inter');
+ assert.doesNotMatch(rules.get('.change-photo'),/text-decoration/,'and carry no underline at rest');
+ assert.match(cssRules('(min-width:761px)').get('.change-photo:hover'),/text-decoration:underline/,'a pointer underlines them');
+ assert.match(rules.get('.change-photo:hover, .artwork-toggle[aria-pressed=true]'),/color:var\(--cream\)/,'pressed, it turns cream');
+ assert.match(rules.get('.artwork-toggle[aria-pressed=true]'),/text-decoration:underline/,'with a solid underline');
+ assert.match(rules.get('body:not(:has(#hero-cover[src], #painted-artist[src])) #artwork-toggle:not(:focus)'),/display:none/,'no artwork, no toggle; a cover still loading keeps it, and it never hides while it has focus');
  const denied=()=>{throw new Error('Storage denied');};
  const blocked=setup({storage:{getItem:denied,setItem:denied}});await flush();
  blocked.elements['artwork-toggle'].emit('click');assert.equal(blocked.document.body.getAttribute('data-photo-only'),'');
@@ -153,6 +163,17 @@ test('the live count polls fast after a change and backs off while it stays the 
  e.document.hidden=true;e.clock.now+=60000;await e.tickAudience();assert.equal(e.audienceCalls,11,'a hidden page polls nothing');
  e.document.hidden=false;e.change('03');await flush();assert.equal(e.audienceCalls,12,'a station change polls at once');
  e.setWall(-3600000);e.clock.now+=4000;await e.tickAudience();assert.equal(e.audienceCalls,13,'a system clock correction cannot stall polling');
+});
+
+test('going back to a stage waits for that stage\'s new audience reply',async()=>{
+ const e=setup();await flush();const live=e.elements['live-text'];
+ assert.equal(live.getAttribute('data-pending'),null,'the first stage is ready');
+ let release;e.audienceHold=new Promise(resolve=>{release=resolve;});
+ e.change('03');e.change('04');await flush();
+ assert.equal(live.getAttribute('data-pending'),'','A, then B, then A again: A\'s old count is not reused');
+ assert.equal(e.elements['live-label'].textContent,'Connecting…');
+ release();await flush();
+ assert.equal(live.getAttribute('data-pending'),null,'its new reply ends the wait');
 });
 
 test('gesture, pause/resume races and media controls release the source',async()=>{
@@ -191,19 +212,46 @@ test('late metadata cannot overwrite a newer station or clear its poll guard',as
  const e=setup({deferFetch:true});e.change('03');e.change('04');
  assert.equal(e.requests[0].signal.aborted,true);assert.equal(e.requests[1].signal.aborted,true);
  e.complete(2,status('Current',7));await flush();e.complete(0,status('Old',99));e.requests[1].reject(new Error('Old'));
- await flush();assert.equal(e.elements['player-title'].textContent,'Current');e.audienceResponse=status('Count',7).audience;await e.pollAudience();assert.equal(e.elements['live-text'].textContent,'Live · 7');
+ await flush();assert.equal(e.elements['player-title'].textContent,'Current');e.audienceResponse=status('Count',7).audience;await e.pollAudience();assert.equal(e.elements['live-text'].textContent,'Live · 7 listening');
  const poll=e.poll();await flush();assert.equal(e.requests.length,4);e.complete(3,status('Next'));await poll;
  assert.equal(e.elements['player-title'].textContent,'Next');
 });
 
 test('live audience updates independently and never presents missing data as zero',async()=>{
- const e=setup();await flush();e.audienceResponse=status('Count',0).audience;await e.pollAudience();assert.equal(e.elements['live-text'].textContent,'Live · 0');
- e.audienceResponse=status('Count',2).audience;await e.pollAudience();assert.equal(e.elements['live-text'].textContent,'Live · 2');
- e.response=status('Old metadata count',0);await e.poll();assert.equal(e.elements['live-text'].textContent,'Live · 2');
- e.audienceResponse.measuredAt=new Date(0).toISOString();await e.pollAudience();assert.equal(e.elements['live-text'].textContent,'Live');
- e.audienceResponse=new Error('Unavailable');await e.pollAudience();assert.equal(e.elements['live-text'].textContent,'Live');
- e.response=new Error('Offline');await e.poll();assert.equal(e.elements['live-text'].textContent,'Data unavailable');assert.equal(e.mediaSession.metadata,null);
- e.response={track:null,audience:{available:false,listeners:null}};await e.poll();assert.equal(e.elements['player-album'].textContent,'');
+ const e=setup();await flush();const live=e.elements['live-text'],body=e.document.body;
+ e.audienceResponse=status('Count',0).audience;await e.pollAudience();assert.equal(live.textContent,'Live','nobody listening shows no count');
+ assert.equal(e.elements['live-label'].textContent,'0 listening to this stage: Lost in Feelings','screen readers get the full sentence, zero included');assert.equal(body.getAttribute('data-on-air'),'');
+ e.audienceResponse=status('Count',2).audience;await e.pollAudience();assert.equal(live.textContent,'Live · 2 listening');
+ e.response=status('Old metadata count',0);await e.poll();assert.equal(live.textContent,'Live · 2 listening');
+ e.audienceResponse.measuredAt=new Date(0).toISOString();await e.pollAudience();assert.equal(live.textContent,'Live');assert.equal(e.elements['live-label'].textContent,'Live','an unknown count is never read as a number');
+ e.audienceResponse=new Error('Unavailable');await e.pollAudience();assert.equal(live.textContent,'Live');
+ e.audienceResponse=status('Count',2).audience;await e.pollAudience();
+ e.response=new Error('Offline');await e.poll();assert.equal(live.textContent,'Live','lost data is not an alarm in the header');assert.equal(body.getAttribute('data-on-air'),null,'the dot goes quiet');
+ assert.equal(e.elements['live-label'].textContent,'Live. No track announced','the muted dot is not read aloud, so the label says it');assert.equal(e.mediaSession.metadata,null);
+ e.response={track:null,audience:{available:true,listeners:2,measuredAt:new Date(e.clock.now).toISOString()}};await e.poll();
+ assert.equal(live.textContent,'Live','no track: no count, no Standby');assert.equal(body.getAttribute('data-on-air'),null);assert.equal(e.elements['player-album'].textContent,'');
+});
+
+test('the header holds its words unseen until the radio and the audience answer, and narrow headers drop the word',async()=>{
+ const e=setup({deferFetch:true});await flush();const live=e.elements['live-text'],shown=()=>[live.textContent,live.getAttribute('data-pending')];
+ assert.deepEqual([live.textContent,e.elements['live-label'].textContent,e.document.body.getAttribute('data-on-air')],['','Connecting…',null],'loading: a muted dot, no words on screen, Connecting for screen readers');
+ e.complete(0,status('First'));await flush();e.audienceResponse=status('Count',3).audience;await e.pollAudience();assert.deepEqual(shown(),['Live · 3 listening',null]);
+ let answer;e.audienceResponse=new Promise(resolve=>{answer=resolve;});
+ e.change('03');assert.deepEqual(shown(),['Live · 3 listening',''],'a stage change keeps the last words in place, unseen, so the dot does not jump');
+ assert.equal(e.elements['live-label'].textContent,'Connecting…');
+ e.complete(1,status('Dance'));await flush();assert.deepEqual(shown(),['Live · 3 listening',''],'the radio alone does not flash a bare Live');
+ answer(status('Count',4).audience);await flush();assert.deepEqual(shown(),['Live · 4 listening',null],'the words change once, to their final value');
+ e.audienceResponse=new Error('Unavailable');await e.pollAudience();assert.deepEqual(shown(),['Live',null],'a later failed count never hides the status');
+ e.change('04');await flush();assert.deepEqual(shown(),['Live',''],'a failed count ends the wait for the audience');
+ e.complete(2,status('Feelings'));await flush();assert.deepEqual(shown(),['Live',null]);
+ e.audienceResponse=status('Count',3).audience;await e.pollAudience();e.setLanguage('de');assert.equal(live.textContent,'Live · 3 hören');
+ const rules=cssRules();
+ assert.match(rules.get('#live-text[data-pending]'),/color:transparent/,'pending words stay unseen but reach screen readers');
+ assert.doesNotMatch(rules.get('#live-text[data-pending]'),/visibility:hidden|display:none/,'hiding them would drop the Connecting label');
+ assert.match(rules.get('.live'),/white-space:nowrap/,'the status never breaks onto two lines');
+ const narrow=setup({media:['(max-width: 900px)']});await flush();narrow.audienceResponse=status('Count',3).audience;await narrow.pollAudience();
+ assert.equal(narrow.elements['live-text'].textContent,'Live · 3','phones and tablets keep the count and drop the word');
+ narrow.queries.get('(max-width: 900px)').change(false);assert.equal(narrow.elements['live-text'].textContent,'Live · 3 listening','a widened window gets the word back');
 });
 
 test('language switching preserves playback and station',async()=>{
@@ -211,11 +259,26 @@ test('language switching preserves playback and station',async()=>{
  assert.equal(e.requests.at(-1).url,'/api/radio/fontanna');
  assert.equal(e.elements['mood-place'].textContent,'The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.');
  e.click();e.playing();
- e.elements.language.value='de';e.elements.language.emit('change');
+ e.setLanguage('de');
  assert.equal(e.document.documentElement.lang,'de');assert.equal(e.elements['playback-status'].textContent,'Wiedergabe');
  assert.equal(e.audio.src,'/stream/fontanna.mp3');assert.equal(e.audio.calls.length,1);
  assert.equal(e.elements['mood-place'].textContent,'Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.');
  assert.equal(e.mediaSession.metadata.album,'Fontanna');
+});
+
+test('two language buttons switch in one click and mark the active one',async()=>{
+ const html=web('index.html');
+ assert.match(html,/<div id="language" role="group" aria-label="Language"><button type="button" value="en" aria-pressed="true">EN<\/button><button type="button" value="de" aria-pressed="false">DE<\/button><\/div>/);
+ assert.doesNotMatch(html,/<select id="language"/,'no menu to open for two choices');
+ const rules=cssRules();
+ assert.match(rules.get('#language button'),/min-width:44px; min-height:44px;.*color:var\(--muted\); font:11px var\(--mono\)/);
+ assert.match(rules.get('#language button:is([aria-pressed=true], :hover)'),/color:var\(--cream\)/,'the active language is cream');
+ const e=setup();await flush();
+ const choice=value=>({value,attrs:{},setAttribute(name,v){this.attrs[name]=String(v);}}),[en,de]=[choice('en'),choice('de')];
+ e.elements.language.children.push(en,de);
+ e.elements.language.emit('click',{target:e.elements.language});assert.equal(e.document.documentElement.lang,'en','a click beside the buttons changes nothing');
+ e.setLanguage('de');assert.equal(e.document.documentElement.lang,'de');assert.deepEqual([en.attrs['aria-pressed'],de.attrs['aria-pressed']],['false','true']);
+ e.setLanguage('en');assert.deepEqual([en.attrs['aria-pressed'],de.attrs['aria-pressed']],['true','false']);
 });
 
 test('native end/error ordering reconnects and station changes reset retry timers',async()=>{
@@ -231,6 +294,17 @@ test('native end/error ordering reconnects and station changes reset retry timer
  }
 });
 
+test('Next photo carries its position and names it in full',async()=>{
+ const html=web('index.html'),button=html.slice(html.indexOf('<button type="button" id="change-photo"'),html.indexOf('</button>',html.indexOf('id="change-photo"')));
+ assert.match(button,/<span data-copy="changePhoto">Next photo<\/span> <output id="photo-count"/,'the count lives inside the button');
+ assert.doesNotMatch(button,/title=/,'no tooltip repeats the label');
+ const e=setup();await flush();const next=e.elements['change-photo'];
+ assert.equal(next.getAttribute('aria-label'),'Next photo, 1 of 4');assert.equal(e.elements['photo-count'].textContent,'1 / 4');
+ next.emit('click');await flush();assert.equal(next.getAttribute('aria-label'),'Next photo, 2 of 4');assert.equal(e.elements['photo-count'].textContent,'2 / 4');
+ e.setLanguage('de');assert.equal(next.getAttribute('aria-label'),'Nächstes Foto, 2 von 4');assert.equal(next.title,undefined);
+ e.change('01');await flush();assert.equal(next.getAttribute('aria-label'),'Nächstes Foto, 1 von 8');
+});
+
 test('selected photos cycle on request and stage entry without changing playback',async()=>{
  const e=setup();await flush();e.click();e.playing();
  const first=e.elements.photo.src,seen=new Set([first]),audioCalls=e.audio.calls.length;
@@ -243,7 +317,7 @@ test('selected photos cycle on request and stage entry without changing playback
  assert.equal(e.audio.calls.length,audioCalls);assert.equal(e.audio.paused,false);
  assert.equal(e.elements.player.dataset.state,'playing');
  e.response=status('Another track');await e.poll();assert.equal(e.elements.photo.src,first);
- e.elements.language.value='de';e.elements.language.emit('change');assert.equal(e.elements.photo.src,first);
+ e.setLanguage('de');assert.equal(e.elements.photo.src,first);
  e.change('04');assert.equal(e.elements.photo.src,first);
  e.change('02');await flush();assert.equal(e.document.documentElement.style['--focus'],'58% 38%');
  e.change('04');await flush();assert.notEqual(e.elements.photo.src,first);assert.ok(seen.has(e.elements.photo.src));
@@ -256,15 +330,15 @@ test('Bus navigation and metadata updates keep the playing station and source',a
  const source=e.audio.src,calls=e.audio.calls.length,photo=e.elements.photo.src;
  e.location.hash='#bus';e.window.emit('hashchange');await flush();
  assert.equal(e.document.title,'▶ First · Artist First · Pavoia Radio','while it plays, the tab names the record even on the Bus');
- assert.equal(e.elements['mood-place'].textContent,'Somewhere in the forest');
- assert.equal(e.elements['bus-copy'].hidden,false);assert.equal(e.elements['change-photo'].hidden,true);
+ assert.equal(e.elements['mood-place'].textContent,'Somewhere in the forest. No playlist here, you have to be there.');
+ assert.equal(e.document.body.getAttribute('data-bus'),'');assert.equal(e.elements['change-photo'].hidden,true);
  assert.equal(e.elements.photo.src,'photos/bus-stage.jpg');
  assert.equal(e.audio.src,source);assert.equal(e.audio.calls.length,calls);assert.equal(e.audio.paused,false);
  e.response=status('New track');await e.poll();
  assert.equal(e.elements['player-title'].textContent,'New track');assert.equal(e.elements.photo.src,'photos/bus-stage.jpg');
  assert.equal(e.window.Pavoia.getState().stage,'palac-dance');assert.equal(e.mediaSession.metadata.album,'Night in Motion');
- e.elements.language.value='de';e.elements.language.emit('change');
- assert.equal(e.elements['mood-place'].textContent,'Irgendwo im Wald');
+ e.setLanguage('de');
+ assert.equal(e.elements['mood-place'].textContent,'Irgendwo im Wald. Hier gibt es keine Playlist, du musst dabei sein.');
  e.location.hash='';e.window.emit('popstate');await flush();assert.equal(e.elements.photo.src,photo);
  e.location.hash='#bus';e.window.emit('popstate');
  e.elements.moods.emit('click',{target:{name:'mood',value:'03'}});
@@ -275,12 +349,12 @@ test('Bus navigation and metadata updates keep the playing station and source',a
 
 test('direct Bus links remain paused and use the regular station for playback',async()=>{
  const e=setup({hash:'#bus'});await flush();
- assert.equal(e.document.title,'The Bus · Pavoia Radio');assert.equal(e.elements['bus-copy'].hidden,false);assert.equal(e.audio.calls.length,0);
+ assert.equal(e.document.title,'The Bus · Pavoia Radio');assert.equal(e.document.body.getAttribute('data-bus'),'');assert.equal(e.audio.calls.length,0);
  assert.equal(e.elements.play.disabled,false);assert.notEqual(e.elements['player-title'].textContent,'Not on air yet');
  e.click();e.playing();assert.equal(e.audio.src,'/stream/palac-feel.mp3');
  await flush();e.actions.pause();assert.equal(e.audio.src,undefined);assert.equal(e.elements.photo.src,'photos/bus-stage.jpg');
  e.location.hash='#explore/art_123456789abc';e.window.Pavoia.renderScene();await flush();
- assert.equal(e.elements['bus-copy'].hidden,true);assert.notEqual(e.elements.photo.src,'photos/bus-stage.jpg');
+ assert.equal(e.document.body.getAttribute('data-bus'),null);assert.notEqual(e.elements.photo.src,'photos/bus-stage.jpg');
 });
 
 test('late or failed photos keep the latest scene without delaying audio',async()=>{
@@ -380,7 +454,7 @@ test('the bar names the stage, the tab names the record and Play names its key',
  e.response=new Error('Offline');e.change('03');await flush();
  assert.equal(e.elements['player-stage'].textContent,'Night in Motion');assert.equal(e.elements['player-title'].textContent,'Night in Motion','a failed metadata call names the stage');
  assert.equal(e.elements['player-artist'].textContent,'','the artist line does not repeat it');
- e.elements.language.value='de';e.elements.language.emit('change');assert.equal(e.elements.play.title,'Pause (Leertaste)');
+ e.setLanguage('de');assert.equal(e.elements.play.title,'Pause (Leertaste)');
  e.click();assert.equal(e.elements.play.title,'Abspielen (Leertaste)');assert.equal(e.document.title,'Night in Motion · Pavoia Radio');
 });
 
@@ -469,4 +543,46 @@ test('every class in the stylesheet is used by the page',()=>{
  const css=web('style.css').replace(/\/\*[\s\S]*?\*\//g,'').replace(/url\([^)]*\)/g,''),page=['index.html','app.js','journey.js','waveform.js'].map(web).join('\n');
  const unused=[...new Set([...css.matchAll(/\.([a-z][a-z0-9-]*)/g)].map(m=>m[1]))].filter(name=>!new RegExp('(?<![\\w-])'+name+'(?![\\w-])').test(page));
  assert.deepEqual(unused,[]);
+});
+
+test('the stage column is one line of stations over one constant line of actions',()=>{
+ const rules=cssRules(),html=web('index.html');
+ assert.match(rules.get('.listen-layout'),/grid-template-columns:minmax\(0,1fr\); align-items:end;.*padding:clamp\(120px,24svh,320px\) var\(--gutter\) 32px;/,'one column, and a 1366×768 laptop sees all of it');
+ assert.ok(!cssRules('(min-width:761px) and (max-width:1100px)').has('.listen-layout'),'no empty second column on small laptops either');
+ assert.match(rules.get('.scene-artwork'),/display:contents/,'the artwork layers keep their geometry without taking a grid cell');
+ assert.match(rules.get('.stage-actions'),/display:flex; flex-wrap:wrap; align-items:center; gap:8px 24px; min-height:44px;/);
+ const line=html.slice(html.indexOf('<div class="stage-actions">'),html.indexOf('</div>',html.indexOf('<div class="stage-actions">')));
+ assert.deepEqual([...line.matchAll(/(?:id|class)="([a-z-]+)"/g)].map(m=>m[1]),['stage-actions','stage-action','stage-spotify','stage-spotify','spotify-caption','spotify-daily','bus-ticket','change-photo','change-photo','photo-count','artwork-toggle'],'slot, Next photo, Photo only');
+ assert.doesNotMatch(line.slice(0,line.indexOf('>')),/hidden/,'the line is always there, so the rail never moves');
+ assert.match(line,/<\/a><span class="spotify-daily" data-journey="spotifyDaily">/,'the daily note sits outside the link');
+ assert.match(rules.get('.stage-action'),/font-size:14px;.*color:var\(--muted\)/);
+ assert.match(rules.get('.stage-spotify, .bus-ticket'),/color:var\(--soft\)/,'the ticket takes the playlist link style');
+ assert.match(rules.get('body:not([data-bus]) :is(.bus-ticket, .stage-action:has(#stage-spotify[hidden]))'),/display:none/,'the ticket only on the Bus; no playlist, no empty slot before the photo tools');
+ assert.match(rules.get('body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-daily, #artwork-toggle)'),/display:none/,'the Bus swaps the playlist for the ticket');
+ assert.match(rules.get('.place'),/min-height:2lh/,'a one-line description keeps the title where two lines put it');
+ assert.match(cssRules('(max-width:760px)').get('body[data-bus] .swipe-hint'),/visibility:hidden/,'on phones the Bus keeps the hint\'s height, so its title does not drop');
+ assert.match(cssRules('(max-width:760px)').get('.stage-spotify>span:not(.spotify-caption), .spotify-daily'),/display:none/,'phones keep the Playlist tile alone');
+ for(const gone of ['bus-copy','bus-line','busLine','sleeve-empty','painted-artist-secondary','.secondary','showArtwork','standby','offline','audienceUnknown'])
+  for(const name of ['index.html','app.js','journey.js','style.css'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
+});
+
+test('the sleeve clears the text column, which sits in a darker pool',()=>{
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.record-sleeve'),/left:28%/);
+ assert.match(rules.get('.listen-layout::after'),/background:radial-gradient\(ellipse 60% 55% at 0% 70%,rgb\(11 10 9 \/ \.6\),transparent\),linear-gradient\(/,'the pool is in front of the old gradient');
+ assert.match(rules.get('.listen-layout::after'),/linear-gradient\(180deg,rgb\(11 10 9 \/ \.75\),rgb\(11 10 9 \/ \.6\) 90px,rgb\(11 10 9 \/ \.25\) 160px,transparent 30%,/,'the header band is as dark as on phones, so a cover or a pale sky cannot show through the status');
+ for(const selector of ['h1','.place'])assert.match(rules.get(selector),/text-shadow:0 2px 18px rgb\(0 0 0 \/ \.45\)/,selector+' carries the shadow at every width');
+ assert.match(rules.get('.place'),/color:var\(--cream\)/,'the description reads in cream at every width');
+ assert.doesNotMatch(phone.get('h1')+phone.get('.place'),/text-shadow|color:/,'the phone rules no longer carry their own copy');
+});
+
+test('title and description arrive together, on the shared curve',async()=>{
+ const e=setup();await flush();const moves=[],fades=[];
+ e.elements.bottom.animate=(frames,options)=>{moves.push([frames,options]);return {cancel(){},finished:Promise.resolve()};};
+ e.elements['photo-buffer'].animate=(frames,options)=>{fades.push(options);return {cancel(){},finished:Promise.resolve()};};
+ e.change('03');await flush();
+ const plain=value=>JSON.parse(JSON.stringify(value));
+ assert.deepEqual(plain(moves),[[[{opacity:0,transform:'translateY(6px)'},{opacity:1,transform:'none'}],{duration:240,easing:'cubic-bezier(.22, 1, .36, 1)'}]]);
+ e.setLanguage('de');assert.equal(moves.length,1,'a language change is not a scene change');
+ assert.deepEqual(plain(fades),[{duration:360,easing:'cubic-bezier(.22, 1, .36, 1)'}],'the photo crossfade uses the same curve');
 });

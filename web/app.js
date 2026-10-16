@@ -80,9 +80,9 @@ const words = {
   play:'Play', pause:'Pause', space:'Space', retry:'Try again', paused:'Paused', connecting:'Connecting…', playing:'Playing', buffering:'Buffering…',
   retrying:'Reconnecting…', blocked:'Press play to start', error:'Stream lost. Press play to retry.', soon:'Soon', soonSuffix:' (soon)', untitled:'Untitled track', unknownArtist:'Unknown artist',
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
-  live:'Live', standby:'Standby', offline:'Data unavailable', audience:'live audio connections', audienceUnknown:'Audience unavailable',
-  cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Change photo', photoOnly:'Photo only', showArtwork:'Show artwork',
-  busPlace:'Somewhere in the forest', busLine:'No playlist here. You have to be there.', busTicket:'Get your Pavoia ticket',
+  live:'Live', listening:'listening', audience:'listening to this stage',
+  cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Next photo', of:'of', photoOnly:'Photo only',
+  busPlace:'Somewhere in the forest. No playlist here, you have to be there.', busTicket:'Get your Pavoia ticket',
   places:['Finding your own rhythm in the open air, with no pressure to rush the day.','A growing sense of possibility: something is beginning, and you want to be part of it!','Pałac at its peak. The shared moment when everyone commits to the dance and everything else can wait.','The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.','The tracks I keep close and always come back to, at different times for different reasons.','The basement. Giving yourself fully to the speed and intensity, whether the feeling is dark or joyful.','The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.'],
   lines:['Sunny, groovy and easygoing records for warm ups and the open air.','Bright, melodic and a little energetic, building toward the dance floor.','Physical, driving, peak time. Built to move a room.','Melancholic, hypnotic and deep. Night music with a focus on feeling.','The tracks I keep coming back to.','Hard techno and hard trance from the basement. Dark or happy, always fast and full of energy.','Happy house for daylight dancing and relaxed afternoons.'] },
  de: { promise:'Damit es niemals aufhört.', choose:'Wähle ein Radio', letterTitle:'Das Festival endet.', letterEnd:'Die Musik bleibt.',
@@ -92,16 +92,16 @@ const words = {
   play:'Abspielen', pause:'Pause', space:'Leertaste', retry:'Erneut versuchen', paused:'Pausiert', connecting:'Verbinden…', playing:'Wiedergabe', buffering:'Puffern…',
   retrying:'Neu verbinden…', blocked:'Zum Starten Play drücken', error:'Stream unterbrochen. Play erneut drücken.', soon:'Bald', soonSuffix:' (bald)', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
-  live:'Live', standby:'Bereit', offline:'Daten fehlen', audience:'Live-Audioverbindungen', audienceUnknown:'Hörerzahl nicht verfügbar',
-  cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Foto wechseln', photoOnly:'Nur Foto', showArtwork:'Artwork zeigen',
-  busPlace:'Irgendwo im Wald', busLine:'Hier gibt es keine Playlist. Du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket',
+  live:'Live', listening:'hören', audience:'hören auf dieser Bühne',
+  cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Nächstes Foto', of:'von', photoOnly:'Nur Foto',
+  busPlace:'Irgendwo im Wald. Hier gibt es keine Playlist, du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket',
   places:['Unter freiem Himmel den eigenen Rhythmus finden und dem Tag seine Zeit lassen.','Das Gefühl, dass immer mehr möglich ist: Etwas beginnt, und du möchtest dabei sein!','Pałac auf dem Höhepunkt. Dieser gemeinsame Moment, in dem sich alle ganz dem Tanzen hingeben und alles andere warten kann.','Pałac, mit dem Blick nach innen. Sehnsucht, Zärtlichkeit, Melancholie: diesen Gefühlen Raum geben, während du weitertanzt.','Die Tracks, die mir am Herzen liegen und zu denen ich immer wieder zurückkehre, zu verschiedenen Zeiten aus verschiedenen Gründen.','Der Keller. Sich ganz dem Tempo und der Intensität hingeben, ob düster oder voller Freude.','Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.'],
   lines:['Sonnige, groovige und entspannte Musik zum Aufwärmen und für draußen.','Melodisch und zunehmend energiegeladen, auf dem Weg zur Tanzfläche.','Kraftvoll und treibend. Musik für die volle Tanzfläche.','Melancholisch, hypnotisch und tief. Nachtmusik mit Gefühl.','Die Tracks, zu denen ich immer wieder zurückkehre.','Hard Techno und Hard Trance aus dem Keller. Dunkel oder fröhlich, immer schnell und voller Energie.','Fröhlicher House zum Tanzen bei Tageslicht und für entspannte Nachmittage.'] }
 };
 words.en.places.push('A safe, quiet space to lie down, relax and feel good. Nothing demanding your energy.', 'Tracks I could play to close a set.');
 words.de.places.push('Ein sicherer, ruhiger Ort zum Hinlegen, Entspannen und Wohlfühlen. Hier musst du nichts leisten.', 'Tracks, mit denen ich ein Set beenden könnte.');
-Object.assign(words.en, {special:'Special', stations:'Change stage', closeStations:'Close stages', stationPosition:'Stage', swipeHint:'Swipe to change stage', audience:'listening to this stage'});
-Object.assign(words.de, {special:'Besonders', stations:'Bühne wechseln', closeStations:'Bühnen schließen', stationPosition:'Bühne', swipeHint:'Wischen, um die Bühne zu wechseln', audience:'hören auf dieser Bühne'});
+Object.assign(words.en, {special:'Special', stations:'Change stage', closeStations:'Close stages', stationPosition:'Stage', swipeHint:'Swipe to change stage'});
+Object.assign(words.de, {special:'Besonders', stations:'Bühne wechseln', closeStations:'Bühnen schließen', stationPosition:'Bühne', swipeHint:'Wischen, um die Bühne zu wechseln'});
 words.en.lines.push('Ambiance', 'Closing');
 words.de.lines.push('Ambiance', 'Closing');
 let language = 'en';
@@ -127,11 +127,14 @@ let watchdog;
 let healthyTimer;
 let removeListeners = () => {};
 let pollController;
-let audienceController, audienceData=null;
+let audienceController, audienceData=null, audienceStage;
 const delays = [1000, 2000, 4000, 8000];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const mobileLayout = matchMedia('(max-width: 760px)');
+// Below 900 px the header has no room for the word after the count.
+const narrowHeader = matchMedia('(max-width: 900px)');
 let photoRequest = '', photoVersion = 0, photoAnimation, sceneID = '';
+const sceneText = document.querySelector('.bottom');
 const nextPhoto = new Image();
 nextPhoto.fetchPriority = 'low';
 
@@ -161,7 +164,7 @@ async function showPhoto(photo) {
       previous.classList.add('photo-back');
       incoming.classList.remove('photo-back');
       if (!reducedMotion.matches && !document.hidden && previous.complete && previous.naturalWidth) {
-        photoAnimation = incoming.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
+        photoAnimation = incoming.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, easing: 'cubic-bezier(.22, 1, .36, 1)' });
         photoAnimation.finished.then(() => { if (version === photoVersion) previous.hidden = true; }).catch(() => {});
       } else previous.hidden = true;
     }
@@ -194,13 +197,13 @@ document.addEventListener('visibilitychange', () => {
   document.documentElement.toggleAttribute('data-page-hidden', document.hidden);
   if (document.hidden) {
     photoAnimation?.cancel();
-    $('mood-name').getAnimations().forEach(animation => animation.cancel());
+    sceneText.getAnimations().forEach(animation => animation.cancel());
   }
 });
 reducedMotion.addEventListener('change', () => {
   if (reducedMotion.matches) {
     photoAnimation?.cancel();
-    $('mood-name').getAnimations().forEach(animation => animation.cancel());
+    sceneText.getAnimations().forEach(animation => animation.cancel());
   }
 });
 
@@ -300,7 +303,7 @@ let photoOnly = false;
 try { photoOnly = localStorage.getItem('pavoia-photo-only') === 'on'; } catch { /* Storage is optional. */ }
 function renderArtworkToggle() {
   document.body.toggleAttribute('data-photo-only', photoOnly);
-  $('artwork-toggle').textContent = text(photoOnly ? 'showArtwork' : 'photoOnly');
+  $('artwork-toggle').setAttribute('aria-pressed', photoOnly);
 }
 $('artwork-toggle').addEventListener('click', () => {
   photoOnly = !photoOnly;
@@ -313,20 +316,17 @@ function renderScene() {
   const photo = bus ? { src: 'photos/bus-stage.jpg', focus: '50% 50%' }
     : currentMood.photos[currentMood.photoIndex ?? 0];
   document.body.toggleAttribute('data-bus', bus);
-  $('bus-copy').hidden = !bus;
   if (bus) $('bus-link').setAttribute('aria-current', 'page');
   else $('bus-link').removeAttribute('aria-current');
   $('change-photo').hidden = bus || currentMood.photos.length < 2;
-  $('photo-count').hidden = $('change-photo').hidden;
-  $('photo-controls').hidden = bus;
+  $('change-photo').setAttribute('aria-label', `${text('changePhoto')}, ${(currentMood.photoIndex ?? 0) + 1} ${text('of')} ${currentMood.photos.length}`);
   showPhoto(photo);
   tabTitle();
   const nextScene = bus ? 'bus' : currentMood.id;
   if (nextScene !== sceneID) {
-    const title = $('mood-name');
-    setTitle(title, bus ? ['The', 'Bus'] : currentMood.title);
-    title.getAnimations().forEach(animation => animation.cancel());
-    if (sceneID && !reducedMotion.matches && !document.hidden) title.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'ease-out' });
+    setTitle($('mood-name'), bus ? ['The', 'Bus'] : currentMood.title);
+    sceneText.getAnimations().forEach(animation => animation.cancel());
+    if (sceneID && !reducedMotion.matches && !document.hidden) sceneText.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.22, 1, .36, 1)' });
     revealStation(Boolean(sceneID));
       sceneID = nextScene;
   }
@@ -356,8 +356,7 @@ $('moods').addEventListener('click', event => {
 
 function render() {
   changePhoto();
-  $('live-text').textContent = currentMood.stage ? text('connecting') : text('soon');
-  $('live-text').removeAttribute('aria-label');
+  renderStatus();
   button.disabled = !currentMood.stage;
   document.querySelector(`input[value="${currentMood.id}"]`).checked = true;
   metadata(null);
@@ -553,7 +552,7 @@ async function pollListeners(urgent = false) {
     if (audienceController===controller) {audienceData=null;audienceDelay=Math.min(audienceDelay*2, AUDIENCE_SLOW);}
   } finally {
     clearTimeout(timeout);
-    if (audienceController===controller) {audienceController=null;audienceDue=performance.now()+audienceDelay;renderStatus();}
+    if (audienceController===controller) {audienceController=null;audienceStage=stage;audienceDue=performance.now()+audienceDelay;renderStatus();}
   }
 }
 
@@ -569,7 +568,7 @@ function selectMood(id) {
   retries = 0;
   if (pollController) pollController.abort();
   pollController = null;
-  audienceController?.abort();audienceController=null;audienceData=null;
+  audienceController?.abort();audienceController=null;audienceData=null;audienceStage=null;
   currentMood = next;
   radioData=null; dataFresh=false; loading=Boolean(next.stage);
   if (!next.stage) wanted = false;
@@ -592,32 +591,34 @@ pollListeners(true);
 setInterval(tickListeners, 1000);
 audio.addEventListener('playing', () => pollListeners(true));
 
+// The header says Live and counts only real listeners; the dot is red only while a track is on air.
+// Until the stage's radio data and audience have both answered, the last words stay in place, unseen,
+// so the dot moves at most once per stage change. Screen readers get #live-label instead of the
+// visible words: "Connecting…" while pending, then the full sentence, zero included, and whether a track is on air.
 function renderStatus() {
-  document.body.toggleAttribute('data-on-air',Boolean(dataFresh && track));
-  if (!currentMood.stage) { $('live-text').textContent=text('soon'); return; }
-  if (loading) { $('live-text').textContent=text('connecting'); return; }
-  if (!dataFresh) {
-    $('live-text').textContent=text('offline');
-    $('live-text').removeAttribute('aria-label');
-    if (!track) $('player-title').textContent=plain(currentMood);
-    return;
-  }
+  const live=$('live-text'),label=$('live-label'),onAir=Boolean(dataFresh && track);
+  const pending=Boolean(currentMood.stage) && (loading || audienceStage!==currentMood.stage);
+  document.body.toggleAttribute('data-on-air',onAir);
+  live.toggleAttribute('data-pending',pending);
+  live.removeAttribute('title');
+  if (!currentMood.stage) { live.textContent=label.textContent=text('soon'); return; }
+  if (!loading && !dataFresh && !track) $('player-title').textContent=plain(currentMood);
+  if (pending) { label.textContent=text('connecting'); return; }
   const { listeners: count, measuredAt, available }=audienceData || {};
   const fresh=Number.isFinite(Date.parse(measuredAt)) && Math.abs(Date.now()-Date.parse(measuredAt))<=AUDIENCE_SLOW+5000;
-  const known=fresh && available && Number.isInteger(count) && count>=0;
-  $('live-text').textContent=track ? known ? `${text('live')} · ${count}` : text('live') : text('standby');
-  const hint=known ? `${count} ${text('audience')}: ${plain(currentMood)}` : text('audienceUnknown');
-  $('live-text').setAttribute('aria-label',hint);
-  $('live-text').title=hint;
+  const known=dataFresh && fresh && available && Number.isInteger(count) && count>=0;
+  live.textContent=text('live')+(onAir && known && count>=1 ? ` · ${count}${narrowHeader.matches ? '' : ' '+text('listening')}` : '');
+  if (known) live.title=`${count} ${text('audience')}: ${plain(currentMood)}`;
+  // The muted dot is not read aloud, so the label says when no track is on air.
+  label.textContent=(known ? live.title : live.textContent)+(onAir ? '' : '. '+text('noTrack'));
 }
+narrowHeader.addEventListener('change', renderStatus);
 
 function localise() {
   document.documentElement.lang=language;
-  $('language').value=language;
+  for (const choice of $('language').children) choice.setAttribute('aria-pressed',choice.value===language);
   $('language').setAttribute('aria-label',text('language'));
   $('close-stations').setAttribute('aria-label',text('closeStations'));
-  $('change-photo').setAttribute('aria-label',text('changePhoto'));
-  $('change-photo').title=text('changePhoto');
   document.querySelectorAll('[data-copy]').forEach(node=>{node.textContent=text(node.dataset.copy);});
   document.querySelectorAll('.mood span').forEach(node=>{node.dataset.soon=text('soonSuffix');});
   document.querySelector('.wordmark').setAttribute('aria-label',text('home'));
@@ -629,9 +630,9 @@ function localise() {
   renderStatus();
   state(playbackState,playbackText);
 }
-$('language').addEventListener('change',()=>{
-  if (!Object.hasOwn(words,$('language').value)) return;
-  language=$('language').value;
+$('language').addEventListener('click',event=>{
+  if (!Object.hasOwn(words,event.target.value)) return;
+  language=event.target.value;
   try { localStorage.setItem('pavoia-language',language); } catch { /* Storage is optional. */ }
   localise();
 });

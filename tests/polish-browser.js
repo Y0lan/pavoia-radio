@@ -99,14 +99,14 @@ async page => {
   assert(await page.locator('#playback-status').innerText() === 'Reconnecting…', 'Retry feedback missing');
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'error', null, {timeout:25000});
   assert(await page.locator('#play').getAttribute('aria-label') === 'Try again', 'Terminal error has no retry control');
-  await page.locator('#language').selectOption('de');
+  await page.locator('#language [value=de]').dispatchEvent('click');
   assert(await page.locator('#playback-status').innerText() === 'Stream unterbrochen. Play erneut drücken.', 'German error feedback missing');
   assert((await page.locator('#playback-status').boundingBox()).width <= 320, 'German feedback overflows');
   await page.unroute('**/stream/fontanna.mp3', unavailable);
   await page.locator('#play').click();
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'playing');
   await page.locator('#play').click();
-  await page.locator('#language').selectOption('en');
+  await page.locator('#language [value=en]').dispatchEvent('click');
   assert(errors.length === 0, errors.join('\n'));
   return {focusPreserved, widths:[1440,760,390,320], photoRaces:true, photoFailure:true, audioIndependent:true, reducedMotion:true, mobileRecovery:true, pageErrors:errors};
 }

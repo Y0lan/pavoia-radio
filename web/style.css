@@ -32,14 +32,18 @@ p, h1, h2 { margin: 0; font-weight: 400; }
 .wordmark img { width:132px; height:auto; filter:invert(1); }
 .broadcast-mark { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
 .promise { font:italic 28px var(--serif); }
-.live { display:flex; align-items:center; gap:9px; font:11px var(--mono); letter-spacing:.06em; color:var(--soft); }
+.live { display:flex; align-items:center; gap:9px; font:11px var(--mono); letter-spacing:.06em; color:var(--soft); white-space:nowrap; }
+/* A stage change keeps the last words in place, unseen, until the new ones are known, so the dot moves once at most.
+   Transparent, not hidden: screen readers still hear the pending "Connecting…" label. */
+#live-text[data-pending] { color:transparent; }
 .dot { width:7px; height:7px; border-radius:50%; background:var(--muted); }
 body[data-on-air] .dot { background:var(--red); }
-.listen-layout { position:relative; isolation:isolate; display:grid; grid-template-columns:minmax(0,1fr) minmax(340px,460px); align-items:end; gap:clamp(32px,6vw,100px); min-height:calc(100svh - var(--bar)); padding:320px var(--gutter) 32px; overflow:hidden; }
-.listen-layout::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(180deg,rgb(11 10 9 / .55),transparent 24%,rgb(11 10 9 / .2) 45%,rgb(11 10 9 / .92) 100%); }
+/* One column: the sleeve and the portrait are absolute layers of the same photo, not a second column. */
+.listen-layout { position:relative; isolation:isolate; display:grid; grid-template-columns:minmax(0,1fr); align-items:end; min-height:calc(100svh - var(--bar)); padding:clamp(120px,24svh,320px) var(--gutter) 32px; overflow:hidden; }
+.scene-artwork { display:contents; }
+.listen-layout::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse 60% 55% at 0% 70%,rgb(11 10 9 / .6),transparent),linear-gradient(180deg,rgb(11 10 9 / .75),rgb(11 10 9 / .6) 90px,rgb(11 10 9 / .25) 160px,transparent 30%,rgb(11 10 9 / .2) 45%,rgb(11 10 9 / .92) 100%); }
 .poster { min-width:0; }
 .swipe-hint, .station-switcher, .station-position, .mood-preview, .change-photo svg { display:none; }
-.station-tools { display:contents; }
 .spotify-caption, .special-name, .special-tag { display:none; }
 #stations-sheet { margin:auto 0 0; width:100%; max-width:none; max-height:calc(100dvh - 24px); padding:0 20px max(12px,env(safe-area-inset-bottom)); border:1px solid var(--line); border-bottom:0; border-radius:18px 18px 0 0; background:#141210; color:var(--cream); overscroll-behavior:contain; opacity:0; transform:translateY(24px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
 #stations-sheet[open] { opacity:1; transform:none; }
@@ -52,12 +56,16 @@ body:has(#stations-sheet[open]) { overflow:hidden; }
 .photo { position:absolute; inset:0; z-index:-4; width:100%; height:100%; object-fit:cover; object-position:var(--focus); }
 .photo-back { z-index:-5; }
 .bottom { width:fit-content; max-width:100%; }
-h1 { font:clamp(56px,7vw,112px)/.94 var(--serif); letter-spacing:-.025em; }
-.place { max-width:52ch; margin-top:14px; font:italic 21px/1.45 var(--serif); color:var(--soft); text-wrap:pretty; }
-.stage-spotify { display:inline-block; margin-top:14px; min-height:44px; font-size:12px; line-height:1.6; color:var(--soft); }
-.stage-spotify>span:first-child { text-decoration:underline; text-underline-offset:5px; }
+h1 { font:clamp(56px,7vw,112px)/.94 var(--serif); letter-spacing:-.025em; text-shadow:0 2px 18px rgb(0 0 0 / .45); }
+.place { max-width:52ch; min-height:2lh; margin-top:14px; font:italic 21px/1.45 var(--serif); color:var(--cream); text-shadow:0 2px 18px rgb(0 0 0 / .45); text-wrap:pretty; }
+.stage-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 24px; min-height:44px; }
+.stage-action { font-size:14px; line-height:44px; color:var(--muted); }
+.stage-spotify, .bus-ticket { display:inline-block; color:var(--soft); }
+.stage-spotify>span:first-child, .bus-ticket { text-decoration:underline; text-underline-offset:5px; }
 .stage-spotify>span:first-child::before { content:""; display:inline-block; width:20px; height:20px; margin-right:8px; vertical-align:middle; background:url('assets/spotify.svg') center / contain no-repeat; }
-.spotify-daily { display:block; margin-top:6px; }
+.spotify-daily::before { content:' · ' / ''; }
+/* Off the Bus, the ticket hides; without a playlist, the whole slot hides so the photo tools start the line. */
+body:not([data-bus]) :is(.bus-ticket, .stage-action:has(#stage-spotify[hidden])) { display:none; }
 .moods { margin:20px 0 0; padding:8px 0; border:0; min-width:0; }
 .mood-list { display:flex; flex-wrap:wrap; gap:0 18px; }
 .mood { position:relative; min-height:44px; font:19px/2.3 var(--serif); color:var(--soft); cursor:pointer; }
@@ -67,24 +75,21 @@ h1 { font:clamp(56px,7vw,112px)/.94 var(--serif); letter-spacing:-.025em; }
 .mood span::after { content:""; position:absolute; inset:auto 0 -6px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
 .mood:has(input:checked) span::after { transform:scaleX(1); }
 .mood:has(input:focus-visible) span { outline:2px solid var(--cream); outline-offset:3px; }
-.change-photo { display:block; min-height:44px; padding:0; border:0; background:none; color:var(--soft); font:12px Inter,sans-serif; text-decoration:underline; text-underline-offset:5px; cursor:pointer; }
-.change-photo:hover { color:var(--cream); }
-.photo-controls { display:flex; align-items:center; gap:14px; }
+.change-photo { display:block; min-height:44px; padding:0; border:0; background:none; color:var(--muted); font:12px Inter,sans-serif; text-underline-offset:5px; cursor:pointer; }
+.change-photo:hover, .artwork-toggle[aria-pressed=true] { color:var(--cream); }
+.artwork-toggle[aria-pressed=true] { text-decoration:underline; }
+/* Keyed on the artwork URL, not its load state, so a new cover does not blink the toggle; focus never loses it. */
+body:not(:has(#hero-cover[src], #painted-artist[src])) #artwork-toggle:not(:focus) { display:none; }
 .record-sleeve, .painted-artist { transition:opacity var(--panel) var(--ease), visibility var(--panel); }
-@media (min-width:761px) { body[data-photo-only] :is(.record-sleeve, .painted-artist) { opacity:0; visibility:hidden; } }
+@media (min-width:761px) { body[data-photo-only] :is(.record-sleeve, .painted-artist) { opacity:0; visibility:hidden; } .change-photo:hover { text-decoration:underline; } }
 #photo-count { font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
 .bus-link { display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; min-width:44px; min-height:44px; color:var(--soft); opacity:.65; }
 .bus-link:hover, .bus-link:focus-visible, .bus-link[aria-current] { color:var(--cream); opacity:1; }
-.bus-line { margin-top:20px; color:var(--soft); font-size:14px; line-height:1.6; }
-.bus-ticket { display:inline-flex; align-items:center; min-height:44px; margin-top:16px; padding:10px 14px; border:1px solid var(--soft); font-size:13px; }
-.bus-ticket:hover { border-color:var(--cream); }
-body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify) { display:none; }
+body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-daily, #artwork-toggle) { display:none; }
 /* Explicit ellipse radii reach transparency before every rectangular image edge. */
-.record-sleeve { position:absolute; z-index:-3; left:16%; top:-3%; width:60%; max-width:860px; aspect-ratio:1; pointer-events:none; opacity:.88; mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 24%,rgb(0 0 0 / .92) 43%,rgb(0 0 0 / .4) 70%,transparent 100%); }
+.record-sleeve { position:absolute; z-index:-3; left:28%; top:-3%; width:60%; max-width:860px; aspect-ratio:1; pointer-events:none; opacity:.88; mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 24%,rgb(0 0 0 / .92) 43%,rgb(0 0 0 / .4) 70%,transparent 100%); }
 .record-sleeve img { width:100%; height:100%; object-fit:contain; }
-#sleeve-empty { display:none; }
 .painted-artist { position:absolute; z-index:-2; right:-2%; top:0; width:45%; height:86%; object-fit:cover; object-position:50% 28%; pointer-events:none; opacity:.76; filter:saturate(.35); mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 20%,rgb(0 0 0 / .9) 42%,rgb(0 0 0 / .3) 72%,transparent 100%); }
-.painted-artist.secondary { right:24%; top:12%; width:30%; height:68%; opacity:.4; }
 .entity-link { border:0; border-bottom:1px solid var(--line); padding:8px 0; color:var(--cream); background:none; font:inherit; text-align:left; cursor:pointer; }
 button:disabled { opacity:.45; cursor:default; }
 .credited-artists { display:flex; flex-wrap:wrap; gap:16px; padding:20px 0 0; }
@@ -196,7 +201,7 @@ body[data-wanted] .icon-pause { display:block; }
 }
 
 button, .mood, .bus-link, .bus-ticket, .stage-spotify { transition:transform var(--press) var(--ease), color var(--hover) ease, background-color var(--hover) ease, border-color var(--hover) ease, opacity var(--hover) ease; }
-button:not(:disabled):active, .bus-ticket:active, .bus-link:active { transform:scale(.98); }
+button:not(:disabled):active, .bus-link:active { transform:scale(.98); }
 @keyframes tuning { to { transform:rotate(360deg); } }
 @keyframes artwork-in { from { opacity:0; } }
 @media (prefers-reduced-motion: no-preference) {
@@ -224,8 +229,9 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 }
 
 .station-status { justify-self: end; display: flex; align-items: center; gap: 16px; }
-#language { appearance:none; font:11px var(--mono); min-width:44px; min-height:44px; text-align:center; color:var(--soft); background:transparent; border:0; border-radius:0; padding:0 6px; cursor:pointer; }
-#language option { color:var(--cream); background:var(--ink); }
+#language { display:flex; }
+#language button { min-width:44px; min-height:44px; padding:0; border:0; background:transparent; color:var(--muted); font:11px var(--mono); cursor:pointer; }
+#language button:is([aria-pressed=true], :hover) { color:var(--cream); }
 @media (max-width: 600px) { .station-status { gap: 10px; } }
 @media (max-width: 360px) {
   .top { column-gap: 12px; }
@@ -288,7 +294,6 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   /* The column is too narrow for a message beside the clock; the waveform is blank in these states anyway. */
   .player:not([data-status=paused],[data-status=playing]) :is(#track-clock, #waveform) { display:none; }
   .player #waveform { width:100%; height:22px; }
-  .listen-layout { grid-template-columns:minmax(0,1fr) minmax(320px,.95fr); gap:24px; }
   h1 { font-size:64px; }
 }
 @media (max-width:760px) {
@@ -297,7 +302,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .top { grid-template-columns:1fr auto; gap:4px 12px; align-items:start; min-height:112px; }
   .promise { display:none; }
   .station-status { display:grid; grid-template-columns:auto auto; gap:0 10px; }
-  .station-status .live { grid-column:1; grid-row:1; white-space:nowrap; }
+  .station-status .live { grid-column:1; grid-row:1; }
   .station-status #language { grid-column:2; grid-row:1; }
   .wordmark { width:120px; height:45px; margin-top:6px; }
   .wordmark img { width:99px; }
@@ -306,19 +311,19 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .poster { position:relative; isolation:isolate; display:flex; flex-direction:column; justify-content:end; min-height:calc(100svh - var(--bar)); padding:clamp(180px,30svh,300px) var(--gutter) 24px; touch-action:pan-y pinch-zoom; }
   .poster::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(180deg,rgb(11 10 9 / .75),rgb(11 10 9 / .6) 16%,rgb(11 10 9 / .15) 30%,rgb(11 10 9 / .72) 48%,rgb(11 10 9 / .94) 72%,var(--ink)); }
   .bottom { width:100%; min-width:0; }
-  h1 { font-size:clamp(44px,12vw,66px); text-shadow:0 2px 18px rgb(0 0 0 / .45); text-wrap:balance; }
-  .place { margin-top:14px; max-width:44ch; color:var(--cream); font:italic 19px/1.45 var(--serif); }
+  h1 { font-size:clamp(44px,12vw,66px); text-wrap:balance; }
+  .place { margin-top:14px; max-width:44ch; font:italic 19px/1.45 var(--serif); }
   .swipe-hint { display:flex; align-items:center; gap:8px; margin-top:20px; color:var(--muted); font:14px/1.5 Inter,sans-serif; }
-  body[data-bus] .swipe-hint { display:none; }
+  body[data-bus] .swipe-hint { visibility:hidden; }
   .station-controls { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
   .station-switcher { display:inline-flex; align-items:center; gap:6px; min-height:44px; padding:0; border:0; background:none; color:var(--cream); font:17px var(--serif); cursor:pointer; }
   .station-position { display:block; font:11px var(--mono); color:var(--muted); font-variant-numeric:tabular-nums; }
-  .station-tools { display:flex; align-items:center; gap:6px; margin-left:auto; }
-  .stage-spotify { display:flex; align-items:end; justify-content:center; order:-1; width:50px; height:48px; margin:0; background:url('assets/spotify.svg') center 2px / 22px no-repeat; }
+  .stage-actions { gap:6px; margin-left:auto; }
+  .stage-spotify { display:flex; align-items:end; justify-content:center; width:50px; height:48px; background:url('assets/spotify.svg') center 2px / 22px no-repeat; }
   .stage-spotify .spotify-caption { display:block; font:12px/18px Inter,sans-serif; color:var(--soft); }
-  .stage-spotify>span:not(.spotify-caption) { display:none; }
+  .stage-spotify>span:not(.spotify-caption), .spotify-daily { display:none; }
   .stage-spotify>span:first-child::before { display:none; }
-  .change-photo { display:flex; flex-direction:column; align-items:center; justify-content:space-between; height:48px; min-width:76px; padding-top:2px; font:12px/18px Inter,sans-serif; text-decoration:none; }
+  .change-photo { display:flex; flex-direction:column; align-items:center; justify-content:space-between; height:48px; min-width:76px; padding-top:2px; font:12px/18px Inter,sans-serif; color:var(--soft); }
   .change-photo svg { display:block; }
   #photo-count { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
   .artwork-toggle { display:none; }
