@@ -84,6 +84,13 @@ test('photo-only toggle hides artwork, is remembered and works without storage',
  blocked.elements['artwork-toggle'].emit('click');assert.equal(blocked.document.body.getAttribute('data-photo-only'),'');
 });
 
+test('the start says Connecting; only a stall during play says Buffering',async()=>{
+ const e=setup();await flush();e.click();e.audio.emit('waiting');
+ assert.equal(e.elements['playback-status'].textContent,'Connecting');
+ e.playing();e.audio.readyState=2;e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering');
+ e.change('03');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Connecting','a new station connects again');
+});
+
 test('gesture, pause/resume races and media controls release the source',async()=>{
  const e=setup();await flush();assert.equal(e.audio.calls.length,0);
  e.click();const old=e.audio.calls[0],oldPlaying=[...e.audio.events.playing][0];

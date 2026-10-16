@@ -240,8 +240,8 @@ class OpsChecks(unittest.TestCase):
         self.assertEqual(limits.findtext("sources"), "9")
         queue = int(limits.findtext("queue-size"))
         burst = int(limits.findtext("burst-size"))
-        self.assertEqual(queue, 524288)
-        self.assertEqual(burst, 262144)
+        self.assertEqual(queue, 2097152)
+        self.assertEqual(burst, 786432)
         self.assertLess(burst, queue)
 
     def test_observation_requires_exact_both_mounts_and_both_apis(self):

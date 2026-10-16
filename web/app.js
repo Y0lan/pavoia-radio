@@ -405,9 +405,11 @@ function connect() {
   const token = generation;
   const current = () => wanted && token === generation;
   state('connecting', 'connecting');
+  let started = false;
   const handlers = {
     playing: () => {
       if (!current() || audio.paused || audio.readyState < 3) return;
+      started = true;
       clearTimeout(watchdog);
       watchdog = null;
       clearTimeout(healthyTimer);
@@ -417,7 +419,7 @@ function connect() {
     waiting: () => {
       if (!current()) return;
       clearTimeout(healthyTimer);
-      state('connecting', 'buffering');
+      state('connecting', started ? 'buffering' : 'connecting');
       if (watchdog == null) watchdog = setTimeout(() => fail(token), 20000);
     },
     stalled: () => { if (audio.readyState < 3) handlers.waiting(); },

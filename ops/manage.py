@@ -92,7 +92,9 @@ def configure():
     for key, value in [("location", "Pavoia"), ("admin", "radio@localhost"), ("hostname", "127.0.0.1")]:
         element(icecast, key, value)
     limits = ET.SubElement(icecast, "limits")
-    for key, value in [("clients", 160), ("sources", len(SCENES)), ("queue-size", 524288), ("client-timeout", 15), ("header-timeout", 10), ("source-timeout", 10), ("burst-size", 262144)]:
+    # 320 kbps is 40,000 B/s. The burst is each new listener's head start, about 19.7 s, which absorbs
+    # dips on long routes (Noumea to the server is ~311 ms per round trip). The queue must stay larger.
+    for key, value in [("clients", 160), ("sources", len(SCENES)), ("queue-size", 2097152), ("client-timeout", 15), ("header-timeout", 10), ("source-timeout", 10), ("burst-size", 786432)]:
         element(limits, key, value)
     auth = ET.SubElement(icecast, "authentication")
     for key, value in [("source-password", credentials["source"]), ("relay-password", credentials["admin"]), ("admin-user", "admin"), ("admin-password", credentials["admin"])]:
