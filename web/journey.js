@@ -192,7 +192,7 @@
   async function loadEntity(id) {
     setView('explore');
     selected=null;explorerRequest?.abort();const controller=new AbortController();explorerRequest=controller;
-    $('discovery-status').textContent=word('loading');$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
+    $('discovery-status').textContent=word('loading');hideResults();$('explore-workspace').hidden=true;
     const timeout=setTimeout(()=>controller.abort(),10000);
     try{const data=await request('/api/discovery/entity/'+id,controller.signal);
       if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}selected=data;renderEntity(data);$('discovery-status').textContent='';
@@ -246,6 +246,8 @@
     const center=node('div','map-center');center.append(node('small','',word(e.type)),node('span','',e.title));map.append(center);
     for(const p of coords){const b=action('',()=>navigate(p.v.id),'map-node');b.style.left=(p.x/640*100)+'%';b.style.top=(p.y/450*100)+'%';b.append(node('small','',word(p.v.type)),node('span','',p.v.title));map.append(b);}
   }
+  // Results that go away while one has focus hand it to the field, never to the page, where Space plays.
+  const hideResults=()=>{if($('discovery-results').contains(document.activeElement))$('discovery-query').focus();$('discovery-results').hidden=true;};
   // Results stay in place while the next ones load. The URL holds the query (#explore?q=…), so each
   // history entry keeps its own search, and the Roots tab points to the last one.
   const searchPage=query=>{history.replaceState(history.state,'',query?'#explore?q='+encodeURIComponent(query):'#explore');$('roots-tab').setAttribute('href',location.hash);};
@@ -256,12 +258,11 @@
     const timeout=setTimeout(()=>c.abort(),10000);
     try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent(query),{signal:c.signal});if(!res.ok)throw new Error();
       const data=await res.json();if(explorerRequest!==c)return;if(!Array.isArray(data.items))throw new Error();
-      // A focused result that goes away hands focus to the field, never to the page, where Space plays.
       const focused=$('discovery-results').contains(document.activeElement);
       $('discovery-results').replaceChildren(...data.items.map(e=>{const b=action('',()=>navigate(e.id),'search-result');b.append(node('small','',word(e.type)),node('span','',e.title));return b;}));
       if(focused)$('discovery-query').focus();
       shownQuery=query;$('discovery-results').hidden=false;$('discovery-status').textContent=data.items.length?word('firstResults'):word('empty');
-    }catch{if(explorerRequest===c){$('discovery-results').hidden=true;$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
+    }catch{if(explorerRequest===c){hideResults();$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
   }
   function cancelPreview() {
     const resume=preview?.resume;preview=null;const audio=$('preview-audio');audio.pause();audio.removeAttribute('src');audio.load();$('preview-banner').hidden=true;return resume;
@@ -320,7 +321,7 @@
     clearTimeout(typing);
     if($('discovery-query').value.trim().length>=2){typing=setTimeout(search,300);return;}
     if(!/^#explore(?:\?|$)/.test(location.hash))return;
-    searchPage('');explorerRequest?.abort();explorerRequest=null;shownQuery='';$('discovery-results').hidden=true;$('discovery-status').textContent='';
+    searchPage('');explorerRequest?.abort();explorerRequest=null;shownQuery='';hideResults();$('discovery-status').textContent='';
   });
   let view='explore',musicRequest=null,historyPage=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
@@ -341,7 +342,7 @@
       if(link.getAttribute('href').split('?')[0]==='#'+next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
     }
     if(next!=='explore'){
-      explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
+      explorerRequest?.abort();selected=null;hideResults();$('explore-workspace').hidden=true;
       $('history-period-label').hidden=next!=='history';fillStages($('music-stage').value);
     }
   }

@@ -928,6 +928,12 @@ test('a focused result replaced by a live search hands focus to the field, not t
  query.value='jimi';query.emit('input');e.fire(300);await flush();results.children[0].focus();
  query.value='jimi j';query.emit('input');e.fire(300);await flush();
  assert.equal(e.document.activeElement,query,'Space then types, it does not toggle the radio');
+ results.children[0].focus();e.discovery=url=>url.includes('/search?')?null:entity(url.split('/').pop());
+ query.value='jimi ju';query.emit('input');e.fire(300);await flush();
+ assert.deepEqual([results.hidden,e.document.activeElement],[true,query],'a failed search that hides the results does the same');
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
+ query.value='jimi';query.emit('input');e.fire(300);await flush();results.children[0].focus();
+ query.value='j';query.emit('input');assert.equal(e.document.activeElement,query,'and so does a field cut under two characters');
 });
 
 test('Escape while composing text stays in the field',async()=>{
