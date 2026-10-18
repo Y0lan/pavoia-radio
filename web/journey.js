@@ -82,7 +82,7 @@
     load();
   }
   function action(title,handler,cls='entity-link') {const b=node('button',cls,title);b.type='button';b.addEventListener('click',handler);return b;}
-  let enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, currentLanguage='', renderedPlayer='', shownQuery='', typing=null;
+  let recordTitle=null, enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, currentLanguage='', renderedPlayer='', shownQuery='', typing=null;
   // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
   // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
   // or ✕ always lands on the page in one step.
@@ -192,10 +192,13 @@
   async function loadEntity(id) {
     setView('explore');
     selected=null;explorerRequest?.abort();const controller=new AbortController();explorerRequest=controller;
-    $('discovery-status').textContent=word('loading');hideResults();$('explore-workspace').hidden=true;
+    // A record opened from a focused result keeps focus visible and off the field: on the explorer while
+    // it loads, then on the record's title. Touch screens open no keyboard.
+    if($('discovery-results').contains(document.activeElement))dialog.focus({preventScroll:true});
+    $('discovery-status').textContent=word('loading');$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
     const timeout=setTimeout(()=>controller.abort(),10000);
     try{const data=await request('/api/discovery/entity/'+id,controller.signal);
-      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}selected=data;renderEntity(data);$('discovery-status').textContent='';
+      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}selected=data;renderEntity(data);$('discovery-status').textContent='';if(document.activeElement===dialog)recordTitle.focus({preventScroll:true});
     }catch{if(explorerRequest===controller)$('discovery-status').textContent=word('unavailable');}
     finally{clearTimeout(timeout);}
   }
@@ -205,7 +208,8 @@
     const panel=$('entity-inspector');panel.replaceChildren();
     const heading=node('div','entity-heading');
     if(e.image){const img=node('img','entity-image');img.width=100;img.height=100;image(img,e.image,word('cover'));heading.append(img);}
-    const title=node('div');title.append(node('p','eyebrow',word(e.type)),node('h3','',e.title));
+    recordTitle=node('h3','',e.title);recordTitle.tabIndex=-1;
+    const title=node('div');title.append(node('p','eyebrow',word(e.type)),recordTitle);
     if(e.artist)title.append(node('p','entity-subtitle',e.artist));heading.append(title);panel.append(heading);
     const badges=node('div','entity-badges');
     if(e.favorite)badges.append(node('span','favorite-badge',word('favorite')));
@@ -246,7 +250,8 @@
     const center=node('div','map-center');center.append(node('small','',word(e.type)),node('span','',e.title));map.append(center);
     for(const p of coords){const b=action('',()=>navigate(p.v.id),'map-node');b.style.left=(p.x/640*100)+'%';b.style.top=(p.y/450*100)+'%';b.append(node('small','',word(p.v.type)),node('span','',p.v.title));map.append(b);}
   }
-  // Results that go away while one has focus hand it to the field, never to the page, where Space plays.
+  // On the search page, results that go away while one has focus hand it to the field, never to the
+  // page, where Space plays. Opening a record or a tab moves on instead: no keyboard pops up on touch.
   const hideResults=()=>{if($('discovery-results').contains(document.activeElement))$('discovery-query').focus();$('discovery-results').hidden=true;};
   // Results stay in place while the next ones load. The URL holds the query (#explore?q=…), so each
   // history entry keeps its own search, and the Roots tab points to the last one.
@@ -342,7 +347,7 @@
       if(link.getAttribute('href').split('?')[0]==='#'+next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
     }
     if(next!=='explore'){
-      explorerRequest?.abort();selected=null;hideResults();$('explore-workspace').hidden=true;
+      explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
       $('history-period-label').hidden=next!=='history';fillStages($('music-stage').value);
     }
   }
@@ -436,6 +441,6 @@
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
-    if(landing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
+    if(landing&&!closing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
 })();

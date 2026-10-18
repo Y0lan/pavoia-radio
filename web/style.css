@@ -255,6 +255,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 /* A plain dialog that stops above the player bar; its shadow dims the inert page around it. */
 #explorer { position:fixed; inset:16px 16px calc(var(--bar) + 16px); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain; padding:28px; border:1px solid var(--line); background:var(--surface); color:var(--cream); box-shadow:0 0 0 100vmax rgb(11 10 9 / .8); opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete; }
 #explorer[open] { opacity:1; transform:none; }
+/* The explorer takes focus while a record opened from a result loads; it is a place, not a control. */
+#explorer:focus { outline:none; }
 @starting-style { #explorer[open] { opacity:0; transform:translateY(12px); } }
 /* One header row: the tabs, the search on the Roots tab, and ✕ at the far end. */
 .explorer-top { display:flex; align-items:center; gap:24px; padding-bottom:12px; border-bottom:1px solid var(--line); }

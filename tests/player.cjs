@@ -936,6 +936,26 @@ test('a focused result replaced by a live search hands focus to the field, not t
  query.value='j';query.emit('input');assert.equal(e.document.activeElement,query,'and so does a field cut under two characters');
 });
 
+test('a track that arrives while the explorer closes does not close it in place, and a result opened by touch raises no keyboard',async()=>{
+ const e=setup({journey:true});await flush();
+ e.response={track:null,audience:{available:false,listeners:null}};await e.poll();await flush();
+ e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore'})},preventDefault(){}});await flush();
+ assert.equal(e.elements['discovery-status'].textContent,'Nothing on air right now. Search to start.');
+ let arrive;const back=e.history.back;e.history.back=()=>{arrive=()=>back.call(e.history);};
+ e.elements['explorer-close'].emit('click');
+ e.response={track:{id:'123',title:'Later',artist:'Artist Later'},audience:{available:true,listeners:2,measuredAt:new Date(e.clock.now).toISOString()}};await e.poll();await flush();
+ assert.deepEqual([e.elements.explorer.open,e.location.hash],[true,'#explore'],'the track waits for the close, it does not land the leaving page');
+ arrive();await flush();assert.deepEqual([e.elements.explorer.open,e.position(),e.entries()],[false,0,['','#explore']],'Back lands on the page and Forward keeps the explorer');
+ e.history.back=back;e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
+ e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore?q=jimi'})},preventDefault(){}});await flush();
+ const query=e.elements['discovery-query'],results=e.elements['discovery-results'];let loaded;
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:new Promise(resolve=>{loaded=()=>resolve(entity(url.split('/').pop()));});
+ results.children[0].focus();results.children[0].emit('click');await flush();
+ assert.equal(e.document.activeElement,e.elements.explorer,'while the record loads, focus waits on the explorer, visible and not a field');
+ loaded();await flush();
+ const title=e.document.activeElement;assert.deepEqual([title.tabIndex,title===e.elements.explorer,title===query,title.textContent.length>0],[-1,false,false,true],'then it lands on the record\'s title');
+});
+
 test('Escape while composing text stays in the field',async()=>{
  const e=setup({journey:true});e.discovery=url=>entity(url.split('/').pop());await flush();
  e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore/art_0123456789ab'})},preventDefault(){}});await flush();

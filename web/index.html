@@ -102,7 +102,7 @@
     <header class="stations-heading"><h2 id="stations-title" data-copy="stations">Change stage</h2><button id="close-stations" type="button" aria-label="Close"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button></header>
     <div id="station-sheet-list"></div>
   </dialog>
-  <dialog id="explorer" aria-labelledby="explorer-title">
+  <dialog id="explorer" tabindex="-1" aria-labelledby="explorer-title">
     <header class="explorer-top"><h2 id="explorer-title" class="visually-hidden" data-journey="roots">The roots</h2>
       <nav class="explorer-nav" aria-label="Explore"><a href="#explore" id="roots-tab" data-journey="exploreTab">Roots</a><a href="#history" data-journey="history">History</a><a href="#statistics" data-journey="statistics">Statistics</a></nav>
       <form id="discovery-search" class="discovery-search" role="search"><label for="discovery-query" class="visually-hidden" data-journey="searchLabel">Artist, track, release or label</label><input id="discovery-query" type="search" maxlength="100" autocomplete="off" enterkeyhint="search" placeholder="Search artists, tracks, releases, labels"></form>
