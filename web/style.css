@@ -106,7 +106,6 @@ body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-dai
 .record-sleeve { position:absolute; z-index:-3; left:28%; top:-3%; width:60%; max-width:860px; aspect-ratio:1; pointer-events:none; opacity:.88; mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 24%,rgb(0 0 0 / .92) 43%,rgb(0 0 0 / .4) 70%,transparent 100%); }
 .record-sleeve img { width:100%; height:100%; object-fit:contain; }
 .painted-artist { position:absolute; z-index:-2; right:-2%; top:0; width:45%; height:86%; object-fit:cover; object-position:50% 28%; pointer-events:none; opacity:.76; filter:saturate(.35); mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 20%,rgb(0 0 0 / .9) 42%,rgb(0 0 0 / .3) 72%,transparent 100%); }
-.entity-link { border:0; border-bottom:1px solid var(--line); padding:8px 0; color:var(--cream); background:none; font:inherit; text-align:left; cursor:pointer; }
 button:disabled { opacity:.45; cursor:default; }
 .credited-artists { display:flex; flex-wrap:wrap; gap:16px; padding:20px 0 0; }
 .artist-credit { min-height:44px; display:flex; align-items:center; gap:12px; text-align:left; color:var(--cream); background:none; border:0; padding:0; cursor:pointer; }
@@ -203,10 +202,10 @@ body[data-wanted] .icon-pause { display:block; }
 .player-release > :not([hidden]) ~ :not([hidden])::before { content:'·'; display:inline-block; margin:0 6px; color:var(--muted); }
 /* A long album title gives way before the label, so both stay readable. */
 .player .label-note { display:flex; align-items:center; flex-shrink:0; max-width:50%; }
-.player .label-note button { min-height:24px; min-width:0; padding:0; border:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:inherit; font:inherit; }
+.player .label-note a { min-height:24px; min-width:0; padding:0; border:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:inherit; font:inherit; }
 #track-spotify { flex-shrink:0; }
 /* Names are quiet doors: no underline until a pointer or the keyboard reaches them. */
-.player :is(#player-title[href], #player-album[href], #track-spotify, .label-note button):is(:hover, :focus-visible), .player .artist-credit:is(:hover, :focus-visible)>span>span { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+.player :is(#player-title[href], #player-album[href], #track-spotify, .label-note a):is(:hover, :focus-visible), .player .artist-credit:is(:hover, :focus-visible)>span>span { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 .player .transport-track { grid-column:4; grid-row:1 / 4; }
 .player .volume-control { grid-column:5; grid-row:1 / 4; }
 /* Phones and tablets ignore a page volume, so the slider only stays where it works. */
@@ -251,7 +250,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   #live-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
-.eyebrow { font:11px/1.7 var(--mono); letter-spacing:.09em; text-transform:uppercase; color:var(--soft); }
+.eyebrow { font:11px/1.7 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
 /* A plain dialog that stops above the player bar; its shadow dims the inert page around it. */
 #explorer { position:fixed; inset:16px 16px calc(var(--bar) + 16px); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain; padding:28px; border:1px solid var(--line); background:var(--surface); color:var(--cream); box-shadow:0 0 0 100vmax rgb(11 10 9 / .8); opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete; }
 #explorer[open] { opacity:1; transform:none; }
@@ -263,9 +262,13 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer button, #explorer input { font:inherit; color:var(--cream); border:1px solid #4b4640; background:transparent; min-height:44px; padding:10px 14px; }
 #explorer button { cursor:pointer; }
 #explorer button:hover { background:var(--raised); }
-/* The actions: Try again, Older tracks and the preview buttons. */
-#explorer :is(#music-status button, #history-more, .preview-button, #preview-stop) { padding:10px 16px; border-color:var(--soft); font:14px Inter,sans-serif; }
-#explorer :is(#music-status button, #history-more, .preview-button, #preview-stop):hover { border-color:var(--cream); }
+/* The actions: Try again and Older tracks. */
+#explorer :is(#music-status button, #history-more) { padding:10px 16px; border-color:var(--soft); font:14px Inter,sans-serif; }
+#explorer :is(#music-status button, #history-more):hover { border-color:var(--cream); }
+/* Quiet text actions: a stage to tune, More, and the rest of a group. */
+#explorer .text-button { padding:0; border:0; background:none; color:var(--soft); font:13px Inter,sans-serif; text-decoration:underline; text-underline-offset:4px; }
+#explorer .text-button:hover { color:var(--cream); }
+#explorer :is(.text-button, .preview-toggle):hover { background:none; }
 /* 16px keeps iOS from zooming into the field. */
 #explorer input { border-color:var(--muted); font:16px Inter,sans-serif; }
 #explorer input::placeholder { color:var(--muted); opacity:1; }
@@ -274,41 +277,55 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer :is(input, select):focus-visible { outline-offset:-1px; }
 .discovery-search { flex:0 1 360px; min-width:0; }
 .discovery-search input { width:100%; min-width:0; text-overflow:ellipsis; }
-.explore-workspace { display:grid; grid-template-columns:minmax(0,1.3fr) minmax(280px,1fr); gap:24px; margin-top:32px; }
-.explore-workspace.is-basic { grid-template-columns:minmax(0,1fr); max-width:640px; }
-.connection-map { position:sticky; top:0; align-self:start; min-width:0; border:1px solid var(--line); }
-#connection-map { position:relative; aspect-ratio:640/450; }
-#connection-map svg { width:100%; height:100%; }
-#connection-map line { stroke:#6b6258; stroke-width:1; }
-#connection-map .map-node { position:absolute; transform:translate(-50%,-50%); width:clamp(66px,9vw,130px); background:#211c17; padding:8px; font-size:11px; overflow-wrap:anywhere; }
-/* The lines end under the nodes, so a hovered node keeps its fill under the raised tint. */
-#connection-map .map-node:hover { background:linear-gradient(var(--raised),var(--raised)) #211c17; }
-.map-node small, .map-center small { display:block; color:#c4b9ab; font:11px var(--mono); text-transform:uppercase; margin-bottom:6px; }
-.map-center { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:28%; padding:12px 8px; border:1px solid #a99a89; background:#29221b; text-align:center; font:20px/1.2 var(--serif); overflow-wrap:anywhere; }
-.map-caption { padding:16px; border-top:1px solid var(--line); font:11px/1.6 var(--mono); color:var(--soft); }
-.entity-inspector { min-width:0; border-left:1px solid var(--line); padding-left:24px; }
-.entity-heading { display:flex; align-items:center; gap:20px; }
-.entity-heading h3 { font:34px/1.1 var(--serif); margin:8px 0; overflow-wrap:anywhere; }
-.entity-image { width:90px; height:90px; object-fit:cover; }
-.entity-subtitle { font-size:13px; color:var(--soft); line-height:1.6; }
-.entity-badges { display:flex; flex-wrap:wrap; gap:8px; margin:20px 0; }
-.entity-badges span { border:1px solid #4b4640; padding:6px 8px; font:11px var(--mono); }
-.favorite-badge, .favorite-mark { color:#efb7b0; }
-.entity-bio { font-size:13px; line-height:1.8; margin-bottom:20px; }
-.entity-bio summary { min-height:44px; cursor:pointer; }
-.entity-bio p { white-space:pre-line; margin:10px 0; color:var(--soft); }
-.entity-bio small { color:var(--soft); }
-.entity-links { display:flex; flex-wrap:wrap; gap:0 14px; font-size:11px; }
-.entity-links a { min-height:44px; display:inline-flex; align-items:center; }
-.entity-connections h4 { font:11px var(--mono); color:var(--soft); margin-top:30px; }
-#explorer .connection-row { display:flex; align-items:center; gap:14px; border:0; border-top:1px solid var(--line); width:100%; text-align:left; padding:12px 0; font-size:13px; }
-.relation-kind { width:84px; flex-shrink:0; color:#c4b9ab; font:11px var(--mono); }
-.connection-row>span:nth-child(2) { flex:1; overflow-wrap:anywhere; }
-.discovery-results { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:10px; margin-top:16px; }
-.search-result { display:grid; gap:8px; text-align:left; }
-.search-result small { color:var(--soft); font:11px var(--mono); }
-.preview-banner { position:sticky; bottom:0; display:flex; align-items:center; justify-content:space-between; gap:20px; background:#29221b; border:1px solid #a99a89; padding:14px; margin-top:20px; }
-.preview-banner p { font-size:13px; }
+.explore-workspace { margin-top:32px; }
+/* A hop keeps the last record in place, dimmed, until the next one is drawn. */
+.explore-workspace[aria-busy=true] { opacity:.45; transition:opacity var(--panel) var(--ease); }
+/* The profile: a picture that holds its box, then the trail, the type, the name and its facts, all from
+   the top, so the title stays put from record to record. */
+.entity-heading { display:grid; grid-template-columns:120px minmax(0,1fr); align-items:start; gap:24px; }
+.picture { flex-shrink:0; width:40px; height:40px; border-radius:2px; background:var(--raised); overflow:hidden; }
+.picture[data-type=artist] { border-radius:50%; }
+.picture img { width:100%; height:100%; object-fit:cover; }
+.entity-heading .picture { width:120px; height:120px; }
+.entity-trail { margin-bottom:6px; font-size:12px; line-height:1.6; color:var(--soft); }
+.entity-trail a:hover { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+.entity-trail [aria-current] { color:var(--cream); }
+.entity-heading h3 { width:fit-content; max-width:100%; margin:2px 0 0; font:44px/1.05 var(--serif); overflow-wrap:anywhere; }
+.entity-meta { margin-top:10px; font-size:14px; line-height:1.5; color:var(--soft); }
+.entity-tags { margin-top:4px; font:11px/1.6 var(--mono); color:var(--muted); }
+/* The preview plays in place: the player's circle and icons, and what it does next. */
+#explorer .preview-toggle { display:inline-flex; align-items:center; gap:12px; margin-top:14px; padding:0; border:0; background:none; font:14px Inter,sans-serif; font-variant-numeric:tabular-nums; }
+.preview-icon { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--soft); border-radius:50%; }
+.preview-icon svg { grid-area:1 / 1; width:16px; height:16px; fill:currentColor; }
+.preview-icon .icon-start { margin-left:2px; }
+.preview-toggle:hover .preview-icon { border-color:var(--cream); }
+.preview-toggle[data-playing] .preview-icon { background:var(--cream); color:var(--ink); }
+.preview-toggle:not([data-playing]) .icon-stop, .preview-toggle[data-playing] .icon-start { display:none; }
+.entity-links { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:20px; padding-block:10px; font-size:13px; line-height:1.5; color:var(--soft); }
+.entity-links a:hover { color:var(--cream); }
+.entity-radio { display:flex; flex-wrap:wrap; align-items:center; gap:0 16px; font-size:13px; color:var(--muted); }
+.entity-radio .essentials-icon { fill:currentColor; }
+.entity-bio { max-width:65ch; margin-top:12px; }
+/* Cut, the paragraphs run on, so no blank line ends on a lone ellipsis; open, they part again. */
+.entity-bio>p:first-child { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; overflow:hidden; font-size:14px; line-height:1.7; color:var(--soft); }
+.entity-bio:has([aria-expanded=true])>p:first-child { -webkit-line-clamp:unset; white-space:pre-line; }
+.bio-foot { display:flex; flex-wrap:wrap; align-items:center; gap:0 16px; min-height:44px; font-size:12px; color:var(--muted); }
+.bio-foot a { color:var(--soft); }
+/* The roots: one curve per group from the profile, drawn like the footer's, down to a column each. */
+.roots-band { display:block; width:100%; height:72px; margin-top:28px; color:var(--soft); opacity:.5; }
+.roots-band path { fill:none; stroke:currentColor; stroke-width:1.2; vector-effect:non-scaling-stroke; }
+.root-groups, .discovery-results { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:28px 32px; }
+.discovery-results { margin-top:16px; }
+.root-group h4 { margin:0 0 8px; font:22px/1.2 var(--serif); }
+.root-group h4 small { margin-left:8px; font:11px var(--mono); color:var(--muted); }
+/* A single group, such as a label's artists, flows across the width. */
+.root-group:only-of-type .root-nodes { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0 24px; }
+.root-node { display:flex; align-items:center; gap:12px; min-height:52px; margin-inline:-8px; padding:6px 8px; }
+.root-node:hover { background:var(--raised); }
+.root-node>span:last-child { display:grid; gap:2px; min-width:0; }
+.root-name { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; font-size:14px; line-height:1.35; }
+.root-node small { font:11px/1.4 var(--mono); color:var(--muted); }
+.root-line { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--soft); }
 @media (min-width:761px) and (max-width:1100px) {
   .player .transport-track { display:grid; grid-template-columns:minmax(0,1fr); gap:2px; }
   .player .transport-time { display:flex; justify-content:space-between; gap:12px; }
@@ -377,15 +394,18 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .player .artist-credit { min-height:24px; }
   #track-clock { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
   .player:not([data-status=paused],[data-status=playing]) #playback-status { position:absolute; inset:auto 0 100%; padding:8px 12px; background:var(--ink); font:12px Inter,sans-serif; pointer-events:none; }
-  .explore-workspace { grid-template-columns:1fr; }
+  .entity-heading { grid-template-columns:88px minmax(0,1fr); gap:16px; }
+  .entity-heading .picture { width:88px; height:88px; }
+  .entity-heading h3 { font-size:32px; }
+  /* Phones stack the groups, each hanging from its own thin line. */
+  .roots-band { display:none; }
+  .root-groups, .discovery-results { grid-auto-flow:row; }
+  .root-groups { margin-top:32px; }
+  .root-group { padding-left:16px; border-left:1px solid var(--line); }
   #explorer { inset:0 0 var(--bar); padding:18px; border:0; }
   /* The tabs and ✕ share the row; the search takes the full width under them. */
   .explorer-top { flex-wrap:wrap; gap:12px; }
   .discovery-search { order:1; flex-basis:100%; }
-  .entity-inspector { border-left:0; border-top:1px solid var(--line); padding:24px 0 0; }
-  .connection-map { position:relative; }
-  #connection-map .map-node { width:80px; font-size:11px; }
-  .map-center { font-size:18px; }
 }
 /* Under 375px the arrows would push the photo tools onto a second line, as German does at 360px. */
 @media (max-width:374px) { .station-position svg { display:none; } }
@@ -419,6 +439,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .chart-row meter::-webkit-meter-optimum-value { background:#b49b7c; }
 .chart-row meter::-moz-meter-bar { background:#b49b7c; }
 .played-ranking { margin-top:32px; }
+#explorer .connection-row { display:flex; align-items:center; gap:14px; border:0; border-top:1px solid var(--line); width:100%; text-align:left; padding:12px 0; font-size:13px; }
 #explorer .played-ranking .connection-row { justify-content:space-between; }
 .played-ranking .connection-row>span:first-child { overflow-wrap:anywhere; }
 .played-ranking .connection-row>span:nth-child(2) { flex:none; }

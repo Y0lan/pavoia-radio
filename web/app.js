@@ -626,8 +626,14 @@ $('language').addEventListener('click',event=>{
   localise();
 });
 
+// The explorer tunes the radio to a stage that plays a record; the player bar shows the switch.
+function tune(stage) {
+  const mood = moods.find(m => m.stage === stage);
+  if (mood) selectMood(mood.id);
+}
+
 function announceRadio() {
   if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('pavoia:radio'));
 }
 window.Pavoia = { stations: moods.map(m => ({id:m.stage, name:plain(m), thumb:m.photos[0].src})), getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
-  play, pause, renderScene, toggle };
+  play, pause, renderScene, toggle, tune };

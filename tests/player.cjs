@@ -68,7 +68,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     showModal(){this.open=true;this.modal=true;}
     show(){this.open=true;this.modal=false;}
     close(){this.open=false;}
-    contains(child){return this.children.includes(child);}
+    contains(child){return this.descendants().includes(child);}
     remove(){if(this.parent)this.parent.children=this.parent.children.filter(c=>c!==this);}
     decode(){return deferImages ? new Promise((resolve,reject)=>imageRequests.push({src:this.src,resolve,reject})) : Promise.resolve();}
     getAnimations(){return [];}
@@ -94,7 +94,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   let wallOffset=0;
   class FakeDate extends Date {static now(){return clock.now+wallOffset;}}
   const mediaSession={setActionHandler(name,fn){actions[name]=fn;}};
-  const document=Object.assign(new Element(),{body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:tag=>Object.assign(new Element(),{localName:tag}),createElementNS:()=>new Element(),
+  const document=Object.assign(new Element(),{body,activeElement:body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:tag=>Object.assign(new Element(),{localName:tag}),createElementNS:()=>new Element(),
     // env.openDialog stands for the modal stations sheet; the explorer counts as an open dialog, never a modal one.
     querySelector:selector=> selector==='dialog:modal' ? env.openDialog || null : selector==='dialog[open]' ? env.openDialog || (elements.explorer.open ? elements.explorer : null) : selector.startsWith('input') ? elements.moods.descendants().find(n=>n.localName==='input'&&selector.includes(`"${n.value}"`)) || new Element() : elements[selector.slice(1)],
     querySelectorAll:selector=>selector==='.explorer-nav a' ? (env.nav ||= ['#explore','#history','#statistics'].map((href,i)=>{const link=i?new Element():elements['roots-tab'];link.setAttribute('href',href);return link;})) : selector==='.mood' ? elements.moods.descendants().filter(n=>n.className==='mood') : selector==='main, .roots-footer' ? [elements.main,elements['roots-footer']] : []});
@@ -113,7 +113,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     back(){this.go(-1);}};
   // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
   const queries=new Map();
-  const env={clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],response:status('First'),
+  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],response:status('First'),
     entries:()=>entries.map(entry=>entry.hash),position:()=>at,evict(n){entries.splice(0,n);at-=n;},
     visit(target){location.hash=target;window.emit('popstate');window.emit('hashchange');},
     click:()=>elements.play.emit('click'),
@@ -134,6 +134,8 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   const context={Date:FakeDate,URL,URLSearchParams,CustomEvent:class{constructor(type){this.type=type;}},performance:{now:()=>clock.now},document,navigator:{mediaSession,connection:{saveData}},window,location,history,MediaMetadata,AbortController,
     matchMedia:query=>queries.get(query)||queries.set(query,{matches:media.includes(query),listeners:[],addEventListener(_name,fn){this.listeners.push(fn);},change(matches){this.matches=matches;for(const fn of this.listeners)fn();}}).get(query),Image:class extends Element {constructor(){super();env.preloader=this;}},
     localStorage:storage,
+    // A test calls an observer's fn as the browser would after a resize; disconnect() stops it.
+    ResizeObserver:class{constructor(fn){this.fn=fn;this.targets=[];env.observers.push(this);}observe(el){this.targets.push(el);}disconnect(){this.targets=[];}},
     // env.discovery is one reply for every discovery path, or a function of the path.
     fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
@@ -144,7 +146,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   };
   runInNewContext(source,context);
   env.run=code=>runInContext(code,context);
-  if(journey){elements['discovery-query'].value='';elements['connection-map'].parentElement=new Element();runInContext(web('journey.js'),context);}
+  if(journey){elements['discovery-query'].value='';runInContext(web('journey.js'),context);}
   return env;
 }
 
@@ -744,6 +746,11 @@ test('every mood has a stage, so no Soon code and no rail scrolling remain',asyn
 });
 
 const entity=(id,type='artist')=>({entity:{id,type,title:'Name '+id},included:[]});
+// The first link under an element, and a plain click on it, which the page's document handler routes.
+const firstLink=root=>root.descendants().find(n=>n.localName==='a');
+const follow=(e,a)=>e.document.emit('click',{button:0,target:{closest:()=>a},preventDefault(){}});
+// An element's text with its children's, as a browser reads it.
+const textOf=n=>typeof n==='string'?n:(n.textContent||'')+n.children.map(textOf).join('');
 
 test('the explorer opens over an inert page, keeps the player, and ✕, Escape or Back go back to the page in one step',async()=>{
  const e=setup({journey:true});await flush();const explorer=e.elements.explorer,main=e.elements.main,footer=e.elements['roots-footer'];
@@ -817,12 +824,12 @@ test('a result replaces the search in the explorer\'s entry, and the Roots tab r
  link('#explore');await flush();assert.equal(e.location.hash,'#explore/plex_123');
  query.value='jimi';query.emit('input');e.fire(300);await flush();
  assert.deepEqual([e.location.hash,results.hidden,results.children.length],['#explore?q=jimi',false,1],'typing turns the record into the search page');
- const searches=e.discoveryRequests.length;results.children[0].emit('click');await flush();
+ const searches=e.discoveryRequests.length;follow(e,firstLink(results));await flush();
  assert.deepEqual([e.location.hash,e.entries().length,results.hidden,e.elements['explore-workspace'].hidden],['#explore/art_0123456789ab',2,true,false],'the result replaces the search, so the explorer keeps one entry');
  const tab=()=>e.elements['roots-tab'].getAttribute('href'),current=()=>e.nav.map(link=>link.getAttribute('aria-current'));
  assert.deepEqual(current(),['page',null,null],'Roots stays the current tab though its link carries the search');
  link('#history');link(tab());await flush();
- assert.deepEqual([e.location.hash,results.hidden,query.value,e.discoveryRequests.length,e.elements['discovery-status'].textContent],['#explore?q=jimi',false,'jimi',searches+1,'Showing up to 40 matches.'],'the Roots tab returns to the same results, without searching again');
+ assert.deepEqual([e.location.hash,results.hidden,query.value,e.discoveryRequests.length,e.elements['discovery-status'].textContent],['#explore?q=jimi',false,'jimi',searches+1,'1 result'],'the Roots tab returns to the same results, without searching again');
  query.value='jules';query.emit('input');e.fire(300);await flush();
  assert.deepEqual([e.discoveryRequests.at(-1).url,tab()],['/api/discovery/search?q=jules','#explore?q=jules'],'the Roots tab follows the last search');
  query.value='j';query.emit('input');assert.deepEqual([e.location.hash,tab()],['#explore','#explore'],'and a cleared field');
@@ -838,7 +845,7 @@ test('a search still waiting to run is dropped once the listener leaves it',asyn
  assert.deepEqual([typed(),e.location.hash],[0,'#history'],'so does another tab');
  // No search ran yet, so the tab still has its href from the page HTML.
  e.visit(e.elements['roots-tab'].getAttribute('href')??'#explore');await flush();assert.deepEqual([query.value,results.children.length],['',0],'the typed query left with its wait');
- query.value='abcd';e.elements['discovery-search'].emit('submit',{preventDefault(){}});await flush();query.value='abcde';query.emit('input');results.children[0].emit('click');await flush();
+ query.value='abcd';e.elements['discovery-search'].emit('submit',{preventDefault(){}});await flush();query.value='abcde';query.emit('input');follow(e,firstLink(results));await flush();
  assert.deepEqual([typed(),e.location.hash],[0,'#explore/art_0123456789ab'],'and a result clicked while it waits');
 });
 
@@ -925,14 +932,14 @@ test('a focused result replaced by a live search hands focus to the field, not t
  const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'];
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
  e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore'})},preventDefault(){}});await flush();
- query.value='jimi';query.emit('input');e.fire(300);await flush();results.children[0].focus();
+ query.value='jimi';query.emit('input');e.fire(300);await flush();firstLink(results).focus();
  query.value='jimi j';query.emit('input');e.fire(300);await flush();
  assert.equal(e.document.activeElement,query,'Space then types, it does not toggle the radio');
- results.children[0].focus();e.discovery=url=>url.includes('/search?')?null:entity(url.split('/').pop());
+ firstLink(results).focus();e.discovery=url=>url.includes('/search?')?null:entity(url.split('/').pop());
  query.value='jimi ju';query.emit('input');e.fire(300);await flush();
  assert.deepEqual([results.hidden,e.document.activeElement],[true,query],'a failed search that hides the results does the same');
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
- query.value='jimi';query.emit('input');e.fire(300);await flush();results.children[0].focus();
+ query.value='jimi';query.emit('input');e.fire(300);await flush();firstLink(results).focus();
  query.value='j';query.emit('input');assert.equal(e.document.activeElement,query,'and so does a field cut under two characters');
 });
 
@@ -950,7 +957,7 @@ test('a track that arrives while the explorer closes does not close it in place,
  e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore?q=jimi'})},preventDefault(){}});await flush();
  const query=e.elements['discovery-query'],results=e.elements['discovery-results'];let loaded;
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:new Promise(resolve=>{loaded=()=>resolve(entity(url.split('/').pop()));});
- results.children[0].focus();results.children[0].emit('click');await flush();
+ const result=firstLink(results);result.focus();follow(e,result);await flush();
  assert.equal(e.document.activeElement,e.elements.explorer,'while the record loads, focus waits on the explorer, visible and not a field');
  loaded();await flush();
  const title=e.document.activeElement;assert.deepEqual([title.tabIndex,title===e.elements.explorer,title===query,title.textContent.length>0],[-1,false,false,true],'then it lands on the record\'s title');
@@ -995,11 +1002,11 @@ test('a station change during a preview plays the new station when the radio was
   e.elements['preview-audio'].play=async()=>{};
   if(on){e.click();e.playing();}
   e.visit('#explore/trk_0123456789ab');await flush();
-  e.elements['entity-inspector'].querySelector('.preview-button').emit('click');await flush();
+  e.elements['entity-inspector'].querySelector('.preview-toggle').emit('click');await flush();
   assert.equal(e.window.Pavoia.getState().wanted,false,'the preview pauses the radio');
   e.key('ArrowRight');
   assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.audio.src],['etage-zero',on,on?'/stream/etage-zero.mp3':undefined],why);
-  assert.equal(e.elements['preview-banner'].hidden,true,'and the preview ends');
+  assert.equal(e.elements['entity-inspector'].querySelector('.preview-toggle').getAttribute('data-playing'),null,'and the preview ends');
  }
 });
 
@@ -1043,13 +1050,12 @@ test('the explorer frame stops above the player bar and its controls read in Int
  assert.ok(!rules.has('body:has(#stations-sheet[open])'));
  assert.ok(!/#141210|#2c2722/.test([...rules.entries()].filter(([selector])=>selector!==':root').map(([,body])=>body).join()),'surfaces and hovers use the tokens');
  assert.match(rules.get('#explorer button:hover'),/background:var\(--raised\)/);
- assert.match(rules.get('#connection-map .map-node:hover'),/background:linear-gradient\(var\(--raised\),var\(--raised\)\) #211c17/,'a hovered map node keeps its fill, so the line under it stays hidden');
  assert.match(rules.get('.discovery-search input'),/text-overflow:ellipsis/,'a long query ends on an ellipsis');
  assert.match(rules.get('#explorer input::placeholder'),/color:var\(--muted\); opacity:1;/,'the placeholder, now the field\'s only visible name, reads at 5.4:1 in the palette');
  assert.match(rules.get('#discovery-query::-webkit-search-cancel-button'),/appearance:none/,'one ✕ in the header row: the browser\'s clear mark goes');
  assert.match(rules.get('html'),/scrollbar-gutter:stable/,'locking the page scroll keeps the scrollbar\'s room, so the player bar does not move');
- const actions='#explorer :is(#music-status button, #history-more, .preview-button, #preview-stop)';
- assert.match(rules.get(actions),/padding:10px 16px; border-color:var\(--soft\); font:14px Inter,sans-serif;/,'Try again, Older tracks and the preview buttons');
+ const actions='#explorer :is(#music-status button, #history-more)';
+ assert.match(rules.get(actions),/padding:10px 16px; border-color:var\(--soft\); font:14px Inter,sans-serif;/,'Try again and Older tracks');
  assert.match(rules.get(actions+':hover'),/border-color:var\(--cream\)/);
  assert.match(rules.get('#explorer button, #explorer input'),/min-height:44px/);
  assert.match(rules.get('#explorer input'),/border-color:var\(--muted\); font:16px Inter,sans-serif;/,'16px keeps iOS from zooming');
@@ -1067,4 +1073,261 @@ test('the explorer frame stops above the player bar and its controls read in Int
  assert.match(rules.get('#explorer .collection-note'),/color:var\(--soft\); font-size:13px/,'notes read the same in every tab');
  assert.ok(!rules.has('#music-view .collection-note'));
  assert.match(rules.get('.explore-workspace'),/margin-top:32px/);assert.match(rules.get('.discovery-results'),/margin-top:16px/);
+});
+
+// Step 6: the Roots tab is one profile with its roots under it, and every name is a link.
+const byClass=(root,name)=>root.descendants().filter(n=>(n.className||n.attrs?.class||'').split(' ').includes(name));
+const inspector=e=>e.elements['entity-inspector'];
+const links=(over={})=>[{kind:'wikidata',url:'https://www.wikidata.org/wiki/Q1'},{kind:'other',url:'https://www.after.life/'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},
+ {kind:'musicbrainz',url:'https://musicbrainz.org/artist/1'},{kind:'twitter',url:'https://twitter.com/a'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},{kind:'juno',url:'https://www.junodownload.com/artists/A'},
+ {kind:'wikipedia',url:'https://en.wikipedia.org/wiki/A'},{kind:'lastfm',url:'https://www.last.fm/music/A'},{kind:'resident_advisor',url:'https://ra.co/dj/a'},{kind:'spotify',url:'https://open.spotify.com/artist/1'},{kind:'apple_music',url:'https://music.apple.com/artist/1'},{kind:'javascript',url:'javascript:alert(1)'}];
+const recondite=(over={})=>({entity:{id:'art_000000000001',type:'artist',title:'Recondite',country:'DE',tags:['techno','house','electronic','acid house','acid'],links:links(),
+ bio:'Recondite is a German musician.',bioSource:'wikipedia',bioUrl:'https://en.wikipedia.org/wiki/A',image:'/api/discovery/media/'+'a'.repeat(40),playlists:[],connections:[],...over},included:[]});
+const roots=()=>{
+ const people=['primary','featured','similar/related','collaboration/shared_release','remix','related','musicbrainz:member of band','artist','remixer'];
+ const included=[...people.map((_,i)=>({id:'art_00000000010'+i,type:'artist',title:'Artist '+i})),{id:'rel_000000000001',type:'release',title:'Release'},{id:'trk_000000000001',type:'track',title:'Track'},{id:'lab_000000000001',type:'label',title:'Label'},{id:'pl_000000000001',type:'playlist',title:'Playlist'}];
+ const connections=[{id:'lab_000000000001',relation:'label'},...people.map((relation,i)=>({id:'art_00000000010'+i,relation})),{id:'trk_000000000001',relation:'track'},{id:'rel_000000000001',relation:'release'},{id:'pl_000000000001',relation:'playlist'},{id:'art_000000000999',relation:'similar'}];
+ return {entity:{id:'art_000000000001',type:'artist',title:'Recondite',connections},included};
+};
+
+test('the Roots tab is one column: the profile on top, its roots under it, and no map',async()=>{
+ const html=web('index.html'),journey=web('journey.js'),css=web('style.css');
+ assert.match(html,/<div class="explore-workspace" id="explore-workspace" hidden><section id="entity-inspector" aria-label="Details"><\/section><\/div>\s*<audio id="preview-audio" preload="none"><\/audio>/,'one section, and the preview audio outside any banner');
+ for(const gone of ['connection-map','map-caption','map-center','map-node','mapNote','preview-banner','preview-stop','preview-title'])assert.ok(!html.includes(gone)&&!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
+ for(const gone of ['renderMap','relatedTitle','entity-connections','relation-kind','entity-badges','favorite-badge','favorite-mark','previewPending','moreBio','function navigate','openEntity','search-result','entity-subtitle',"'details'"])assert.ok(!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
+ assert.doesNotMatch(journey+css,/entity-link(?!s)/,'entity-link is gone');
+ assert.ok(!css.includes('#efb7b0'),'no pink');
+ assert.doesNotMatch(cssRules().get('.explore-workspace'),/grid-template-columns/,'one column');
+ assert.ok(!cssRules('(max-width:760px)').has('.explore-workspace'));
+ const e=setup({journey:true});await flush();e.discovery=()=>roots();e.visit('#explore/art_000000000001');await flush();
+ assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading','roots-band','root-groups'],'the profile, then the band, then the groups');
+});
+
+test('the profile keeps its picture box, names its type above the title and reads one line of facts',async()=>{
+ const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
+ await show(recondite());
+ const box=byClass(inspector(e),'picture')[0],img=box.children[0];
+ assert.deepEqual([box.dataset.type,img.alt,img.getAttribute('src')],['artist','Portrait','/api/discovery/media/'+'a'.repeat(40)]);
+ const heading=byClass(inspector(e),'entity-heading')[0],about=heading.children[1];
+ assert.deepEqual(about.children.map(n=>n.localName+'.'+(n.className||'')),['p.eyebrow','h3.','p.entity-meta','p.entity-tags'],'the type above the title, then its facts');
+ assert.deepEqual([about.children[0].textContent,about.children[1].textContent,about.children[1].tabIndex],['Artist','Recondite',-1]);
+ assert.equal(about.children[2].textContent,'Germany','a country code reads as its name');
+ assert.equal(about.children[3].textContent,'techno · house · electronic · acid house','four tags at most');
+ await show(recondite({id:'lab_000000000001',type:'label',title:'Afterlife',country:'',tags:[],image:null}));
+ const empty=byClass(inspector(e),'picture')[0];
+ assert.deepEqual([empty.dataset.type,empty.children[0].hidden,empty.children[0].alt],['label',true,'Label logo'],'no image keeps the box, empty');
+ assert.equal(byClass(inspector(e),'entity-meta').length,0,'no facts, no line');
+ await show({entity:{id:'trk_000000000001',type:'track',title:'Abandoned Soul',artist:'Jimi Jules',album:'Watergate Records 2008-2018',releaseDate:'2019-01-01',connections:[]},included:[]});
+ assert.equal(byClass(inspector(e),'entity-meta')[0].textContent,'Jimi Jules · Watergate Records 2008-2018 · 2019','a track: artist, release, year');
+ assert.equal(byClass(inspector(e),'picture')[0].children[0].alt,'Cover');
+ await show({entity:{id:'rel_000000000001',type:'release',title:'Theater II EP',artist:'Recondite',album:'',releaseDate:'2017-07-21',connections:[]},included:[]});
+ assert.equal(byClass(inspector(e),'entity-meta')[0].textContent,'Recondite · 2017','a release: artist, year');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({country:'IT'}));
+ assert.deepEqual([byClass(inspector(e),'entity-meta')[0].textContent,byClass(inspector(e),'picture')[0].children[0].alt],['Italien','Porträt']);
+ await show(recondite({id:'lab_000000000002',type:'label'}));assert.equal(byClass(inspector(e),'picture')[0].children[0].alt,'Label-Logo');
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.picture'),/border-radius:2px; background:var\(--raised\)/);assert.match(rules.get('.picture[data-type=artist]'),/border-radius:50%/);
+ assert.match(rules.get('.entity-heading .picture'),/width:120px; height:120px/);assert.match(phone.get('.entity-heading .picture'),/width:88px; height:88px/);
+ assert.match(rules.get('.entity-heading'),/grid-template-columns:120px minmax\(0,1fr\); align-items:start/,'the box is reserved before the image loads, and the title starts at its top');
+ assert.match(rules.get('.entity-heading h3'),/font:44px\/1\.05 var\(--serif\)/);assert.match(phone.get('.entity-heading h3'),/font-size:32px/);
+ assert.match(rules.get('.eyebrow'),/font:11px\/1\.7 var\(--mono\); letter-spacing:\.08em; text-transform:uppercase; color:var\(--muted\)/);
+ assert.match(rules.get('.entity-meta'),/font-size:14px;.*color:var\(--soft\)/);assert.match(rules.get('.entity-tags'),/font:11px\/1\.6 var\(--mono\); color:var\(--muted\)/);
+});
+
+test('external links sit in one line, listening services first, named, each address once',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=()=>recondite();e.visit('#explore/art_000000000001');await flush();
+ const line=byClass(inspector(e),'entity-links')[0];
+ assert.deepEqual(line.children.map(a=>a.textContent),['Spotify','Apple Music','Wikipedia','Resident Advisor','Discogs','X','MusicBrainz','Last.fm','after.life','junodownload.com'],'all of them, in a fixed order, Wikidata and unsafe links dropped');
+ assert.deepEqual([line.children[0].target,line.children[0].rel,line.children[8].href],['_blank','noopener noreferrer','https://www.after.life/']);
+ assert.equal(inspector(e).children.indexOf(line),1,'right after the profile and its facts, before the biography');
+ assert.match(cssRules().get('.entity-links'),/display:flex; flex-wrap:wrap; gap:6px 16px;.*padding-block:10px; font-size:13px;.*color:var\(--soft\)/);
+});
+
+test('the biography reads open, offers More only when it is cut, and credits its source once',async()=>{
+ const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
+ await show(recondite());
+ const bio=()=>byClass(inspector(e),'entity-bio')[0],more=()=>bio().children[1].children[0],credit=()=>bio().children[1].children[1];
+ assert.deepEqual([bio().localName,bio().children[0].localName,bio().children[0].textContent,bio().children[0].lang],['div','p','Recondite is a German musician.','en'],'no summary to open first');
+ assert.equal(more().hidden,true,'a short biography has no More');
+ assert.deepEqual([textOf(credit()),credit().children.some(n=>n.localName==='a')],['Biography from Wikipedia',false],'its source is already in the line, so here it is plain text');
+ await show(recondite({links:[]}));
+ const source=credit().children.find(n=>n.localName==='a');
+ assert.deepEqual([source?.textContent,source?.href],['Wikipedia','https://en.wikipedia.org/wiki/A'],'otherwise the credit is the one link');
+ await show(recondite({bioSource:'plex_metadata',bioUrl:null}));assert.equal(textOf(credit()),'','no name to give, no credit');
+ Object.defineProperty(e.Element.prototype,'scrollHeight',{configurable:true,get(){return this.textContent.length>40?200:100;}});
+ Object.defineProperty(e.Element.prototype,'clientHeight',{configurable:true,get(){return 100;}});
+ await show(recondite({bio:'A long life in music. '.repeat(20)}));
+ assert.deepEqual([more().hidden,more().textContent,more().getAttribute('aria-expanded')],[false,'More','false'],'a cut biography offers More');
+ more().emit('click');assert.deepEqual([more().textContent,more().getAttribute('aria-expanded')],['Less','true']);
+ more().emit('click');assert.deepEqual([more().textContent,more().getAttribute('aria-expanded')],['More','false']);
+ await show(recondite({bio:'Fits in four lines on a wide screen.'}));
+ const watch=e.observers.at(-1),text=bio().children[0];
+ assert.deepEqual([more().hidden,watch.targets,e.observers.slice(0,-1).every(o=>!o.targets.length)],[true,[text],true],'the biography on screen is the only one watched');
+ Object.defineProperty(e.Element.prototype,'clientHeight',{configurable:true,get(){return 20;}});watch.fn();
+ assert.equal(more().hidden,false,'a narrower window or a turned phone cuts it, and More appears');
+ more().emit('click');Object.defineProperty(e.Element.prototype,'clientHeight',{configurable:true,get(){return 100;}});watch.fn();
+ assert.equal(more().hidden,false,'open, it keeps Less');
+ more().emit('click');assert.equal(more().hidden,true,'closed on a wider screen, where it fits, More goes, with no resize to say so');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({links:[]}));
+ assert.deepEqual([textOf(credit()),more().textContent],['Biografie auf Englisch · Biografie von Wikipedia','Mehr']);
+ const rules=cssRules();
+ assert.match(rules.get('.entity-bio>p:first-child'),/-webkit-line-clamp:4/);assert.match(rules.get('.entity-bio'),/max-width:65ch/);
+ assert.match(rules.get('.entity-bio:has([aria-expanded=true])>p:first-child'),/-webkit-line-clamp:unset; white-space:pre-line/,'More opens it in place, paragraphs apart');
+ assert.doesNotMatch(rules.get('.entity-bio>p:first-child'),/white-space/,'cut, the paragraphs run on: no blank fourth line with a lone ellipsis');
+});
+
+test('On the radio tunes a stage in place, and a favourite shows the Essentials heart',async()=>{
+ const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
+ const playlists=[{code:'LIF',station:'Lost in Feelings'},{code:'X',station:'Not a stage'},{code:'ESS',station:'Essentials'}];
+ await show(recondite({playlists,favorite:true}));
+ const line=byClass(inspector(e),'entity-radio')[0],tunes=byClass(line,'text-button');
+ assert.deepEqual([line.localName,line.textContent,tunes.map(b=>b.textContent)],['p','On the radio',['Lost in Feelings','Essentials']],'each stage that plays it, by name');
+ const heart=line.descendants().find(n=>n.attrs?.role==='img');
+ assert.deepEqual([heart.attrs['aria-label'],heart.attrs.class,heart.attrs['aria-hidden'],heart.parent.children[1]],['Essentials favourite','essentials-icon',undefined,tunes[1]],'the heart goes with Essentials');
+ tunes[0].emit('click');assert.deepEqual([e.window.Pavoia.getState().stage,e.elements.explorer.open,e.location.hash],['palac-feel',true,'#explore/art_000000000001'],'the stage it is on stays');
+ tunes[1].emit('click');await flush();
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.elements['player-stage'].textContent,e.elements.explorer.open,e.location.hash],['essentials','Essentials',true,'#explore/art_000000000001'],'the radio switches under the open explorer');
+ e.window.Pavoia.tune('nowhere');assert.equal(e.window.Pavoia.getState().stage,'essentials','an unknown stage changes nothing');
+ await show(recondite({id:'art_000000000002',playlists:[{station:'Essentials'}],favorite:false}));
+ assert.equal(inspector(e).descendants().some(n=>n.attrs?.role==='img'),false,'no favourite, no heart');
+ await show(recondite({id:'art_000000000003',playlists:[]}));assert.equal(byClass(inspector(e),'entity-radio').length,0,'no stage, no line');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({playlists,favorite:true}));
+ assert.deepEqual([byClass(inspector(e),'entity-radio')[0].textContent,inspector(e).descendants().find(n=>n.attrs?.role==='img').attrs['aria-label']],['Im Radio','Essentials-Favorit']);
+ assert.match(cssRules().get('.entity-radio .essentials-icon'),/fill:currentColor/);
+});
+
+test('a preview plays in place under the title, counts its seconds, and ends when its profile is left',async()=>{
+ for(const on of [true,false]){
+  const e=setup({journey:true});await flush();const audio=e.elements['preview-audio'];audio.play=async()=>{};
+  const track=id=>({entity:{id,type:'track',title:'T',previewUrl:'/api/discovery/preview/'+id,connections:[]},included:[]});
+  e.discovery=url=>url.includes('/search?')?{items:[]}:track(url.split('/').pop());
+  if(on){e.click();e.playing();}
+  e.visit('#explore/trk_0123456789ab');await flush();
+  const toggle=()=>byClass(inspector(e),'preview-toggle')[0],label=()=>toggle().children[1].textContent;
+  const about=byClass(inspector(e),'entity-heading')[0].children[1];
+  assert.equal(about.children.indexOf(toggle()),2,'right under the title');
+  assert.deepEqual([label(),toggle().getAttribute('data-playing'),byClass(toggle(),'preview-icon')[0].children.map(n=>n.attrs.class)],['Listen · 60 s',null,['icon-start','icon-stop']]);
+  toggle().emit('click');await flush();
+  assert.deepEqual([audio.src,label(),toggle().getAttribute('data-playing'),e.window.Pavoia.getState().wanted],['/api/discovery/preview/trk_0123456789ab','Stop · 0:00','',false],'it plays in place and pauses the radio');
+  audio.currentTime=23;e.intervals.at(-1)();assert.equal(label(),'Stop · 0:23','the clock counts it each second');
+  e.visit('#explore/trk_0123456789ac');await flush();
+  assert.deepEqual([audio.getAttribute('src'),e.window.Pavoia.getState().wanted,label()],[null,on,'Listen · 60 s'],'leaving its profile ends it and gives the radio back as it was');
+  toggle().emit('click');await flush();e.elements['discovery-query'].value='abc';e.elements['discovery-search'].emit('submit',{preventDefault(){}});await flush();
+  assert.deepEqual([audio.getAttribute('src'),e.window.Pavoia.getState().wanted],[null,on],'so does a search that replaces it');
+ }
+ const e=setup({journey:true});await flush();e.setLanguage('de');e.elements['preview-audio'].play=async()=>{};
+ e.discovery=()=>({entity:{id:'trk_0123456789ab',type:'track',title:'T',previewUrl:'/api/discovery/preview/trk_0123456789ab',connections:[]},included:[]});
+ e.visit('#explore/trk_0123456789ab');await flush();const toggle=byClass(inspector(e),'preview-toggle')[0];
+ assert.equal(toggle.children[1].textContent,'Anhören · 60 s');toggle.emit('click');await flush();e.elements['preview-audio'].currentTime=5;e.intervals.at(-1)();
+ assert.equal(toggle.children[1].textContent,'Stopp · 0:05');toggle.emit('click');assert.equal(toggle.children[1].textContent,'Anhören · 60 s','a second press stops it');
+ const rules=cssRules();
+ assert.match(rules.get('.preview-icon'),/width:44px; height:44px; border:1px solid var\(--soft\); border-radius:50%/,'the player\'s circle');
+ assert.match(rules.get('.preview-toggle:not([data-playing]) .icon-stop, .preview-toggle[data-playing] .icon-start'),/display:none/);
+});
+
+test('the roots group records by kind, credits first, and say a relation only when it adds something',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=()=>roots();e.visit('#explore/art_000000000001');await flush();
+ const groups=byClass(inspector(e),'root-group');
+ assert.deepEqual(groups.map(g=>textOf(g.children[0])),['Artists9','Releases1','Tracks1','Labels1'],'artists, releases, tracks, labels, each with its count; playlists and missing records stay out');
+ const artists=groups[0].children[1].children;
+ assert.deepEqual(artists.map(a=>a.getAttribute('href')),['#explore/art_000000000100','#explore/art_000000000101','#explore/art_000000000107','#explore/art_000000000108','#explore/art_000000000103','#explore/art_000000000104'],'credits, then shared records, six at first');
+ assert.deepEqual(artists.map(a=>a.children[1].children.map(textOf)),[['Artist 0'],['Artist 1','Featuring'],['Artist 7'],['Artist 8','Remixed by'],['Artist 3','Collaboration'],['Artist 4','Remix']],'a relation that repeats the heading is left out');
+ assert.deepEqual([artists[0].className,artists[0].children[0].className,artists[0].children[0].dataset.type,artists[0].children[0].children[0].hidden],['root-node','picture','artist',true],'a 40px box waits where there is no image');
+ const more=byClass(groups[0],'text-button')[0];assert.equal(more.textContent,'+ 3 more');
+ more.emit('click');
+ assert.deepEqual([artists.length,groups[0].children.includes(more),e.document.activeElement,artists.slice(6).map(a=>textOf(a.children[1]))],[9,false,artists[6],['Artist 6Band member','Artist 2Similar','Artist 5']],'the column grows in place, focus on the first name it showed');
+ assert.equal(textOf(groups[3].children[1].children[0]),'Label','no relation under a label');
+ const band=inspector(e).children.find(n=>n.attrs?.class==='roots-band');
+ assert.deepEqual([band.attrs.viewBox,band.attrs.preserveAspectRatio,band.attrs['aria-hidden'],band.children.map(p=>p.attrs.d)],['0 0 1000 72','none','true',['M500 0C500 40 10 32 10 72','M500 0C500 40 260 32 260 72','M500 0C500 40 510 32 510 72','M500 0C500 40 760 32 760 72']],'one curve per group, to where its heading starts');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
+ assert.deepEqual(byClass(inspector(e),'root-group').map(g=>g.children[0].textContent),['Künstler','Veröffentlichungen','Tracks','Labels']);
+ assert.equal(byClass(inspector(e),'text-button')[0].textContent,'+ 3 weitere');
+ e.discovery=()=>({entity:{id:'lab_000000000001',type:'label',title:'Label',connections:[]},included:[]});e.visit('#explore/lab_000000000001');await flush();
+ assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading'],'no roots, no band');
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.roots-band path'),/fill:none; stroke:currentColor; stroke-width:1\.2; vector-effect:non-scaling-stroke/);
+ assert.match(rules.get('.roots-band'),/height:72px;.*color:var\(--soft\); opacity:\.5/,'the footer roots\' stroke');
+ assert.match(rules.get('.root-groups, .discovery-results'),/display:grid; grid-auto-flow:column; grid-auto-columns:minmax\(0,1fr\)/,'one column per group');
+ assert.match(rules.get('.root-group:only-of-type .root-nodes'),/grid-template-columns:repeat\(auto-fill,minmax\(220px,1fr\)\)/,'a single group flows across');
+ assert.match(rules.get('.root-node'),/min-height:52px/);assert.match(rules.get('.root-node:hover'),/background:var\(--raised\)/);assert.doesNotMatch(rules.get('.root-node'),/border/);
+ assert.match(rules.get('.root-name'),/-webkit-line-clamp:2;.*font-size:14px/);assert.match(rules.get('.root-node small'),/font:11px\/1\.4 var\(--mono\); color:var\(--muted\)/);
+ assert.match(rules.get('.root-group h4'),/font:22px\/1\.2 var\(--serif\)/);assert.match(rules.get('.root-group h4 small'),/font:11px var\(--mono\); color:var\(--muted\)/);
+ assert.match(phone.get('.roots-band'),/display:none/);assert.match(phone.get('.root-groups, .discovery-results'),/grid-auto-flow:row/,'phones stack the groups');
+ assert.match(phone.get('.root-group'),/padding-left:16px; border-left:1px solid var\(--line\)/);
+});
+
+test('search results use the same groups and names, and say how many there are',async()=>{
+ const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'],status=e.elements['discovery-status'];
+ const items=[{id:'trk_000000000001',type:'track',title:'Taum',artist:'Recondite',album:'Taum'},{id:'art_000000000001',type:'artist',title:'Recondite',artist:'',album:''},{id:'rel_000000000001',type:'release',title:'Taum',artist:'Recondite',album:''}];
+ let answer={items};e.discovery=url=>url.includes('/search?')?answer:entity(url.split('/').pop());
+ const search=async q=>{query.value=q;e.elements['discovery-search'].emit('submit',{preventDefault(){}});await flush();};
+ e.visit('#explore');await search('recondite');
+ assert.deepEqual(results.children.map(g=>g.children[0].textContent),['Artists','Releases','Tracks'],'grouped like the roots');
+ assert.deepEqual(results.children.map(g=>g.children[1].children.map(a=>[a.getAttribute('href'),a.children[1].children.map(textOf)])),[[['#explore/art_000000000001',['Recondite']]],[['#explore/rel_000000000001',['Taum','Recondite']]],[['#explore/trk_000000000001',['Taum','Recondite · Taum']]]],'a release names its artist, a track its artist and album');
+ assert.equal(status.textContent,'3 results');
+ answer={items:items.slice(0,1)};await search('taum');assert.equal(status.textContent,'1 result');
+ answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.equal(status.textContent,'First 40 results. Add a word to narrow them.');
+ answer={items:[]};await search('zz');assert.equal(status.textContent,'No matches in the radio catalogue.');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore');answer={items};await search('recondite');assert.equal(status.textContent,'3 Treffer');
+ answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.equal(status.textContent,'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.');
+ assert.match(cssRules().get('.root-line'),/font-size:12px; color:var\(--soft\)/,'the second line reads in Inter');
+});
+
+test('every name in the player bar is a link the explorer routes, and openTrack still opens a track',async()=>{
+ const e=setup({journey:true});await flush();
+ e.discovery=url=>url.includes('/track/')?{entity:{id:'trk_0123456789ab',type:'track',title:'First',connections:[{id:'art_000000000001',relation:'primary'},{id:'art_000000000002',relation:'featured'},{id:'lab_000000000001',relation:'label'}]},
+  included:[{id:'art_000000000001',type:'artist',title:'Jimi Jules'},{id:'art_000000000002',type:'artist',title:'Guest'},{id:'lab_000000000001',type:'label',title:'Watergate'}]}:entity(url.split('/').pop());
+ await e.poll();await flush();
+ const credits=e.elements['credited-artists'].children,label=e.elements['label-note'].children[0];
+ assert.deepEqual(credits.map(a=>[a.localName,a.className,a.getAttribute('href')]),[['a','artist-credit','#explore/art_000000000001'],['a','artist-credit','#explore/art_000000000002']]);
+ assert.deepEqual([label.localName,label.getAttribute('href'),label.getAttribute('aria-label')],['a','#explore/lab_000000000001','Label: Watergate']);
+ follow(e,label);await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash,e.discoveryRequests.at(-1).url],[true,'#explore/lab_000000000001','/api/discovery/entity/lab_000000000001'],'the document handler routes it');
+ follow(e,credits[1]);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/art_000000000002',2],'inside, it replaces the explorer\'s entry');
+ e.elements['explorer-close'].emit('click');await flush();
+ e.window.Pavoia.openTrack('nope');await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash],[false,''],'an invalid track opens nothing');
+ e.window.Pavoia.openTrack('7');await flush();assert.equal(e.location.hash,'#explore/plex_7');
+ assert.match(cssRules().get('.player .label-note a'),/min-height:24px/);
+});
+
+test('the trail steps back through the records of this visit',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ const open=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
+ const trail=()=>byClass(inspector(e),'entity-trail')[0];
+ open('#explore/art_000000000001');await flush();assert.equal(trail(),undefined,'one record, no trail');
+ for(const n of [2,3]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
+ const steps=()=>trail().children.filter(n=>n.attrs['aria-hidden']!=='true');
+ assert.deepEqual([trail().localName,trail().attrs['aria-label'],textOf(trail())],['nav','Path','Name art_000000000001 / Name art_000000000002 / Name art_000000000003']);
+ assert.deepEqual(steps().map(n=>[n.localName,n.getAttribute('href'),n.attrs['aria-current']]),[['a','#explore/art_000000000001',undefined],['a','#explore/art_000000000002',undefined],['span',null,'page']],'the current record is not a link');
+ for(const n of [4,5,6]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
+ assert.deepEqual(steps().map(n=>n.textContent),['Name art_000000000003','Name art_000000000004','Name art_000000000005','Name art_000000000006'],'the last four');
+ follow(e,steps()[1]);await flush();
+ assert.deepEqual([e.location.hash,e.entries().length,steps().map(n=>n.textContent)],['#explore/art_000000000004',2,['Name art_000000000001','Name art_000000000002','Name art_000000000003','Name art_000000000004']],'going back cuts the trail there, in the explorer\'s one entry');
+ e.elements['explorer-close'].emit('click');await flush();open('#explore/art_000000000009');await flush();assert.equal(trail(),undefined,'a new visit starts a new trail');
+ assert.match(cssRules().get('.entity-trail'),/font-size:12px;.*color:var\(--soft\)/);assert.match(cssRules().get('.entity-trail [aria-current]'),/color:var\(--cream\)/);
+});
+
+test('a hop keeps the record in place, dimmed, then starts the next one at its title',async()=>{
+ const e=setup({journey:true});await flush();const workspace=e.elements['explore-workspace'],status=e.elements['discovery-status'],explorer=e.elements.explorer;
+ let pending=[];e.discovery=url=>new Promise(resolve=>pending.push(()=>resolve(entity(url.split('/').pop()))));const answer=async()=>{pending.shift()();await flush();};
+ e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore/art_000000000001'})},preventDefault(){}});await flush();
+ assert.deepEqual([workspace.hidden,status.textContent],[true,'Loading the connections…'],'the first record says it is loading');
+ pending=pending.slice(-1);await answer();
+ const title=()=>inspector(e).descendants().find(n=>n.localName==='h3');
+ assert.deepEqual([workspace.hidden,workspace.getAttribute('aria-busy'),status.textContent,e.document.activeElement,title().textContent],[false,null,'',title(),'Name art_000000000001'],'then starts at its title');
+ explorer.scrollTop=600;e.document.activeElement=e.document.body;
+ follow(e,{getAttribute:()=>'#explore/art_000000000002'});await flush();
+ assert.deepEqual([workspace.hidden,workspace.getAttribute('aria-busy'),workspace.inert,status.textContent,title().textContent],[false,'true',true,'','Name art_000000000001'],'a hop keeps the last record on screen, busy and out of reach, with no Loading line');
+ await answer();
+ assert.deepEqual([workspace.getAttribute('aria-busy'),workspace.inert,explorer.scrollTop,e.document.activeElement,title().textContent],[null,false,0,title(),'Name art_000000000002'],'the next one starts at the top, focus on its title');
+ workspace.append(inspector(e));title().focus();
+ follow(e,{getAttribute:()=>'#explore/art_000000000005'});await flush();
+ assert.deepEqual([workspace.inert,e.document.activeElement],[true,explorer],'focus in the old record waits on the explorer, not on the page');
+ await answer();
+ follow(e,{getAttribute:()=>'#explore/art_000000000003'});await flush();e.elements['discovery-query'].focus();await answer();
+ assert.equal(e.document.activeElement,e.elements['discovery-query'],'a field the listener moved to keeps the keys');
+ follow(e,{getAttribute:()=>'#explore/art_000000000006'});await flush();e.elements.play.focus();await answer();
+ assert.equal(e.document.activeElement,e.elements.play,'and so does the player');
+ e.discovery=()=>null;follow(e,{getAttribute:()=>'#explore/art_000000000004'});await flush();
+ assert.deepEqual([workspace.hidden,workspace.getAttribute('aria-busy'),workspace.inert,status.textContent],[true,null,false,'These details are unavailable. Try another record or search again.'],'a failed hop hides the old record');
+ assert.match(cssRules().get('.explore-workspace[aria-busy=true]'),/opacity:\.45; transition:opacity var\(--panel\) var\(--ease\)/);
 });

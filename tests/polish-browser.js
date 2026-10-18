@@ -26,8 +26,8 @@ async page => {
   assert(await page.locator('img.photo').count() === 2, 'Scene images are not bounded to two layers');
   assert(await page.evaluate(() => !performance.getEntriesByType('resource').some(r => r.name.endsWith('.ttf'))), 'Uncompressed fonts still load');
 
-  await page.waitForFunction(() => document.querySelector('#credited-artists button'), null, {timeout:15000});
-  await page.locator('#credited-artists button').first().focus();
+  await page.waitForFunction(() => document.querySelector('#credited-artists a'), null, {timeout:15000});
+  await page.locator('#credited-artists a').first().focus();
   const focusPreserved = await page.evaluate(async () => {
     const focused = document.activeElement;
     await poll();

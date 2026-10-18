@@ -43,8 +43,8 @@ async page => {
   await page.locator('.history-record strong').filter({hasText:/^Bipoler Assaults$/}).first().click();
   await page.waitForFunction(()=>location.hash==='#explore/plex_128670'&&!document.getElementById('explore-workspace').hidden);
   assert((await page.locator('#entity-inspector').innerText()).includes('Blausch;Meshcut'),'Basic artist missing');
-  assert(await page.locator('.connection-map').isHidden(),'Empty graph shown');
-  assert(await page.locator('.entity-connections').count()===0,'Empty connections shown');
+  assert(await page.locator('.roots-band').count()===0,'Empty graph shown');
+  assert(await page.locator('.root-groups').count()===0,'Empty connections shown');
   assert(!await page.locator('#discovery-status').textContent(),'Stale error shown');
   await page.screenshot({path:'output/playwright/corrections-basic-320.png'});
   await page.goBack();
@@ -64,8 +64,8 @@ async page => {
   await page.evaluate(()=>window.Pavoia.openTrack('168908'));
   await page.waitForFunction(()=>location.hash==='#explore/plex_168908'&&!document.getElementById('explore-workspace').hidden);
   assert((await page.locator('#entity-inspector').innerText()).includes('Recondite'),'Closing track did not open');
-  const cover=page.locator('#entity-inspector .entity-image');
-  if(await cover.count())await page.waitForFunction(()=>{const n=document.querySelector('#entity-inspector .entity-image');return n.complete&&n.naturalWidth>0;});
+  const cover=page.locator('#entity-inspector .entity-heading img[src]');
+  if(await cover.count())await page.waitForFunction(()=>{const n=document.querySelector('#entity-inspector .entity-heading img[src]');return n.complete&&n.naturalWidth>0;});
   await page.reload();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
   assert((await page.locator('#entity-inspector').innerText()).includes('Recondite'),'Basic link failed on reload');
@@ -79,7 +79,7 @@ async page => {
   },null,{timeout:15000});
   await page.evaluate(()=>window.Pavoia.openTrack('143095'));
   await page.waitForFunction(()=>/^#explore\/trk_/.test(location.hash)&&!document.getElementById('explore-workspace').hidden);
-  assert(await page.locator('.entity-connections').count()===1,'Rich connections lost');
+  assert(await page.locator('.root-groups').count()===1,'Rich connections lost');
   await page.screenshot({path:'output/playwright/corrections-rich-320.png'});
   await page.locator('#explorer-close').click();
   await page.locator('#language [value=de]').dispatchEvent('click');

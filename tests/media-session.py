@@ -50,7 +50,7 @@ with sync_playwright() as p:
         raise AssertionError((expression,errors,page.evaluate('({state:window.Pavoia?.getState(), metadata:navigator.mediaSession.metadata})')))
     wait_for("window.Pavoia?.getState().dataFresh && navigator.mediaSession.metadata?.title==='Current record'")
     wait_for("document.getElementById('hero-cover').getAttribute('src')?.startsWith('/api/discovery/media/')")
-    page.locator('#credited-artists button').focus()
+    page.locator('#credited-artists a').focus()
     page.clock.fast_forward(1500)
     wait_for("document.getElementById('hero-cover').naturalWidth>0 && !document.getElementById('hero-cover').hidden")
     assert artwork_attempts>1,'Artwork did not retry after a temporary failure'

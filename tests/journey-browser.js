@@ -10,24 +10,24 @@ async page => {
   await page.waitForFunction(()=>document.getElementById('audio').currentTime>1);
   await page.locator('#go-deeper').click();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
-  await page.locator('.connection-row').first().click();
-  await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
+  await page.locator('.root-groups a').first().click();
+  await page.waitForFunction(()=>{const w=document.getElementById('explore-workspace');return !w.hidden&&!w.hasAttribute('aria-busy');});
   assert(await page.locator('#audio').evaluate(a=>!a.paused),'Entity navigation stopped live playback');
   await page.locator('#discovery-query').fill('Jimi Jules');
   await page.locator('#discovery-query').press('Enter');
   await page.waitForFunction(()=>!document.getElementById('discovery-results').hidden);
-  await page.locator('.search-result').filter({hasText:'Jimi Jules'}).first().click();
+  await page.locator('#discovery-results a').filter({hasText:'Jimi Jules'}).first().click();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
   assert(await page.locator('#audio').evaluate(a=>!a.paused),'Search stopped live playback');
   // Navigate to a real prepared candidate without reloading the audio element.
   await page.evaluate(()=>{history.pushState(null,'','#explore/trk_5162739e176d');dispatchEvent(new PopStateEvent('popstate'));});
-  await page.locator('.preview-button').click();
+  await page.locator('.preview-toggle').click();
   await page.waitForFunction(()=>document.getElementById('preview-audio').currentTime>1);
   assert(await page.locator('#audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Preview left live stream open');
-  await page.locator('#preview-stop').click();
+  await page.locator('.preview-toggle').click();
   await page.waitForFunction(()=>!document.getElementById('audio').paused&&document.getElementById('audio').currentTime>1);
   await page.locator('#play').click();
-  await page.locator('.preview-button').click();
+  await page.locator('.preview-toggle').click();
   await page.waitForFunction(()=>document.getElementById('preview-audio').currentTime>0.5);
   assert(await page.evaluate(()=>navigator.mediaSession.playbackState==='playing'),'Preview media state is not playing');
   const previewTitle=await page.evaluate(()=>navigator.mediaSession.metadata.title);
@@ -37,11 +37,11 @@ async page => {
   assert(await page.evaluate(title=>navigator.mediaSession.metadata?.title===title,previewTitle),'Radio failure cleared preview metadata');
   await page.unroute('**/api/radio/*',offline);
   await page.evaluate(()=>poll());
-  await page.locator('#preview-stop').click();
+  await page.locator('.preview-toggle').click();
   assert(await page.locator('#audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Paused radio resumed after preview');
   assert(await page.evaluate(()=>navigator.mediaSession.playbackState==='paused'),'Stopped preview left Media Session playing');
   // Browser history must also close the clip when leaving Explore.
-  await page.locator('.preview-button').click();
+  await page.locator('.preview-toggle').click();
   await page.waitForFunction(()=>document.getElementById('preview-audio').currentTime>0.5);
   await page.evaluate(()=>{history.pushState(null,'','/');dispatchEvent(new PopStateEvent('popstate'));});
   assert(await page.locator('#preview-audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Back navigation left preview playing');

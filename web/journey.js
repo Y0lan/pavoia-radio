@@ -31,28 +31,28 @@
     en:{ deeper:'See the roots it’s built on',roots:'The roots',back:'Back to listening',
       spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day',volume:'Volume',
       searchLabel:'Artist, track, release or label',searchPlaceholder:'Search artists, tracks, releases, labels',nothingOnAir:'Nothing on air right now. Search to start.',
-      mapNote:'Choose a connection to continue exploring.',
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
       artist:'Artist',track:'Track',release:'Release',label:'Label',playlist:'Playlist',primary:'Artist',featured:'Featuring',remixer:'Remixed by',
-      similar:'Similar artist',related:'Related artist',collaboration:'Collaboration',remix:'Remix',shared_release:'Shared release','musicbrainz:member of band':'Band member','musicbrainz:is person':'Identity','musicbrainz:collaboration':'Collaboration',
-      favorite:'Essentials favorite',moreBio:'Read the biography',bioSource:'Biography source',
-      bioEnglish:'Biography in English',held:'Artist details are being checked.',relatedTitle:'Connections',tracks:'Tracks in the selection',
-      preview:'Listen · 60 seconds',previewPending:'No audio preview available yet.',stopPreview:'Stop preview',previewError:'The preview could not play. Try again.',
-      results:'results',firstResults:'Showing up to 40 matches.',
+      similar:'Similar',collaboration:'Collaboration',remix:'Remix','musicbrainz:member of band':'Band member','musicbrainz:collaboration':'Collaboration',
+      favorite:'Essentials favourite',onRadio:'On the radio',bioFrom:'Biography from',more:'More',less:'Less',moreRoots:'more',trail:'Path',
+      bioEnglish:'Biography in English',held:'Artist details are being checked.',artists:'Artists',tracks:'Tracks',
+      preview:'Listen · 60 s',stopPreview:'Stop',previewError:'The preview could not play. Try again.',
+      result:'result',results:'results',firstResults:'First 40 results. Add a word to narrow them.',
       basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',
+      artistImage:'Portrait',releaseImage:'Cover',trackImage:'Cover',labelImage:'Label logo',playlistImage:'Cover',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',roots:'Die Wurzeln',back:'Zurück zum Radio',
       spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',
       searchLabel:'Künstler, Track, Veröffentlichung oder Label',searchPlaceholder:'Künstler, Tracks, Alben, Labels suchen',nothingOnAir:'Gerade läuft nichts. Suche, um anzufangen.',
-      mapNote:'Wähle eine Verbindung und entdecke mehr.',
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
       artist:'Künstler',track:'Track',release:'Veröffentlichung',label:'Label',playlist:'Playlist',primary:'Künstler',featured:'Mit',remixer:'Remix von',
-      similar:'Ähnlicher Künstler',related:'Verwandter Künstler',collaboration:'Zusammenarbeit',remix:'Remix',shared_release:'Gemeinsame Veröffentlichung','musicbrainz:member of band':'Bandmitglied','musicbrainz:is person':'Identität','musicbrainz:collaboration':'Zusammenarbeit',
-      favorite:'Essentials-Favorit',moreBio:'Biografie lesen',bioSource:'Quelle der Biografie',
-      bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',relatedTitle:'Verbindungen',tracks:'Tracks in der Auswahl',
-      preview:'Anhören · 60 Sekunden',previewPending:'Noch keine Hörprobe verfügbar.',stopPreview:'Hörprobe stoppen',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
-      results:'Treffer',firstResults:'Bis zu 40 Treffer werden angezeigt.',
+      similar:'Ähnlich',collaboration:'Zusammenarbeit',remix:'Remix','musicbrainz:member of band':'Bandmitglied','musicbrainz:collaboration':'Zusammenarbeit',
+      favorite:'Essentials-Favorit',onRadio:'Im Radio',bioFrom:'Biografie von',more:'Mehr',less:'Weniger',moreRoots:'weitere',trail:'Pfad',
+      bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',artists:'Künstler',tracks:'Tracks',
+      preview:'Anhören · 60 s',stopPreview:'Stopp',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
+      result:'Treffer',results:'Treffer',firstResults:'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.',
       basicDetails:'Für diesen Track gibt es noch keine Künstler- und Veröffentlichungsprofile.',cover:'Cover der Veröffentlichung',portrait:'Künstlerporträt',
+      artistImage:'Porträt',releaseImage:'Cover',trackImage:'Cover',labelImage:'Label-Logo',playlistImage:'Cover',
     },
   };
   Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',period:'Period',day:'Last 24 hours',week:'Last 7 days',month:'Last 30 days',allHistory:'All recorded history',older:'Older tracks',radioSelection:'All radio selections',library:'Whole music library',historyNote:'Confirmed broadcast starts. Times use your local timezone.',noHistory:'No broadcasts recorded in this period.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',plays:'plays',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
@@ -81,8 +81,50 @@
     }
     load();
   }
-  function action(title,handler,cls='entity-link') {const b=node('button',cls,title);b.type='button';b.addEventListener('click',handler);return b;}
-  let recordTitle=null, enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, currentLanguage='', renderedPlayer='', shownQuery='', typing=null;
+  function action(title,handler,cls='') {const b=node('button',cls,title);b.type='button';b.addEventListener('click',handler);return b;}
+  // An inline drawing: the roots band, the preview's play and pause, the Essentials heart.
+  function drawing(box,paths,cls) {
+    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox',box);svg.setAttribute('aria-hidden','true');svg.setAttribute('class',cls);
+    for(const d of paths){const path=document.createElementNS(svg.namespaceURI,'path');path.setAttribute('d',d);svg.append(path);}return svg;
+  }
+  // A picture keeps its box, round for an artist, while it loads or when there is none, so nothing jumps.
+  function picture(v,alt) {const box=node('span','picture'),img=node('img');box.dataset.type=v.type;image(img,v.image,alt);box.append(img);return box;}
+  // Every name in the roots and the search is a link to its record; a second line says what the name does not.
+  function door(v,line) {const a=node('a','root-node'),text=node('span');a.href='#explore/'+v.id;text.append(node('span','root-name',v.title));if(line)text.append(line);a.append(picture(v,''),text);return a;}
+  // Records by kind, in a fixed order, six to a group until the listener asks for the rest, whose
+  // pictures load only then.
+  function groups(items) {
+    return ['artist','release','track','label'].map(type=>{
+      const kind=items.filter(i=>i.v.type===type&&entityID(i.v.id)),doors=list=>list.map(i=>door(i.v,i.line));if(!kind.length)return null;
+      const group=node('section','root-group'),heading=node('h4','',word(type+'s')),list=node('div','root-nodes');
+      heading.append(node('small','',number(kind.length)));list.append(...doors(kind.slice(0,6)));group.append(heading,list);
+      // The button goes once used, so focus moves on to the first name it showed, never to the page.
+      if(kind.length>6){const more=action('+ '+number(kind.length-6)+' '+word('moreRoots'),()=>{const rest=doors(kind.slice(6));list.append(...rest);more.remove();rest[0].focus();},'text-button');group.append(more);}
+      return group;
+    }).filter(Boolean);
+  }
+  // Credits first, then the artists it shares records with, then the ones it sounds like. A relation shows
+  // only where the group heading does not already say it.
+  const tier=relation=>['similar','related'].includes(relation)?2:['collaboration','remix','shared_release'].includes(relation)||relation.startsWith('musicbrainz:')?1:0;
+  const telling=['featured','remixer','remix','collaboration','similar','musicbrainz:member of band','musicbrainz:collaboration'];
+  function renderRoots(e,all) {
+    const byID=new Map(all.map(v=>[v.id,v]));
+    const items=(e.connections||[]).filter(c=>byID.has(c.id)).map(c=>({v:byID.get(c.id),relation:c.relation.split('/')[0]}))
+      .sort((a,b)=>tier(a.relation)-tier(b.relation)).map(({v,relation})=>({v,line:telling.includes(relation)?node('small','',word(relation)):null}));
+    const list=groups(items);if(!list.length)return [];
+    // One curve per group, from the profile down to where its heading starts, drawn like the footer roots.
+    const band=drawing('0 0 1000 72',list.map((_,i)=>{const x=i*1000/list.length+10;return `M500 0C500 40 ${x} 32 ${x} 72`;}),'roots-band');band.setAttribute('preserveAspectRatio','none');
+    const roots=node('div','root-groups');roots.append(...list);return [band,roots];
+  }
+  // External links: listening services first, then the rest in a fixed order, each address once.
+  const services=new Map(Object.entries({spotify:'Spotify',apple_music:'Apple Music',bandcamp:'Bandcamp',soundcloud:'SoundCloud',beatport:'Beatport',deezer:'Deezer',tidal:'Tidal',youtube:'YouTube',website:'Website',wikipedia:'Wikipedia',resident_advisor:'Resident Advisor',discogs:'Discogs',instagram:'Instagram',facebook:'Facebook',twitter:'X',musicbrainz:'MusicBrainz',lastfm:'Last.fm'}));
+  const order=[...services.keys()],place=kind=>order.includes(kind)?order.indexOf(kind):order.length;
+  // A site's own name, or its address without www. for the rest.
+  const site=(kind,url)=>services.get(kind)||(url?new URL(url).hostname.replace(/^www\./,''):kind);
+  function sites(list) {const seen=new Set();return list.map(l=>({kind:l.kind,url:external(l.url)})).filter(l=>l.url&&l.kind!=='wikidata').sort((a,b)=>place(a.kind)-place(b.kind)).filter(l=>!seen.has(l.url)&&seen.add(l.url));}
+  const region=code=>{try{return new Intl.DisplayNames([radio.getState().language],{type:'region'}).of(code);}catch{return code;}};
+  const time=n=>Math.floor(n/60)+':'+String(Math.floor(n%60)).padStart(2,'0');
+  let recordTitle=null, bioWatch=null, enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, previewButton=null, trail=[], currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
   // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
   // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
   // or ✕ always lands on the page in one step.
@@ -91,7 +133,8 @@
   // the page, keep it too; any other explorer entry is marked as found, not owned.
   const life=performance.timeOrigin||Date.now();
   let landing=false,closing=false;
-  function open() {if(dialog.open)return;dialog.show();for(const n of behind)n.inert=true;}
+  // A new visit starts with an empty trail, and never shows the last visit's record while the first loads.
+  function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=true;dialog.show();for(const n of behind)n.inert=true;}
   // The record on air, as the roots know it, or as the radio does until they answer.
   const nowID=()=>{const t=radio.getState().track;return enriched?.entity.id||(t?'plex_'+t.id:'');};
   async function request(path,signal) {
@@ -115,7 +158,7 @@
   function renderPlayer() {
     const s=radio.getState(),t=s.track,e=enriched?.entity,all=enriched?.included||[];
     const cover=e?.image||t?.coverUrl;
-    const people=all.filter(v=>v.type==='artist'&&(e?.connections||[]).some(c=>c.id===v.id&&['primary','featured','remixer'].includes(c.relation)));
+    const people=all.filter(v=>v.type==='artist'&&entityID(v.id)&&(e?.connections||[]).some(c=>c.id===v.id&&['primary','featured','remixer'].includes(c.relation)));
     const portraits=people.filter(a=>a.image);
     image($('hero-cover'),cover,word('cover'));
     // Without a cover the bar shows the stage, so the record cell never starts on an empty square.
@@ -137,12 +180,12 @@
       const release=all.find(v=>v.type==='release' && entityID(v.id) && e?.connections?.some(c=>c.id===v.id && c.relation==='release'));
       if(release && t?.album)$('player-album').href='#explore/'+release.id;
       else $('player-album').removeAttribute('href');
-      const label=all.find(v=>v.type==='label');
+      const label=all.find(v=>v.type==='label'&&entityID(v.id));
       $('label-note').hidden=!label;$('label-note').replaceChildren();
-      if(label){const button=action(label.title,()=>openEntity(label.id));button.setAttribute('aria-label',word('label')+': '+label.title);$('label-note').append(button);}
+      if(label){const a=node('a','',label.title);a.href='#explore/'+label.id;a.setAttribute('aria-label',word('label')+': '+label.title);$('label-note').append(a);}
       $('credited-artists').replaceChildren(...people.slice(0,5).map(a=>{
         const role=e.connections.find(c=>c.id===a.id)?.relation;
-        const b=action('',()=>openEntity(a.id),'artist-credit');
+        const b=node('a','artist-credit');b.href='#explore/'+a.id;
         if(a.image){const img=node('img');img.width=52;img.height=52;image(img,a.image,word('portrait'));b.append(img);}
         const text=node('span');text.append(node('small','',word(role)),node('span','',a.title));b.append(text);return b;
       }));
@@ -160,11 +203,16 @@
     const s=radio.getState(),t=s.track;
     const duration=t?.durationMs/1000,start=Date.parse(t?.startedAt);
     const elapsed=Math.max(0,Math.min(duration,(Date.now()-start)/1000));
-    const format=n=>Math.floor(n/60)+':'+String(Math.floor(n%60)).padStart(2,'0');
     const valid=s.dataFresh&&Number.isFinite(duration)&&duration>0&&Number.isFinite(elapsed);
-    $('track-clock').textContent=valid?format(elapsed)+' / '+format(duration):'—';
+    $('track-clock').textContent=valid?time(elapsed)+' / '+time(duration):'—';
     $('track-progress').value=valid?elapsed/duration:0;
     $('track-progress').setAttribute('aria-label',radio.getState().language==='de'?'Fortschritt des Live-Tracks':'Live track progress');
+    previewState();
+  }
+  // The preview's own button says what it does next, and counts the seconds while it plays.
+  function previewState() {
+    if(!previewButton)return;previewButton.toggleAttribute('data-playing',Boolean(preview));
+    previewButton.children[1].textContent=preview?word('stopPreview')+' · '+time($('preview-audio').currentTime||0):word('preview');
   }
   function localise() {
     shownQuery='';// Results drawn in the old language are searched again.
@@ -187,68 +235,88 @@
     else history.pushState({explorer:life},'',hash);
     radio.renderScene();restore();
   }
-  function navigate(id) {go('#explore/'+id);}
-  function openEntity(id) {if(entityID(id))navigate(id);}
   async function loadEntity(id) {
-    setView('explore');
+    setView('explore');if(preview)finishPreview();
     selected=null;explorerRequest?.abort();const controller=new AbortController();explorerRequest=controller;
-    // A record opened from a focused result keeps focus visible and off the field: on the explorer while
-    // it loads, then on the record's title. Touch screens open no keyboard.
-    if($('discovery-results').contains(document.activeElement))dialog.focus({preventScroll:true});
-    $('discovery-status').textContent=word('loading');$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
+    // A record opened from a focused result or a name in the last record keeps focus visible and off the
+    // field: on the explorer while it loads, then on the record's title. Touch screens open no keyboard.
+    const workspace=$('explore-workspace');
+    if($('discovery-results').contains(document.activeElement)||workspace.contains(document.activeElement))dialog.focus({preventScroll:true});
+    // A hop keeps the last record in place, dimmed and out of reach, until the next one is drawn, so its
+    // preview cannot start; only a first load says so.
+    $('discovery-results').hidden=true;
+    $('discovery-status').textContent=workspace.hidden?word('loading'):'';if(!workspace.hidden){workspace.setAttribute('aria-busy','true');workspace.inert=true;}
     const timeout=setTimeout(()=>controller.abort(),10000);
     try{const data=await request('/api/discovery/entity/'+id,controller.signal);
-      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}selected=data;renderEntity(data);$('discovery-status').textContent='';if(document.activeElement===dialog)recordTitle.focus({preventScroll:true});
-    }catch{if(explorerRequest===controller)$('discovery-status').textContent=word('unavailable');}
+      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}
+      selected=data;$('discovery-status').textContent='';workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=false;renderEntity(data);dialog.scrollTop=0;
+      // The new record starts at its title, unless the listener moved focus while it loaded: a field they
+      // type in, the player or the volume keeps the keys.
+      if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
+    }catch{if(explorerRequest===controller){workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}
     finally{clearTimeout(timeout);}
   }
-  radio.openTrack=id=>openEntity('plex_'+id);
+  radio.openTrack=id=>{if(entityID('plex_'+id))go('#explore/plex_'+id);};
+  // One column: the profile, then its roots growing down from it.
   function renderEntity(data) {
-    const e=data.entity,all=data.included,byID=new Map(all.map(v=>[v.id,v]));
-    const panel=$('entity-inspector');panel.replaceChildren();
-    const heading=node('div','entity-heading');
-    if(e.image){const img=node('img','entity-image');img.width=100;img.height=100;image(img,e.image,word('cover'));heading.append(img);}
-    recordTitle=node('h3','',e.title);recordTitle.tabIndex=-1;
-    const title=node('div');title.append(node('p','eyebrow',word(e.type)),recordTitle);
-    if(e.artist)title.append(node('p','entity-subtitle',e.artist));heading.append(title);panel.append(heading);
-    const badges=node('div','entity-badges');
-    if(e.favorite)badges.append(node('span','favorite-badge',word('favorite')));
-    for(const p of e.playlists||[])badges.append(node('span','',p.station));panel.append(badges);
-    if(e.album)panel.append(node('p','entity-subtitle',e.album));
-    if(e.basicDetails)panel.append(node('p','collection-note',word('basicDetails')));
-    if(e.releaseDate)panel.append(node('p','entity-subtitle',e.releaseDate));
-    if(e.tags?.length)panel.append(node('p','entity-subtitle',e.tags.join(' · ')));
-    if(e.country)panel.append(node('p','entity-subtitle',e.country));
-    if(e.reviewRequired)panel.append(node('p','collection-note',word('held')));
-    if(e.bio){const details=node('details','entity-bio');details.append(node('summary','',word('moreBio')));
-      if(radio.getState().language==='de')details.append(node('small','',word('bioEnglish')));
-      const bio=node('p','',e.bio);bio.lang='en';details.append(bio);
-      if(external(e.bioUrl))details.append(link(word('bioSource'),e.bioUrl));panel.append(details);}
-    const links=node('div','entity-links');for(const l of (e.links||[]).slice(0,8)){if(external(l.url))links.append(link(l.kind.replaceAll('_',' '),l.url));}panel.append(links);
-    if(e.type==='track'&&!e.basicDetails){
-      if(/^\/api\/discovery\/preview\/trk_[a-f0-9]{12}$/.test(e.previewUrl||''))panel.append(action(word('preview'),()=>startPreview(e),'preview-button'));
-      else panel.append(node('p','collection-note',word('previewPending')));
+    const e=data.entity,all=data.included,panel=$('entity-inspector'),heading=node('div','entity-heading'),about=node('div');
+    bioWatch?.disconnect();
+    // The trail of records opened in this visit; going back to one cuts the trail there.
+    const at=trail.findIndex(t=>t.id===e.id);trail.splice(at<0?trail.length:at,Infinity,{id:e.id,title:e.title});
+    if(trail.length>1){
+      const path=node('nav','entity-trail');path.setAttribute('aria-label',word('trail'));
+      trail.slice(-4).forEach((t,i,shown)=>{
+        if(i){const slash=node('span','',' / ');slash.setAttribute('aria-hidden','true');path.append(slash);}
+        const step=node(i<shown.length-1?'a':'span','',t.title);if(step.localName==='a')step.href='#explore/'+t.id;else step.setAttribute('aria-current','page');path.append(step);
+      });about.append(path);
     }
-    const list=node('div','entity-connections');list.append(node('h4','',word('relatedTitle')));
-    for(const ref of e.connections||[]){const related=byID.get(ref.id);if(!related)continue;
-      const b=action('',()=>navigate(ref.id),'connection-row');
-      b.append(node('span','relation-kind',word(ref.relation.split('/')[0])),node('span','',related.title));
-      if(related.favorite)b.append(node('span','favorite-mark','♥'));list.append(b);
-    }if(list.children.length>1)panel.append(list);
-    const hasConnections=all.length>0;
-    $('connection-map').parentElement.hidden=!hasConnections;
-    $('explore-workspace').classList.toggle('is-basic',!hasConnections);
-    if(hasConnections)renderMap(e,all);$('explore-workspace').hidden=false;
-  }
-  function renderMap(e,all) {
-    const map=$('connection-map');map.replaceChildren();
-    const nearby=all.filter(v=>v.type!=='track').slice(0,8);
-    if(!nearby.length)nearby.push(...all.slice(0,6));
-    const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 640 450');svg.setAttribute('aria-hidden','true');
-    const coords=nearby.map((v,i)=>({v,x:320+225*Math.cos(-Math.PI/2+i*2*Math.PI/nearby.length),y:225+160*Math.sin(-Math.PI/2+i*2*Math.PI/nearby.length)}));
-    for(const p of coords){const line=document.createElementNS(svg.namespaceURI,'line');for(const [k,v] of Object.entries({x1:320,y1:225,x2:p.x,y2:p.y}))line.setAttribute(k,v);svg.append(line);}map.append(svg);
-    const center=node('div','map-center');center.append(node('small','',word(e.type)),node('span','',e.title));map.append(center);
-    for(const p of coords){const b=action('',()=>navigate(p.v.id),'map-node');b.style.left=(p.x/640*100)+'%';b.style.top=(p.y/450*100)+'%';b.append(node('small','',word(p.v.type)),node('span','',p.v.title));map.append(b);}
+    recordTitle=node('h3','',e.title);recordTitle.tabIndex=-1;about.append(node('p','eyebrow',word(e.type)),recordTitle);
+    previewButton=null;
+    if(/^\/api\/discovery\/preview\/trk_[a-f0-9]{12}$/.test(e.previewUrl||'')){
+      const circle=node('span','preview-icon');circle.append(drawing('0 0 24 24',['M7 4.5v15l13-7.5z'],'icon-start'),drawing('0 0 24 24',['M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z'],'icon-stop'));
+      previewButton=action('',()=>{if(preview)finishPreview();else startPreview(e);},'preview-toggle');previewButton.append(circle,node('span'));about.append(previewButton);
+    }
+    previewState();
+    const meta=[e.artist,e.album,/^\d{4}/.exec(e.releaseDate||'')?.[0],region(e.country||'')].filter(Boolean).join(' · ');
+    if(meta)about.append(node('p','entity-meta',meta));
+    if(e.tags?.length)about.append(node('p','entity-tags',e.tags.slice(0,4).join(' · ')));
+    heading.append(picture(e,word(e.type+'Image')),about);panel.replaceChildren(heading);
+    if(e.basicDetails)panel.append(node('p','collection-note',word('basicDetails')));
+    if(e.reviewRequired)panel.append(node('p','collection-note',word('held')));
+    const shown=sites(e.links||[]);
+    if(shown.length){const line=node('p','entity-links');line.append(...shown.map(l=>link(site(l.kind,l.url),l.url)));panel.append(line);}
+    // The stages that play it tune the radio in place; the player bar shows the switch.
+    const stages=(e.playlists||[]).map(p=>radio.stations.find(s=>s.id===p.id||s.name===p.station)).filter(Boolean);
+    if(stages.length){
+      const line=node('p','entity-radio',word('onRadio'));
+      for(const s of stages){
+        const tune=action(s.name,()=>radio.tune(s.id),'text-button');
+        if(s.id!=='essentials'||!e.favorite){line.append(tune);continue;}
+        const heart=drawing('0 0 36 36',['M18 30.5S5 22.6 5 13.6A6.6 6.6 0 0 1 18 10.4a6.6 6.6 0 0 1 13 3.2c0 9-13 16.9-13 16.9Z'],'essentials-icon'),pair=node('span');
+        heart.removeAttribute('aria-hidden');heart.setAttribute('role','img');heart.setAttribute('aria-label',word('favorite'));pair.append(heart,tune);line.append(pair);
+      }
+      panel.append(line);
+    }
+    let text=null,more=null,fit=null;
+    if(e.bio){
+      // The biography reads open, up to four lines; More appears only when there is more.
+      const bio=node('div','entity-bio'),foot=node('p','bio-foot'),source=external(e.bioUrl),name=source?site(e.bioSource,source):services.get(e.bioSource);
+      text=node('p','',e.bio);text.lang='en';
+      // Closed again, it may fit now, after the window grew while it was open: its height does not change then.
+      more=action(word('more'),()=>{const open=more.getAttribute('aria-expanded')!=='true';more.setAttribute('aria-expanded',open);more.textContent=word(open?'less':'more');fit();},'text-button');
+      more.setAttribute('aria-expanded','false');more.hidden=true;
+      // The source links once: in the line above when it is there, or here.
+      const credit=node('span','',radio.getState().language==='de'?word('bioEnglish'):'');
+      if(name)credit.append((credit.textContent?' · ':'')+word('bioFrom')+' ',source&&!shown.some(l=>l.url===source)?link(name,source):name);
+      foot.append(more,credit);bio.append(text,foot);panel.append(bio);
+    }
+    panel.append(...renderRoots(e,all));
+    // More follows the width and the font: a turned phone, a narrower window or a late Inter can cut a
+    // biography that fitted. Open, it stays, to close it again.
+    if(text){
+      fit=()=>{const cut=text.scrollHeight>text.clientHeight;more.hidden=!cut&&more.getAttribute('aria-expanded')!=='true';};
+      bioWatch=new ResizeObserver(fit);bioWatch.observe(text);document.fonts.ready.then(fit);
+    }
   }
   // On the search page, results that go away while one has focus hand it to the field, never to the
   // page, where Space plays. Opening a record or a tab moves on instead: no keyboard pops up on touch.
@@ -256,27 +324,30 @@
   // Results stay in place while the next ones load. The URL holds the query (#explore?q=…), so each
   // history entry keeps its own search, and the Roots tab points to the last one.
   const searchPage=query=>{history.replaceState(history.state,'',query?'#explore?q='+encodeURIComponent(query):'#explore');$('roots-tab').setAttribute('href',location.hash);};
+  // Leaving a record for a search or a tab ends its preview, whose button goes with it.
+  const hideRecord=()=>{if(preview)finishPreview();$('explore-workspace').hidden=true;};
+  const found=n=>n>=40?word('firstResults'):n?number(n)+' '+word(n===1?'result':'results'):word('empty');
   async function search() {
     clearTimeout(typing);selected=null;explorerRequest?.abort();const c=new AbortController(),query=$('discovery-query').value;explorerRequest=c;
     searchPage(query);
-    $('discovery-status').textContent=word('loading');$('explore-workspace').hidden=true;
+    $('discovery-status').textContent=word('loading');hideRecord();
     const timeout=setTimeout(()=>c.abort(),10000);
     try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent(query),{signal:c.signal});if(!res.ok)throw new Error();
       const data=await res.json();if(explorerRequest!==c)return;if(!Array.isArray(data.items))throw new Error();
       const focused=$('discovery-results').contains(document.activeElement);
-      $('discovery-results').replaceChildren(...data.items.map(e=>{const b=action('',()=>navigate(e.id),'search-result');b.append(node('small','',word(e.type)),node('span','',e.title));return b;}));
+      // The same groups and names as the roots; the second line says who made a release or a track, and on what.
+      $('discovery-results').replaceChildren(...groups(data.items.map(v=>({v,line:v.artist||v.album?node('span','root-line',[v.artist,v.album].filter(Boolean).join(' · ')):null}))));
       if(focused)$('discovery-query').focus();
-      shownQuery=query;$('discovery-results').hidden=false;$('discovery-status').textContent=data.items.length?word('firstResults'):word('empty');
+      shownQuery=query;shownCount=data.items.length;$('discovery-results').hidden=false;$('discovery-status').textContent=found(shownCount);
     }catch{if(explorerRequest===c){hideResults();$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
   }
   function cancelPreview() {
-    const resume=preview?.resume;preview=null;const audio=$('preview-audio');audio.pause();audio.removeAttribute('src');audio.load();$('preview-banner').hidden=true;return resume;
+    const resume=preview?.resume;preview=null;const audio=$('preview-audio');audio.pause();audio.removeAttribute('src');audio.load();previewState();return resume;
   }
   async function startPreview(e) {
     const resume=preview?preview.resume:radio.getState().wanted;
     cancelPreview();radio.pause();const current={id:e.id,resume,entity:e};preview=current;
-    const a=$('preview-audio');a.volume=$('audio').volume;a.src=e.previewUrl;
-    $('preview-title').textContent=e.title+' · 60s';$('preview-banner').hidden=false;
+    const a=$('preview-audio');a.volume=$('audio').volume;a.src=e.previewUrl;previewState();
     try{await a.play();if(preview===current)renderPlayer();}catch{if(preview===current){cancelPreview();$('discovery-status').textContent=word('previewError');if(resume)radio.play();}}
   }
   function finishPreview() {const resume=preview?.resume;cancelPreview();if(resume)radio.play();else renderPlayer();}
@@ -284,7 +355,6 @@
   radio.stopPreview=()=>{if(!preview)return false;finishPreview();return true;};
   $('preview-audio').addEventListener('ended',finishPreview);
   $('preview-audio').addEventListener('error',()=>{if(preview){$('discovery-status').textContent=word('previewError');finishPreview();}});
-  $('preview-stop').addEventListener('click',finishPreview);
   try{const saved=parseFloat(localStorage.getItem('pavoia-volume'));if(saved>=0&&saved<=1)$('volume').value=saved;}catch{/* Storage is optional. */}
   // Where the stylesheet hides the slider, the device sets the level, so a remembered low volume cannot silence the radio.
   const fixedVolume=matchMedia('(max-width:760px), (pointer:coarse)');
@@ -292,7 +362,7 @@
   fixedVolume.addEventListener('change',volume);
   $('volume').addEventListener('input',()=>{volume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
   // The footer opens the record on air; only with nothing on air does it open the search.
-  $('go-deeper').addEventListener('click',()=>{if(entityID(nowID()))openEntity(nowID());else go('#explore');});
+  $('go-deeper').addEventListener('click',()=>go(entityID(nowID())?'#explore/'+nowID():'#explore'));
   // ✕ and Escape. An entry this page opened goes back to the page's entry right under it, and
   // restore() then closes the dialog; until then, work stops and moves wait. Any other (a shared link,
   // a reload, a restored session, a typed URL) closes in place, since the entry under it may not be
@@ -347,7 +417,7 @@
       if(link.getAttribute('href').split('?')[0]==='#'+next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
     }
     if(next!=='explore'){
-      explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;$('explore-workspace').hidden=true;
+      explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;hideRecord();
       $('history-period-label').hidden=next!=='history';fillStages($('music-stage').value);
     }
   }
@@ -427,10 +497,10 @@
     setView(section);
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
-    explorerRequest?.abort();explorerRequest=null;selected=null;$('explore-workspace').hidden=true;
+    explorerRequest?.abort();explorerRequest=null;selected=null;hideRecord();
     const query=new URLSearchParams(params).get('q')||'';$('discovery-query').value=query;
     const again=Boolean(query.trim())&&query===shownQuery&&$('discovery-results').children.length>0;
-    $('discovery-results').hidden=!again;$('discovery-status').textContent=again?word('firstResults'):'';
+    $('discovery-results').hidden=!again;$('discovery-status').textContent=again?found(shownCount):'';
     if(finePointer.matches)$('discovery-query').focus();
     if(again)return;
     if(query.trim())search();
