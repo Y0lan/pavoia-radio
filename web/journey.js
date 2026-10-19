@@ -418,8 +418,9 @@
   // The day picked. A year typed digit by digit passes through years like 0002, under the field's min, and a
   // typed day can pass its max: until the field holds a real day, no day is picked.
   const pickedDay = () => {const field=$('history-day');return field.validity.valid?field.value:'';};
-  // What the shown music is for. The language is part of it: rows drawn in another one are drawn again.
-  const musicKey = () => [view,$('music-stage').value,pickedDay(),radio.getState().language].join(':');
+  // What the shown music is for. The language and the local day are part of it: rows drawn in another
+  // language, or under a Today that has become Yesterday, are drawn again.
+  const musicKey = () => [view,$('music-stage').value,pickedDay(),radio.getState().language,today()].join(':');
   // Both starts come from one playback row: the radio writes it to the second, History to the millisecond.
   // The same second is the same play. Without a start, the track alone decides.
   const samePlay = (item,track) => item.id===track.id&&(!track.startedAt||Math.floor(Date.parse(item.startedAt)/1000)===Date.parse(track.startedAt)/1000);
@@ -548,8 +549,8 @@
       }
     }catch {if(musicRequest===controller){
       if(more)say('retry');
-      // A refresh the radio asked for keeps the rows and the place; its next answer tries again.
-      else if(follow)unmark();
+      // A refresh the radio asked for keeps the rows, the place and what the list said; its next answer tries again.
+      else if(follow){unmark();$('music-status').textContent=content.children.length?'':word(day?'noDay':'noHistory');}
       else{
         if(content.contains(document.activeElement)||document.activeElement===button)$('music-stage').focus();
         content.replaceChildren();delete content.dataset.key;historyPage=null;button.hidden=true;

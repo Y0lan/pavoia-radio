@@ -1589,6 +1589,22 @@ test('back on History from a record, a track that came on air meanwhile shows at
  assert.deepEqual([e.historyRequests.length,historyRows(e)[0].children[1].children[0].textContent,historyRows(e)[0].getAttribute('aria-current')],[sent+1,'On air 456','true'],'the History tab asks at once and marks the new play');
 });
 
+test('a failed follow refresh of an empty History says it is empty again, and a new local day draws the headings again',async()=>{
+ const e=setup({journey:true});await flush();const status=e.elements['music-status'];
+ e.response=onAirNow('1');await e.poll();await flush();
+ e.historyReply=answer({items:[],next:null});routeTo(e,'#history');await flush();
+ assert.equal(status.textContent,'Nothing has played on this stage yet.');
+ e.historyReply=()=>null;e.response=onAirNow('2');await e.poll();await flush();
+ assert.equal(status.textContent,'Nothing has played on this stage yet.','the failed refresh does not leave Loading on screen');
+ e.discovery=url=>entity(url.split('/').pop(),'track');
+ // The list shows the play on air, so only the day can make it ask again.
+ e.historyReply=answer({items:[{id:'2',title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});e.elements['music-stage'].emit('change');await flush();
+ assert.equal(historyRows(e)[0].getAttribute('aria-current'),'true');
+ follow(e,historyRows(e)[2]);await flush();
+ const sent=e.historyRequests.length;e.setWall(86400000);routeTo(e,'#history');await flush();
+ assert.equal(e.historyRequests.length,sent+1,'past midnight, Today has become Yesterday: History is drawn again');
+});
+
 test('History reads time, title and artist on one grid at every width, under sticky day names, with red only for Now',()=>{
  const rules=cssRules(),phone=cssRules('(max-width:760px)'),small=cssRules('(max-width:600px)');
  assert.match(rules.get('.history-row'),/display:grid; grid-template-columns:5rem minmax\(0,1fr\); gap:16px; align-items:baseline; padding:12px 0;.* scroll-margin-top:44px;/,'a row reached with Tab scrolls clear of the sticky day name');
