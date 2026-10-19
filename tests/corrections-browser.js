@@ -44,7 +44,7 @@ async page => {
   await page.waitForFunction(()=>location.hash==='#explore/plex_128670'&&!document.getElementById('explore-workspace').hidden);
   assert((await page.locator('#entity-inspector').innerText()).includes('Blausch;Meshcut'),'Basic artist missing');
   assert(await page.locator('.roots-band').count()===0,'Empty graph shown');
-  assert(await page.locator('.regions').count()===0,'Empty connections shown');
+  assert(await page.locator('#entity-inspector .regions').count()===0,'Empty connections shown');
   assert(!await page.locator('#discovery-status').textContent(),'Stale error shown');
   await page.screenshot({path:'output/playwright/corrections-basic-320.png'});
   await page.goBack();
@@ -79,7 +79,7 @@ async page => {
   },null,{timeout:15000});
   await page.evaluate(()=>window.Pavoia.openTrack('143095'));
   await page.waitForFunction(()=>/^#explore\/trk_/.test(location.hash)&&!document.getElementById('explore-workspace').hidden);
-  assert(await page.locator('.regions').count()===1,'Rich connections lost');
+  assert(await page.locator('#entity-inspector .regions').count()===1,'Rich connections lost');
   await page.screenshot({path:'output/playwright/corrections-rich-320.png'});
   await page.locator('#explorer-close').click();
   await page.locator('#language [value=de]').dispatchEvent('click');

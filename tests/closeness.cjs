@@ -131,3 +131,20 @@ test('a release looks for similar artists through 1 to 3 credited artists, and a
   const compilation = rec('release',2,[1,2,3,4].map(n=>[A(n),'artist']));
   assert.deepEqual(regions(compilation, docs(compilation, ...people)).map(r=>r.key), ['madeBy','similarReleases','labels']);
 });
+
+test('a track names who calls a similar artist similar, not the credited artist that brought it', () => {
+  // The track is credited to A(1); A(1) worked with A(2); A(2) calls A(3) similar.
+  const track = rec('track',1,[[A(1),'primary']]), credited = rec('artist',1,[[A(2),'collaboration'],[A(4),'similar']]);
+  const all = docs(track, credited, rec('artist',2,[[A(3),'similar']]), rec('artist',3), rec('artist',4));
+  const similar = region(regions(track, all),'similar');
+  assert.deepEqual(similar.items.map(i=>[i.id, i.via, i.reason]), [[A(4), A(1), [{kind:'similarTo', names:[A(1)]}]], [A(3), A(1), [{kind:'similarTo', names:[A(2)]}]]],
+    'A(4) is similar to the credited artist; A(3) is similar to A(2), and hangs from A(1) on the map');
+});
+
+test('the naming plan skips a payload over the budget left, and still takes a smaller one that fits', () => {
+  const want = n => Array.from({length:n},(_,i)=>A(700+i));
+  const record = (n, cover, size) => rec('artist', n, [...cover.map(id=>[id,'similar']), ...Array.from({length:size-cover.length},(_,i)=>[A(9000+n*200+i),'similar'])]);
+  // The first takes 207 KB; the second best would bring the total to 414 KB; the third covers less and fits.
+  const pool = docs(record(1,want(2),120), record(2,want(4).slice(2),120), record(3,want(3).slice(2),10));
+  assert.deepEqual(namingPlan([{key:'similar', items:[], total:4, ids:want(4)}], pool, new Set(), false), [A(1), A(3)]);
+});

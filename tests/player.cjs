@@ -46,6 +46,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   const imageRequests=[];
   class Element {
     constructor(){this.dataset={};this.events={};this.children=[];this.attrs={};this.textContent='';this.complete=true;this.naturalWidth=100;this.classList={add(){},remove(){},toggle(){}};this.style={setProperty(key,value){this[key]=value;}};}
+    get parentNode(){return this.parent||null;}
     addEventListener(name,fn){(this.events[name] ||= new Set()).add(fn);}
     removeEventListener(name,fn){this.events[name]?.delete(fn);}
     emit(name,event={}){for(const fn of [...this.events[name] || []]) fn(event);}
@@ -57,6 +58,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     prepend(...children){for(const child of children.reverse())this.insertBefore(child,this.children[0]);}
     insertBefore(child,before){const index=this.children.indexOf(before);child.parent=this;if(index<0)this.children.push(child);else this.children.splice(index,0,child);}
     before(child){this.parent.insertBefore(child,this);}
+    after(child){child.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,child);}
     replaceChildren(...children){this.textContent='';this.children=[];this.append(...children);}
     descendants(){return this.children.flatMap(c=>typeof c==='object'?[c,...c.descendants()]:[]);}
     // A class (.name), a tag, or the journey's [data-kind] lookup.
@@ -1183,9 +1185,10 @@ test('a region shows six names until the listener asks, says when it is empty, a
  e.visit('#explore/'+A(11));await flush();
  assert.deepEqual(byClass(inspector(e),'region').map(r=>textOf(r.children[0])+'|'+textOf(r.children[1])),['Similar artists 0|No similar artists in the collection yet.','Releases 1|Don’t Give YourselvesC O U P2021','Labels 1|C O U P'],'Worked with, empty, is left out');
  e.visit('#explore/'+A(12));await flush();
- assert.deepEqual(inspector(e).children.slice(1).map(n=>[cls(n),n.textContent]),[['collection-note','Nothing in the collection is linked to Nobody yet.']],'nothing close at all: one sentence instead');
+ const note=()=>byClass(inspector(e),'entity-heading')[0].children.at(-1).children.at(-1);
+ assert.deepEqual([inspector(e).children.map(cls),cls(note()),note().textContent],[['entity-heading'],'collection-note','Nothing in the collection is linked to Nobody yet.'],'nothing close at all: one sentence instead, in the header under its line');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/'+A(12));await flush();
- assert.equal(inspector(e).children[1].textContent,'In der Sammlung ist noch nichts mit Nobody verbunden.');
+ assert.equal(note().textContent,'In der Sammlung ist noch nichts mit Nobody verbunden.');
 });
 
 test('a hop paints its header at once from a record already fetched, and its body once: when the names arrive, or 2.5 s after',async()=>{
@@ -1288,7 +1291,7 @@ test('the profile keeps its picture box, names its type above the title and read
  const box=byClass(inspector(e),'picture')[0],img=box.children[0];
  assert.deepEqual([box.dataset.type,box.dataset.initial,img.alt,img.getAttribute('src')],['artist','R','Portrait','/api/discovery/media/'+'a'.repeat(40)],'the box holds the first letter until the image shows');
  const heading=byClass(inspector(e),'entity-heading')[0],about=heading.children[1];
- assert.deepEqual(about.children.map(n=>n.localName+'.'+(n.className||'')),['p.eyebrow','h3.','p.entity-line'],'the type above the title, then one line');
+ assert.deepEqual(about.children.map(n=>n.localName+'.'+(n.className||'')),['p.eyebrow','h3.','p.entity-line','p.collection-note'],'the type above the title, then one line, and a record linked to nothing says so last');
  assert.deepEqual([about.children[0].textContent,about.children[1].textContent,about.children[1].tabIndex],['Artist','Recondite',-1]);
  assert.equal(textOf(about.children[2]),'Germany','a country code reads as its name');
  await show(recondite({id:'lab_000000000001',type:'label',title:'Afterlife',country:'',tags:[],image:null}));
@@ -1924,4 +1927,223 @@ test('the explorer and the record title take focus as places to read from, with 
  const rules=cssRules();
  assert.match(rules.get('#explorer:focus'),/outline:none/);
  assert.match(rules.get('#explorer h3[tabindex="-1"]:focus'),/outline:none/,'a direct load focuses the title: no white box around it');
+});
+
+// Explorer v2 step 3: from 1100px wide a record is a map, a second layout of the same DOM. The fake boxes: the map is
+// 1300 × 668 until a test resizes it (e.mapWidth), a pictured name 200 × 44, a plain one 120 × 32, a region name
+// 150 × 26, and the header, with a long title, 520 wide around the middle from 244 to 470.
+const mapBoxes=e=>{
+ const P=e.Element.prototype,box=(left,top,width,height)=>({left,top,width,height,right:left+width,bottom:top+height}),is=(n,c)=>(n.className||'').split(' ').includes(c);e.mapWidth=1300;
+ Object.defineProperty(P,'clientWidth',{configurable:true,get(){return is(this,'neighbourhood')?e.mapWidth:0;}});
+ Object.defineProperty(P,'clientHeight',{configurable:true,get(){return is(this,'neighbourhood')?668:0;}});
+ P.getBoundingClientRect=function(){
+  if(is(this,'neighbourhood'))return box(0,0,e.mapWidth,668);
+  if(is(this,'entity-heading'))return box(e.mapWidth/2-260,244,520,226);
+  if(this.localName==='li')return this.dataset.ring==='r1'?box(0,0,200,44):box(0,0,120,32);
+  return this.localName==='h4'?box(0,0,150,26):box(0,0,0,0);
+ };
+};
+// An artist with three similar artists, a fourth one similar to the first, eleven it worked with, a release, a label
+// and a track.
+const mapHood=()=>{
+ const A=n=>id('art',n),T=n=>id('trk',n),workers=Array.from({length:11},(_,n)=>A(311+n));
+ const centre=rec(A(1),'Centre',[[A(101),'similar'],[A(102),'similar'],[A(104),'similar'],...workers.map(w=>[w,'collaboration']),[id('rel',1),'release'],[id('lab',1),'label'],[T(1),'track']],{bio:'A bio.'});
+ const near=[rec(A(101),'Near One',[[A(201),'similar']],{trackCount:9}),rec(A(102),'Near Two',[],{trackCount:8}),rec(A(104),'Near Three',[],{trackCount:7}),rec(A(201),'Far One',[],{trackCount:1}),
+  ...workers.map((w,n)=>rec(w,'Worker '+n,[],{trackCount:30-n})),rec(id('rel',1),'Own Release',[],{releaseDate:'2020-01-01'}),rec(id('lab',1),'Own Label'),rec(T(1),'Own Track',[],{durationMs:300000,playlists:[{code:'LIF',station:'Lost in Feelings'}]})];
+ return {[A(1)]:{entity:centre,included:near}};
+};
+const mapOf=e=>byClass(inspector(e),'neighbourhood')[0];
+const nodesOf=map=>map.descendants().filter(n=>n.localName==='li');
+const px=value=>parseFloat(value);
+
+test('from 1100px wide a record is a map: the header in the middle, the closest names around it on two ellipses, one line to each',async()=>{
+ const e=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(e);await flush();const data=mapHood();e.discovery=url=>data[url.split('/').pop()]||null;
+ e.visit('#explore/'+id('art',1));await flush();
+ const map=mapOf(e),lines=byClass(map,'map-lines')[0],nodes=nodesOf(map),shown=nodes.filter(n=>!n.hidden),at=key=>nodes.find(n=>n.dataset.id===key);
+ assert.deepEqual([inspector(e).children.map(cls),map.children.map(cls),byClass(inspector(e),'regions')[0].children.map(cls)],
+  [['neighbourhood','neighbourhood-caption','regions'],['map-lines','entity-heading','region','region','region','region'],['record-about','region']],'the header, the regions and the lines in one box, the caption under it, then About and On the radio');
+ assert.equal(lines.attrs['aria-hidden'],'true');
+ // The same rows as the list, each knowing what it hangs from: pictured names first, plain ones after.
+ assert.deepEqual(['art_000000000101','art_000000000201','art_000000000311','rel_000000000001'].map(key=>[at(key).dataset.side,at(key).dataset.ring]),[['left','r1'],['left','r2'],['left','r1'],['right','r1']]);
+ const worked=byClass(map,'region')[1].descendants().filter(n=>n.localName==='li');
+ assert.deepEqual([worked.length,worked.filter(n=>n.hidden).length,worked.slice(-2).every(n=>n.hidden)],[11,4,true],'Worked with: 9 at most, and the lowest plain names leave when its band is full; the list keeps them');
+ assert.equal(lines.children.length,shown.length,'one line to each name on the map');
+ // The arithmetic: cx 650, cy 334, inner rx 247, outer rx 468, ry 414.16; Similar artists stack from y 94, 60px apart.
+ const cx=650,cy=334,ry=.62*668,on=(rx,y)=>rx*Math.sqrt(1-Math.min(1,Math.abs(y-cy)/ry)**2),near=at('art_000000000101'),far=at('art_000000000201');
+ assert.deepEqual([px(near.style.top),px(byClass(map,'region')[0].children[0].style.top)],[94,50],'the first name in its band, and its region name 44px above it');
+ assert.ok(Math.abs(cx-px(near.style.left)-on(247,94))<1e-9,'a name clear of the header sits on the inner ellipse');
+ assert.deepEqual([px(far.style.top),cx-px(far.style.left)>=cx-px(near.style.left)+200+16],[94,true],'a plain name similar to a pictured one hangs level with it in the outer column, clear of it');
+ assert.ok(lines.children.some(p=>p.attrs.d.startsWith(`M${cx-(cx-px(near.style.left)+208)} 94C`)),'its line starts 8px past the outer edge of its parent');
+ assert.ok(lines.children.some(p=>p.attrs.d.startsWith(`M${cx-68} ${cy-30}C`)),'the others start beside the middle picture');
+ for(const n of shown.filter(n=>px(n.style.top)+22>244&&px(n.style.top)-22<470))assert.ok(Math.abs(px(n.style.left)-cx)>=260+16,'a name beside the header clears it');
+ // The same records in the same box give the same map; only a resize moves the names, along with the box.
+ const watch=e.observers.find(o=>o.targets.includes(map)),before=nodes.map(n=>[n.hidden,n.style.left,n.style.top]);watch.fn();
+ assert.deepEqual(nodes.map(n=>[n.hidden,n.style.left,n.style.top]),before);
+ e.mapWidth=1200;watch.fn();
+ assert.deepEqual([px(near.style.left),lines.children.length],[600-on(.19*1200,94),nodes.filter(n=>!n.hidden).length],'a narrower window: a narrower ellipse, its lines drawn again');
+ // A name in focus that the window drops hands focus to the title (a browser finds it under [hidden]).
+ const row=far.children[0];row.closest=()=>far.hidden?far:null;row.focus();e.mapWidth=600;watch.fn();
+ assert.deepEqual([far.hidden,e.document.activeElement===inspector(e).descendants().find(n=>n.localName==='h3')],[true,true]);
+ const rules=cssRules(),still=cssRules('(prefers-reduced-motion: no-preference)');
+ assert.match(rules.get('.neighbourhood'),/position:relative; height:clamp\(480px, calc\(100dvh - var\(--bar\) - var\(--top\) - 72px\), 700px\);/,'from a 720px high window down, the caption and its focus ring end above the player bar');
+ assert.match(rules.get('.explore-workspace:has(> #entity-inspector > .neighbourhood)'),/margin-top:0/);assert.match(rules.get('#explorer #discovery-status:empty'),/margin:0/,'the map starts right under the explorer\'s bar: an empty status keeps no margin, so the 72px left are the caption\'s');
+ assert.match(rules.get('.neighbourhood .entity-heading'),/position:absolute; left:50%; top:calc\(50% - 90px\); width:min\(420px, calc\(38% - var\(--s4\)\)\);.*text-align:center; transform:translateX\(-50%\);/,'420px wide at most, centred, its top 90px above the middle');
+ assert.match(rules.get('.neighbourhood .entity-heading :is(nav, p, h3)'),/text-shadow:0 0 3px var\(--surface\), 0 0 6px var\(--surface\), 0 0 10px var\(--surface\)/,'lines pass behind the words');
+ assert.match(rules.get('.neighbourhood .entity-heading h3'),/text-wrap:balance;.*-webkit-line-clamp:2/,'the title in two lines at most');
+ assert.match(rules.get('.neighbourhood .entity-trail'),/position:absolute; inset:auto 0 calc\(100% \+ var\(--s3\)\);/,'the trail 16px above the picture');
+ assert.match(rules.get('.neighbourhood :is(.row-line, .row-fact)'),/position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset\(50%\);/,'the reason and the fact stay for screen readers');
+ assert.match(rules.get('.neighbourhood :is(li, .region > p)[data-side=left]'),/transform:translate\(-100%, -50%\)/);assert.match(rules.get('.neighbourhood [data-side=left] .row'),/flex-direction:row-reverse; text-align:right/,'a left name anchors at its right edge, its picture toward the record');
+ assert.match(rules.get('.neighbourhood .row'),/min-height:44px/);assert.match(rules.get('.neighbourhood .row-name'),/max-width:150px/);
+ assert.match(rules.get('.neighbourhood [data-ring=r2] .row::before'),/width:5px; height:5px; border-radius:50%; background:var\(--muted\)/);assert.match(rules.get('.neighbourhood [data-ring=r2] .picture'),/display:none/);
+ assert.match(rules.get('.map-lines'),/fill:none; stroke:var\(--line\); stroke-width:1;/);assert.match(rules.get('.map-lines [data-lit]'),/stroke:var\(--soft\)/);
+ assert.match(rules.get('.neighbourhood ~ .regions'),/padding-top:var\(--s5\); border-top:1px solid var\(--line\)/,'About and On the radio under a line');
+ assert.match(still.get('.neighbourhood :is(.region, .map-lines)'),/transition:opacity 180ms ease/);assert.match(still.get('@starting-style'),/\.neighbourhood :is\(\.region, \.map-lines\) \{ opacity:0; \}/,'names and lines fade in, unless motion is reduced');
+});
+
+test('the map or the list is the listener\'s choice, kept across visits; a narrow window or blocked storage draws as before',async()=>{
+ const saved={},storage={getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value;}},data=mapHood();
+ let e;const open=async options=>{e=setup({journey:true,media:['(min-width:1100px)'],...options});mapBoxes(e);await flush();e.discovery=url=>data[url.split('/').pop()]||null;e.visit('#explore/'+id('art',1));await flush();};
+ const caption=()=>byClass(inspector(e),'neighbourhood-caption')[0],toggle=()=>caption().children.at(-1);
+ await open({storage});
+ assert.deepEqual([caption().children.map(n=>[n.localName,n.attrs['aria-hidden'],n.textContent])],[[['span','true','The nearer a name, the closer it is. Pick one to go there.'],['button',undefined,'Show as a list']]],'the caption\'s words repeat the links, the button does not');
+ toggle().emit('click');
+ assert.deepEqual([saved['pavoia-explorer-view'],inspector(e).children.map(cls),caption().children.length,toggle().textContent,e.document.activeElement===toggle()],['list',['entity-heading','neighbourhood-caption','regions'],1,'Show as a map',true],'the list of step 2, its switch under the header, with focus');
+ await open({storage});
+ assert.equal(inspector(e).children[0].className,'entity-heading','the choice survives a reload');
+ toggle().emit('click');assert.deepEqual([saved['pavoia-explorer-view'],inspector(e).children[0].className],['map','neighbourhood']);
+ const denied=()=>{throw new Error('Storage denied');};
+ await open({storage:{getItem:denied,setItem:denied}});
+ assert.equal(inspector(e).children[0].className,'neighbourhood','storage that throws still draws the map');
+ toggle().emit('click');assert.equal(inspector(e).children[0].className,'entity-heading','and the switch still works for this visit');
+ await open({storage,media:[]});
+ assert.deepEqual([inspector(e).children.map(cls),byClass(inspector(e),'neighbourhood-caption').length],[['entity-heading','regions'],0],'under 1100px the list stays as it is, with no switch');
+ const title=()=>inspector(e).descendants().find(n=>n.localName==='h3');assert.equal(e.document.activeElement,title());
+ e.queries.get('(min-width:1100px)').change(true);
+ assert.deepEqual([inspector(e).children[0].className,e.document.activeElement===title(),mapOf(e).contains(title())],['neighbourhood',true,true],'widening the window draws the map, and focus stays on the title');
+ e.setLanguage('de');
+ assert.deepEqual(caption().children.map(n=>n.textContent),['Je näher ein Name, desto enger die Verbindung. Wähle einen, um dorthin zu gehen.','Als Liste zeigen']);
+ toggle().emit('click');assert.equal(toggle().textContent,'Als Karte zeigen');
+});
+
+test('a name under the pointer or in focus lights its line and its parent\'s, and the caption says why it is there',async()=>{
+ const e=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(e);await flush();
+ const track={entity:rec('trk_0123456789ab','Abandoned Soul',[['art_000000000001','primary'],['art_000000000002','remixer'],['lab_000000000001','label']],{durationMs:423993,playlists:[{code:'ANB',station:'As Night Begins'}]}),included:[rec('art_000000000001','Jimi Jules',[['art_000000000003','similar']],{trackCount:11}),rec('art_000000000002','Recondite',[['art_000000000003','similar']],{trackCount:7}),rec('lab_000000000001','Watergate Records')]};
+ const credit=n=>({entity:track.included[n],included:[rec('art_000000000003','Guy Gerber',[],{trackCount:3})]});
+ e.discovery=url=>url.endsWith('/track/123')?track:url.endsWith('art_000000000001')?credit(0):url.endsWith('art_000000000002')?credit(1):null;
+ await e.poll();await flush();e.elements['go-deeper'].emit('click');await flush();
+ const map=mapOf(e),nodes=nodesOf(map),lines=byClass(map,'map-lines')[0],hint=byClass(inspector(e),'neighbourhood-caption')[0].children[0];
+ const jimi=nodes.find(n=>n.dataset.id==='art_000000000001'),guy=nodes.find(n=>n.dataset.id==='art_000000000003'),lit=()=>lines.children.filter(p=>'data-lit' in p.attrs).length;
+ assert.deepEqual([jimi.dataset.ring,guy.dataset.ring,guy.dataset.side,px(guy.style.left)<px(jimi.style.left)-200],['r1','r2','left',true],'a track: who made it, pictured, and the similar artists hanging from them in the outer column');
+ map.emit('focusin',{target:{closest:()=>guy}});
+ assert.deepEqual([lit(),hint.textContent],[2,'Guy Gerber · Similar to Jimi Jules and Recondite · 3 tracks'],'its line and its parent\'s light up');
+ map.emit('focusout',{target:guy});
+ assert.deepEqual([lit(),hint.textContent],[0,'The nearer a name, the closer it is. Pick one to go there.']);
+ map.emit('pointerover',{target:{closest:()=>jimi}});assert.deepEqual([lit(),hint.textContent],[1,'Jimi Jules · Artist · 11 tracks']);
+ map.emit('pointerover',{target:{closest:()=>null}});assert.equal(lit(),0,'over the header, nothing is lit');
+ map.emit('pointerover',{target:{closest:()=>jimi}});map.emit('pointerleave',{});assert.deepEqual([lit(),hint.textContent],[0,'The nearer a name, the closer it is. Pick one to go there.']);
+});
+
+test('an outer name starts past its parent\'s outer edge, also far from its parent\'s level, and its region name stays inside the map',async()=>{
+ const e=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(e);await flush();
+ // One credited artist, pushed out by the header beside it, with seven similar artists hanging from it.
+ const A=n=>id('art',n),T=id('trk',1),kids=Array.from({length:7},(_,n)=>A(201+n));
+ const track={entity:rec(T,'Track',[[A(1),'primary']],{durationMs:300000}),included:[rec(A(1),'Parent',kids.map(k=>[k,'similar']),{trackCount:5})]};
+ const parent={entity:track.included[0],included:kids.map((k,n)=>rec(k,'Kid '+n,[],{trackCount:9-n}))};
+ e.discovery=url=>url.endsWith(T)?track:url.endsWith(A(1))?parent:null;
+ e.visit('#explore/'+T);await flush();
+ // cx 650; the header reaches 260 from the middle, so the parent starts at 276 and ends at 476, at y 358.
+ const map=mapOf(e),cx=650,from=n=>cx-px(n.style.left),nodes=nodesOf(map),p=nodes.find(n=>n.dataset.id===A(1)),shown=nodes.filter(n=>n.dataset.via===A(1)&&!n.hidden);
+ assert.deepEqual([from(p),px(p.style.top),shown.length],[276,358,7]);
+ assert.ok(shown.some(n=>Math.abs(px(n.style.top)-px(p.style.top))>=90),'a name far above its parent, where the ellipse runs nearer the middle than the parent reaches');
+ for(const n of shown)assert.ok(from(n)>=from(p)+200+24,'every outer name starts 24px past its parent\'s outer edge, so its line never runs back across the parent');
+ assert.ok(byClass(map,'map-lines')[0].children.filter(l=>l.attrs.d.startsWith(`M${cx-484} 358C`)).length===7,'each line starts 8px past the parent');
+ // 40px narrower, the names still fit past the parent; their region name, wider than they are, moves in to stay inside.
+ // A name 200px wide no longer fits: it leaves before the column stacks, so the column has no gap.
+ const wide=nodes.find(n=>n.dataset.id===kids[1]);wide.getBoundingClientRect=()=>({left:0,top:0,width:200,height:32,right:200,bottom:32});
+ e.mapWidth=1260;e.observers.find(o=>o.targets.includes(map)).fn();
+ const heading=byClass(map,'region')[1].children[0],left=n=>630-px(n.style.left),tops=nodes.filter(n=>n.dataset.via===A(1)&&!n.hidden).map(n=>px(n.style.top));
+ assert.deepEqual([wide.hidden,tops.length,tops.slice(1).every((t,i)=>t-tops[i]===32)],[true,6,true]);
+ assert.deepEqual([nodes.filter(n=>n.dataset.via===A(1)&&!n.hidden).every(n=>left(n)===500),left(heading)+150],[true,630],'the region name ends on the map\'s edge');
+});
+
+test('an empty region keeps its heading and its one sentence on the map, where its first name would be, with no line to it',async()=>{
+ const e=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(e);await flush();
+ e.discovery={entity:rec(id('art',11),'Chlär',[[id('lab',11),'label'],[id('rel',11),'release']]),included:[rec(id('lab',11),'C O U P'),rec(id('rel',11),'Don’t Give Yourselves',[[id('lab',11),'label']],{releaseDate:'2021-01-01'})]};
+ e.visit('#explore/'+id('art',11));await flush();
+ const map=mapOf(e),similar=byClass(map,'region').find(r=>r.dataset.key==='similar'),[heading,note]=similar.children,lines=byClass(map,'map-lines')[0];
+ assert.deepEqual([similar.hidden,note.hidden,textOf(heading),note.textContent,note.dataset.side],[false,false,'Similar artists 0','No similar artists in the collection yet.','left'],'seen, and read');
+ // The sentence stacks in the middle of the left band, at y 358, clear of the header; its region name 30px above it.
+ assert.deepEqual([note.style.left,note.style.top,heading.style.left,heading.style.top],['374px','358px','374px','328px']);
+ assert.equal(lines.children.length,nodesOf(map).filter(n=>!n.hidden).length,'a line to each name, none to the sentence');
+ const rules=cssRules();
+ assert.match(rules.get('.neighbourhood :is(li, .region > p)'),/position:absolute; width:max-content;/);assert.match(rules.get('#explorer .neighbourhood .region > p'),/margin:0/);
+});
+
+test('a map with no name on it offers none to pick, and its header says why',async()=>{
+ const e=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(e);await flush();
+ const open=async entity=>{e.discovery={entity,included:[]};e.visit('#explore/'+entity.id);await flush();};
+ const hint=()=>byClass(inspector(e),'neighbourhood-caption')[0].children[0],last=()=>byClass(mapOf(e),'entity-heading')[0].children.at(-1).children.at(-1);
+ await open(rec(id('art',12),'Nobody'));
+ assert.deepEqual([hint().textContent,last().textContent,inspector(e).children.map(cls)],['','Nothing in the collection is linked to Nobody yet.',['neighbourhood','neighbourhood-caption']],'no hint to pick a name; the sentence sits in the header, in view');
+ await open(rec(id('trk',12),'A Track Without Profiles',[],{artist:'Someone',album:'Somewhere',basicDetails:true,reviewRequired:true}));
+ assert.deepEqual([hint().textContent,byClass(mapOf(e),'entity-heading')[0].children.at(-1).children.slice(-2).map(n=>n.textContent)],['',['Artist and release profiles are not available for this track yet.','Artist details are being checked.']],'the record\'s own notes close its header too');
+ const rules=cssRules();
+ assert.match(rules.get('.neighbourhood-caption > span'),/flex:1;.*text-align:center;/,'the words change inside a box of fixed width: the button stays put');
+ assert.ok(![...rules].some(([selector,body])=>/neighbourhood-caption/.test(selector)&&/justify-content:center/.test(body)),'no centring that moves the button with the words');
+});
+
+test('a pictured name clicked on the map glides into the middle, unless motion is reduced or the list shows',async()=>{
+ const data=mapHood(),A=n=>id('art',n);data[A(101)]={entity:data[A(1)].included[0],included:[data[A(1)].included[3]]};
+ const open=async options=>{
+  const e=setup({journey:true,media:['(min-width:1100px)'],...options});mapBoxes(e);await flush();e.discovery=url=>data[url.split('/').pop()]||null;e.elements['explore-workspace'].append(inspector(e));
+  e.visit('#explore/'+id('art',1));await flush();
+  // As in a browser, the update runs once the old picture is captured, a frame later: here when the test says.
+  e.calls=[];e.document.startViewTransition=fn=>{const call={};e.calls.push(call);const done=new Promise(resolve=>{call.run=()=>{fn();resolve();};});return {updateCallbackDone:done,finished:done.then(()=>new Promise(resolve=>{call.finish=resolve;}))};};
+  // A browser finds the clicked row's map node, and its picture there.
+  const li=inspector(e).descendants().find(n=>n.localName==='li'&&n.dataset.id==='art_000000000101'),row=li.children[0],from=byClass(li,'picture')[0];
+  li.dataset.ring='r1';row.closest=()=>li;from.isConnected=true;
+  return {e,row,from};
+ };
+ let {e,row,from}=await open();
+ follow(e,row);await flush();
+ assert.deepEqual([e.calls.length,from.style.viewTransitionName,inspector(e).descendants().find(n=>n.localName==='h3').textContent],[1,'centre','Centre'],'the clicked picture is named before the snapshot; its own payload came, yet nothing paints before the update');
+ e.calls[0].run();await flush();
+ const title=inspector(e).descendants().find(n=>n.localName==='h3'),to=byClass(inspector(e),'picture')[0];
+ assert.deepEqual([title.textContent,e.document.activeElement===title,to.style.viewTransitionName,Boolean(byClass(mapOf(e),'region').length)],['Near One',true,'centre',true],'the header paints inside the transition, then the body');
+ e.calls[0].finish();await flush();
+ assert.deepEqual([from.style.viewTransitionName,to.style.viewTransitionName],['',''],'both lose the name when it ends');
+ ({e,row}=await open({media:['(min-width:1100px)','(prefers-reduced-motion: reduce)']}));follow(e,row);
+ assert.deepEqual([e.calls.length,inspector(e).descendants().find(n=>n.localName==='h3').textContent],[0,'Near One'],'reduced motion: the hop swaps at once');
+ ({e,row}=await open({storage:{getItem:()=>'list',setItem(){}}}));follow(e,row);
+ assert.deepEqual([e.calls.length,inspector(e).descendants().find(n=>n.localName==='h3').textContent],[0,'Near One'],'the list: no glide');
+ assert.match(cssRules().get('::view-transition-group(centre)'),/animation-duration:240ms; animation-timing-function:var\(--ease\);/);
+ assert.match(cssRules().get('::view-transition-old(root), ::view-transition-new(root)'),/animation-duration:180ms;/);
+});
+
+test('an artist whose only links are its tracks lists them On the radio, and is not said to be linked to nothing',async()=>{
+ const e=setup({journey:true});await flush();const T=n=>id('trk',n);
+ e.discovery={entity:rec(id('art',1),'Only Tracks',[[T(1),'track'],[T(2),'track']]),included:[rec(T(1),'One',[],{durationMs:300000,playlists:[{code:'LIF',station:'Lost in Feelings'}]}),rec(T(2),'Two',[],{album:'An Album'})]};
+ e.visit('#explore/'+id('art',1));await flush();
+ const notes=byClass(inspector(e),'collection-note').map(textOf),radio=byClass(inspector(e),'region').find(r=>r.attrs['aria-labelledby']==='r-onRadio');
+ assert.ok(!notes.some(n=>n.startsWith('Nothing in the collection')),'no sentence that says nothing is linked');
+ assert.deepEqual(byClass(radio,'row').map(a=>a.children.slice(1).map(textOf)),[['OneLost in Feelings','5:00'],['TwoAn Album']]);
+});
+
+test('the 10 s limit of a hop holds until the naming requests settle, also after the deadline painted the body',async()=>{
+ const e=setup({journey:true});await flush();const data=hood();let release;
+ e.discovery=url=>{const key=url.split('/').pop();return key==='art_000000000101'?new Promise(resolve=>{release=()=>resolve(data[key]);}):data[key]||null;};
+ e.visit('#explore/art_000000000001');await flush();e.fire(2500);await flush();
+ const naming=e.discoveryRequests.find(r=>r.url.endsWith('art_000000000101'));
+ assert.deepEqual([Boolean(byClass(inspector(e),'regions').length),naming.signal.aborted],[true,false],'the body painted while a naming request is still out');
+ e.fire(10000);assert.ok(naming.signal.aborted,'a stalled request is dropped at 10 s');
+ const again=setup({journey:true});await flush();again.discovery=e.discovery;
+ again.visit('#explore/art_000000000001');await flush();again.fire(2500);await flush();release();await flush();
+ assert.ok(![...again.timers.values()].some(t=>t.delay===10000),'once every request settled, no limit is left waiting');
+});
+
+test('a track whose credited artists are not at hand names its artist and release in its line',async()=>{
+ const e=setup({journey:true});await flush();
+ e.discovery=url=>url.endsWith('trk_000000000077')?{entity:rec('trk_000000000077','Lonely',[['art_000000000077','primary']],{artist:'Someone',album:'Somewhere',durationMs:301000}),included:[]}:null;
+ e.visit('#explore/trk_000000000077');await flush();
+ assert.deepEqual([textOf(byClass(inspector(e),'entity-line')[0]),byClass(inspector(e),'row').length],['Someone · Somewhere · 5:01',0],'its credited artist failed to load: the line names who made it, since Made by cannot');
 });

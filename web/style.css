@@ -359,6 +359,56 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .row-line { font-size:12px; color:var(--soft); }
 .row-fact, .row > time { font:11px/1.4 var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); white-space:nowrap; }
 .row[href]:is(:hover, :focus-visible) .row-name { text-decoration:underline; text-underline-offset:3px; }
+/* The map, 1100px wide and more: the record in the middle of its neighbourhood, its closest names around it, nearer
+   when closer. layoutMap() places each name and region name through element.style (CSSOM, which the CSP allows); the
+   header sits in the middle from its first paint, so nothing moves when the names arrive. The map starts right under
+   the explorer's bar; the 72px left hold its caption, a 16px margin over a 44px row, and the focus ring of its button,
+   above the player bar down to a 720px high window. */
+.neighbourhood { position:relative; height:clamp(480px, calc(100dvh - var(--bar) - var(--top) - 72px), 700px); }
+.explore-workspace:has(> #entity-inspector > .neighbourhood) { margin-top:0; }
+#explorer #discovery-status:empty { margin:0; }
+.neighbourhood .entity-heading { position:absolute; left:50%; top:calc(50% - 90px); width:min(420px, calc(38% - var(--s4))); grid-template-columns:minmax(0,1fr); justify-items:center; gap:var(--s3); text-align:center; transform:translateX(-50%); }
+/* A halo in the surface colour lets the lines pass behind the words, as on a printed map. */
+.neighbourhood .entity-heading :is(nav, p, h3) { text-shadow:0 0 3px var(--surface), 0 0 6px var(--surface), 0 0 10px var(--surface); }
+.neighbourhood .entity-heading h3 { margin-inline:auto; text-wrap:balance; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.neighbourhood .entity-trail { position:absolute; inset:auto 0 calc(100% + var(--s3)); justify-content:center; }
+.neighbourhood .region h4 { position:absolute; margin:0; white-space:nowrap; color:var(--soft); }
+.neighbourhood .region h4[data-side=left] { transform:translate(-100%, -100%); }
+.neighbourhood .region h4[data-side=right] { transform:translateY(-100%); }
+/* A name anchors at its inner edge, its picture toward the record; its reason and fact stay for screen readers. An
+   empty region's one sentence sits where its first name would be. */
+.neighbourhood :is(li, .region > p) { position:absolute; width:max-content; }
+.neighbourhood :is(li, .region > p)[data-side=left] { transform:translate(-100%, -50%); }
+.neighbourhood :is(li, .region > p)[data-side=right] { transform:translateY(-50%); }
+#explorer .neighbourhood .region > p { margin:0; }
+.neighbourhood .row { display:flex; min-height:44px; padding:0; }
+.neighbourhood [data-side=left] .row { flex-direction:row-reverse; text-align:right; }
+.neighbourhood :is(.row-line, .row-fact) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.neighbourhood .row-name { max-width:150px; }
+.neighbourhood [data-ring=r1] .row-name { white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+/* A plain name is one line behind a 5px dot, 32px tall so the 34px slots of the layout never overlap. */
+.neighbourhood [data-ring=r2] .row { min-height:32px; gap:var(--s2); }
+.neighbourhood [data-ring=r2] .row::before { content:""; flex:none; width:5px; height:5px; border-radius:50%; background:var(--muted); }
+.neighbourhood [data-ring=r2] .picture { display:none; }
+.neighbourhood [data-ring=r2] .row-name { color:var(--soft); }
+.neighbourhood [data-ring=r2] .row:is(:hover, :focus-visible) .row-name { color:var(--cream); }
+.map-lines { position:absolute; inset:0; width:100%; height:100%; overflow:visible; pointer-events:none; fill:none; stroke:var(--line); stroke-width:1; }
+.map-lines path { transition:stroke var(--hover) var(--ease); }
+.map-lines [data-lit] { stroke:var(--soft); }
+/* One line under the map: what it means, or why the name in focus is there, then the switch to the list. Over the list
+   it holds the switch back to the map. It never wraps, so nothing under it moves. */
+.neighbourhood-caption { display:flex; align-items:center; gap:var(--s3); margin-top:var(--s3); font-size:14px; line-height:1.4; color:var(--soft); }
+/* The words change inside a box that keeps its width, so the button stays put. */
+.neighbourhood-caption > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
+.neighbourhood-caption .text-button { flex:none; }
+.neighbourhood ~ .regions { padding-top:var(--s5); border-top:1px solid var(--line); }
+/* The names and lines fade in once, at the body paint; a pictured name clicked on the map glides into the middle. */
+@media (prefers-reduced-motion: no-preference) {
+  .neighbourhood :is(.region, .map-lines) { transition:opacity 180ms ease; }
+  @starting-style { .neighbourhood :is(.region, .map-lines) { opacity:0; } }
+}
+::view-transition-group(centre) { animation-duration:240ms; animation-timing-function:var(--ease); }
+::view-transition-old(root), ::view-transition-new(root) { animation-duration:180ms; }
 @media (min-width:761px) and (max-width:1100px) {
   .player .transport-track { display:grid; grid-template-columns:minmax(0,1fr); gap:2px; }
   .player .transport-time { display:flex; justify-content:space-between; gap:12px; }

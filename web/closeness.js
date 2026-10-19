@@ -70,14 +70,17 @@
       const all=[...count].map(([id,names])=>({id,names,score:names.length})),two=all.filter(c=>c.names.length>=2);
       return two.length?two:all;
     };
-    // A track's or a release's similar artists: those of each credited artist, scores summed, the credits left out.
+    // A track's or a release's similar artists: those of each credited artist, scores summed, the credits left out. The
+    // reason names who calls each one similar: the credited artist for a direct link, else the artist on its similar
+    // step. The map hangs it from the credited artist that brought it.
     const similarTo=credits=>{
-      const sum=new Map();
+      const sum=new Map(),first=list=>[...new Set(list.sort((a,b)=>b[1]-a[1]).map(f=>f[0]))];
       for(const a of credits)if(doc(a))for(const c of similarOf(doc(a),docs)){
         if(credits.includes(c.id)||c.id===centre.id)continue;
-        const s=sum.get(c.id)||sum.set(c.id,{id:c.id,score:0,from:[]}).get(c.id);s.score+=c.score;s.from.push([a,c.score]);
+        const s=sum.get(c.id)||sum.set(c.id,{id:c.id,score:0,from:[],by:[]}).get(c.id);s.score+=c.score;s.from.push([a,c.score]);
+        for(const w of c.direct?[a]:by(c,'similar'))s.by.push([w,c.score]);
       }
-      return [...sum.values()].sort(byScore).map(s=>{const from=s.from.sort((a,b)=>b[1]-a[1]).map(f=>f[0]);return {...s,via:from[0],reason:[{kind:'similarTo',names:from}]};});
+      return [...sum.values()].sort(byScore).map(s=>({...s,via:first(s.from)[0],reason:[{kind:'similarTo',names:first(s.by)}]}));
     };
     if(centre.type==='artist'){
       const all=[...artistCandidates(centre,docs).values()].filter(c=>c.id!==centre.id),of=type=>all.filter(c=>typeOf(c.id)===type);
@@ -127,12 +130,13 @@
     const pool=[...docs.values()].filter(d=>links(d).length&&!cached.has(d.id)),picks=[];let kb=0;
     while(want.size&&picks.length<4){
       let best=null,most=0;
+      // Each connection costs about 1.7 KB of JSON, plus 3 KB for the record itself: one that would pass the budget is
+      // skipped, so a smaller one that fits can still name what is left.
       for(const d of pool){
-        if(picks.includes(d.id))continue;const n=links(d).filter(c=>want.has(c.id)).length;
+        if(picks.includes(d.id)||kb+3+1.7*links(d).length>400)continue;const n=links(d).filter(c=>want.has(c.id)).length;
         if(n>most||(n&&n===most&&links(d).length<links(best).length)){best=d;most=n;}
       }
-      // Each connection costs about 1.7 KB of JSON, plus 3 KB for the record itself.
-      if(!best||kb+3+1.7*links(best).length>400)break;
+      if(!best)break;
       kb+=3+1.7*links(best).length;picks.push(best.id);for(const c of links(best))want.delete(c.id);
     }
     return picks;

@@ -45,6 +45,7 @@
       inCommon:'{n} artists in common',inCommon1:'1 artist in common',moreNames:'{n} more',tracksN:'{n} tracks',tracks1:'1 track',
       noSimilar:'No similar artists in the collection yet.',noSimilarLabels:'No similar labels in the collection yet.',noSimilarReleases:'No similar releases in the collection yet.',
       noLabelReleases:'This label’s releases are not listed yet.',nothingLinked:'Nothing in the collection is linked to {title} yet.',
+      showList:'Show as a list',showMap:'Show as a map',mapHint:'The nearer a name, the closer it is. Pick one to go there.',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',roots:'Die Wurzeln',back:'Zurück zum Radio',
       spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',
@@ -63,6 +64,7 @@
       inCommon:'{n} gemeinsame Künstler',inCommon1:'1 gemeinsamer Künstler',moreNames:'{n} weitere',tracksN:'{n} Tracks',tracks1:'1 Track',
       noSimilar:'Noch keine ähnlichen Künstler in der Sammlung.',noSimilarLabels:'Noch keine ähnlichen Labels in der Sammlung.',noSimilarReleases:'Noch keine ähnlichen Veröffentlichungen in der Sammlung.',
       noLabelReleases:'Die Veröffentlichungen dieses Labels sind noch nicht verzeichnet.',nothingLinked:'In der Sammlung ist noch nichts mit {title} verbunden.',
+      showList:'Als Liste zeigen',showMap:'Als Karte zeigen',mapHint:'Je näher ein Name, desto enger die Verbindung. Wähle einen, um dorthin zu gehen.',
     },
   };
   Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',historyDay:'Day',older:'Show earlier tracks',loadingMore:'Loading…',now:'Now',radioSelection:'All radio selections',library:'Whole music library',noHistory:'Nothing has played on this stage yet.',noDay:'Nothing played on this stage that day.',historyError:'The history could not load.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
@@ -104,12 +106,14 @@
   // reason it is there, and a fact on the right.
   function door(v,line,fact) {const a=node('a','row'),text=node('span','row-text');a.href='#explore/'+v.id;text.append(node('span','row-name',v.title));if(line)text.append(node('span','row-line',line));a.append(picture(v,''),text);if(fact)a.append(node('span','row-fact',fact));return a;}
   // A region: a heading with the count of its names, then a list, six rows until the listener asks for the rest, whose
-  // pictures load only then: Show all {n} shows that count. One with nothing in it says so in one sentence.
-  function regionSection(key,items,empty,prefix='r') {
-    const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.append(door(i,i.line,i.fact));return li;});
-    heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);heading.append(' ',node('small','',number(items.length)));section.append(heading);
+  // pictures load only then: Show all {n} shows that count. One with nothing in it says so in one sentence. On the map
+  // it holds the 14 closest at once, the most a side shows, each knowing the name it hangs from.
+  function regionSection(key,items,empty,prefix='r',map=false) {
+    const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.dataset.id=i.id;if(i.via)li.dataset.via=i.via;li.append(door(i,i.line,i.fact));return li;});
+    heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);section.dataset.key=key;heading.append(' ',node('small','',number(items.length)));section.append(heading);
     if(!items.length){section.append(node('p','collection-note',word(empty)));return section;}
-    list.append(...rows(items.slice(0,6)));section.append(list);
+    list.append(...rows(items.slice(0,map?14:6)));section.append(list);
+    if(map)return section;
     // The button goes once used, so focus moves on to the first row it showed, never to the page.
     if(items.length>6){const more=action(word('showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].children[0].focus();},'text-button');section.append(more);}
     return section;
@@ -132,7 +136,11 @@
   function sites(list) {const seen=new Set();return list.map(l=>({kind:l.kind,url:external(l.url)})).filter(l=>l.url&&l.kind!=='wikidata').sort((a,b)=>place(a.kind)-place(b.kind)).filter(l=>!seen.has(l.url)&&seen.add(l.url));}
   const region=code=>{try{return new Intl.DisplayNames([radio.getState().language],{type:'region'}).of(code);}catch{return code;}};
   const time=n=>Math.floor(n/60)+':'+String(Math.floor(n%60)).padStart(2,'0');
-  let recordTitle=null, bioWatch=null, enriched=null, nowKey='', nowRequest=null, hop=null, selected=null, bodyShown=false, preview=null, previewButton=null, trail=[], currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
+  let recordTitle=null, bioWatch=null, mapWatch=null, glide=null, enriched=null, nowKey='', nowRequest=null, hop=null, selected=null, bodyShown=false, preview=null, previewButton=null, trail=[], currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
+  // A window 1100px wide or more draws a record as a map, unless the listener chose the list; the choice is kept, and a
+  // page that cannot read it draws the map.
+  let listView=false;try{listView=localStorage.getItem('pavoia-explorer-view')==='list';}catch{/* Storage is optional. */}
+  const wide=matchMedia('(min-width:1100px)'),still=matchMedia('(prefers-reduced-motion: reduce)'),mapOn=()=>wide.matches&&!listView;
   // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
   // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
   // or ✕ always lands on the page in one step.
@@ -246,7 +254,7 @@
     $('explorer-close').setAttribute('aria-label',word('back'));
     $('explorer-close').title=word('back');
     $('discovery-query').placeholder=word('searchPlaceholder');
-    renderPlayer();if(selected){const body=bodyShown;renderEntity(selected);if(body)renderBody(selected);}
+    renderPlayer();redraw();
     if(dialog.open&&view!=='explore'){fillStages($('music-stage').value);loadMusic();}
   }
   // Every move into or inside the explorer comes through go(): opening adds the explorer's one entry,
@@ -262,7 +270,7 @@
   // naming fetch have answered, or 2.5 s after the header at most, with the records at hand. Later answers only fill
   // the caches.
   async function loadEntity(id) {
-    setView('explore');if(preview)finishPreview();
+    const from=glide;setView('explore');if(preview)finishPreview();
     selected=null;hop?.abort();const controller=new AbortController();hop=controller;
     // A record opened from a focused result, a History row or a name in the last record keeps focus visible
     // and off the field: on the explorer while it loads, then on the record's title. Touch screens open no keyboard.
@@ -271,13 +279,24 @@
     $('discovery-results').hidden=true;
     // Every request of the hop shares its controller: the next hop, a tab or closing the explorer drops them all.
     const timeout=setTimeout(()=>controller.abort(),10000),fetched=async id=>cached(id)||request('/api/discovery/entity/'+id,controller.signal);
-    let wake,start;const deadline=new Promise(resolve=>{start=()=>{wake=setTimeout(resolve,2500);};});
+    let wake,start,painted=null;const deadline=new Promise(resolve=>{start=()=>{wake=setTimeout(resolve,2500);};});
     const header=e=>{
-      selected=e;$('discovery-status').textContent='';workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=false;renderEntity(e);dialog.scrollTop=0;
-      // The new record starts at its title, unless the listener moved focus while it loaded: a field they
-      // type in, the player or the volume keeps the keys.
-      if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
-      start();
+      selected=e;
+      const paint=()=>{
+        if(hop!==controller)return;
+        $('discovery-status').textContent='';workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=false;renderEntity(selected);dialog.scrollTop=0;
+        // The new record starts at its title, unless the listener moved focus while it loaded: a field they
+        // type in, the player or the volume keeps the keys.
+        if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
+        start();
+      };
+      // A pictured name clicked on the map glides into the middle, unless motion is reduced or the list shows. The
+      // body paints after it.
+      if(!from?.isConnected||!document.startViewTransition||still.matches||!mapOn())return paint();
+      let to=null;from.style.viewTransitionName='centre';
+      const move=document.startViewTransition(()=>{if(hop!==controller)return;paint();to=$('entity-inspector').querySelector('.picture');if(to)to.style.viewTransitionName='centre';});
+      const done=()=>{for(const n of [from,to])if(n)n.style.viewTransitionName='';};
+      painted=move.updateCallbackDone.catch(()=>{});move.finished.then(done,done);
     };
     if(records.has(id))header(records.get(id));
     // Without it, the last record stays in place, dimmed and out of reach, so its preview cannot start; only a
@@ -295,12 +314,14 @@
       const pool=new Map(ours.flatMap(p=>[p.entity,...p.included]).map(r=>[r.id,r]));
       await Promise.all(near.namingPlan(near.regions(e,records),pool,payloads,navigator.connection?.saveData===true).map(a=>fetched(a).catch(()=>null)));
     })();
-    named.catch(()=>{});// An answer that fails after the body painted changes nothing.
-    try{await Promise.race([named,deadline]);if(hop===controller)renderBody(selected);}
+    // An answer that fails after the body painted changes nothing. The 10 s limit holds until every request of the hop
+    // settles, the naming ones still out when the deadline painted the body too.
+    named.catch(()=>{}).then(()=>clearTimeout(timeout));
+    try{await Promise.race([named,deadline]);if(painted)await painted;if(hop===controller)renderBody(selected);}
     // A payload that fails after its header showed from a record at hand is as late as one past the deadline: the header
     // stays, in the trail and with focus, and the body paints with the records at hand.
-    catch{if(hop===controller){if(selected)renderBody(selected);else{workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}}
-    finally{clearTimeout(timeout);clearTimeout(wake);}
+    catch{if(painted)await painted;if(hop===controller){if(selected)renderBody(selected);else{workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}}
+    finally{clearTimeout(wake);}
   }
   radio.openTrack=id=>{if(entityID('plex_'+id))go('#explore/plex_'+id);};
   // The stages that play a track, by name.
@@ -319,15 +340,16 @@
       // An artist counts its tracks on each stage.
       pair.append(action(s.name,()=>radio.tune(s.id),'text-button'));if(e.type==='artist')pair.append(' ',node('small','',number(n)));return i?[', ',pair]:[pair];
     });
-    // A track with no credited artist under Made by, such as one with no profiles yet, names its artist and release.
-    const parts=[...e.type==='track'&&!near.credited(e).length?[e.artist,e.album]:[],['artist','label'].includes(e.type)&&e.country&&region(e.country),e.type==='release'&&year,stages.length&&[word(e.type==='track'?'playsOn':'onStage')+' ',...stages],e.type==='track'&&e.durationMs&&time(e.durationMs/1000)];
+    // A track with no credited artist under Made by, such as one with no profiles yet or whose credited records are not
+    // at hand, names its artist and release.
+    const parts=[...e.type==='track'&&!near.credited(e).some(id=>records.has(id))?[e.artist,e.album]:[],['artist','label'].includes(e.type)&&e.country&&region(e.country),e.type==='release'&&year,stages.length&&[word(e.type==='track'?'playsOn':'onStage')+' ',...stages],e.type==='track'&&e.durationMs&&time(e.durationMs/1000)];
     parts.filter(Boolean).forEach((part,i)=>{if(i)line.append(' · ');line.append(...[part].flat());});
     return line;
   }
   // The header: the trail, the picture, the type, the title and its line.
   function renderEntity(e) {
     const panel=$('entity-inspector'),heading=node('div','entity-heading'),about=node('div');
-    bioWatch?.disconnect();bodyShown=false;
+    bioWatch?.disconnect();mapWatch?.disconnect();bodyShown=false;
     // The trail of records opened in this visit; going back to one cuts the trail there.
     const at=trail.findIndex(t=>t.id===e.id);trail.splice(at<0?trail.length:at,Infinity,{id:e.id,title:e.title});
     if(trail.length>1){
@@ -347,24 +369,31 @@
       previewButton=action('',()=>{if(preview)finishPreview();else startPreview(e);},'preview-toggle');previewButton.append(circle,node('span'));about.append(previewButton);
     }
     previewState();
-    heading.append(picture(e,word(e.type+'Image')),about);panel.replaceChildren(heading);
-    if(e.basicDetails)panel.append(node('p','collection-note',word('basicDetails')));
-    if(e.reviewRequired)panel.append(node('p','collection-note',word('held')));
+    // Notes about the record itself close the header, on the map as in the list.
+    about.append(...[e.basicDetails&&'basicDetails',e.reviewRequired&&'held'].filter(Boolean).map(key=>node('p','collection-note',word(key))));
+    heading.append(picture(e,word(e.type+'Image')),about);
+    // On the map the header sits in the middle of its neighbourhood from its first paint, so it never moves.
+    if(mapOn()){const map=node('div','neighbourhood');map.append(heading);panel.replaceChildren(map);}else panel.replaceChildren(heading);
   }
   // Similar regions keep their heading when empty, and say so in one sentence; so do a label's releases.
   const empties={similar:'noSimilar',similarLabels:'noSimilarLabels',similarReleases:'noSimilarReleases'};
   // The body, painted once: the regions as lists, closest first, then About and On the radio, in the same grid so they
   // sit on the regions' columns.
   function renderBody(e) {
-    const panel=$('entity-inspector'),found=near.regions(e,records),grid=node('div','regions'),line=panel.querySelector('.entity-line');
+    const panel=$('entity-inspector'),found=near.regions(e,records),map=panel.querySelector('.neighbourhood'),grid=node('div','regions'),line=panel.querySelector('.entity-line');
     bodyShown=true;
     // The line fills in with what the payload brought, such as an artist's stages, unless the listener is in it.
     if(line&&!line.contains(document.activeElement)){line.before(recordLine(e));line.remove();}
-    // Nothing close at all says so in one sentence, unless the header already said this track has no profiles yet.
-    if(found.every(r=>!r.total)){if(!e.basicDetails)panel.append(node('p','collection-note',word('nothingLinked').replace('{title}',e.title)));}
+    // Its tracks on the radio: where each plays, or its release where none does, and how long it lasts.
+    const played=(e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track')
+      .map(t=>({...t,line:stagesOf(t).map(s=>s.name).join(', ')||t.album||'',fact:t.durationMs?time(t.durationMs/1000):''}));
+    // Nothing close at all, not even a track on the radio, says so in one sentence, unless the header already said this
+    // track has no profiles yet: at the end of the header, with its notes. On the map the regions sit around the header;
+    // in the list, in the grid under it.
+    if(found.every(r=>!r.total)&&!played.length){if(!e.basicDetails)recordTitle.parentNode.append(node('p','collection-note',word('nothingLinked').replace('{title}',e.title)));}
     else for(const r of found){
       const empty=e.type==='label'&&r.key==='releases'?'noLabelReleases':empties[r.key];
-      if(r.items.length||(empty&&!r.total))grid.append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty));
+      if(r.items.length||(empty&&!r.total))(map||grid).append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty,'r',Boolean(map)));
     }
     const about=node('section','record-about'),title=node('h4','',word('about').replace('{title}',e.title)),shown=sites(e.links||[]);
     title.id='r-about';about.setAttribute('aria-labelledby',title.id);about.append(title);
@@ -385,10 +414,8 @@
     const tags=(e.tags||[]).filter(t=>!t.includes('_')&&t.toLowerCase()!=='electronic').slice(0,4);
     if(tags.length)about.append(node('p','entity-tags',tags.join(', ')));
     if(shown.length){const links=node('p','entity-links');links.append(node('span','',word('elsewhere')),...shown.map(l=>link(site(l.kind,l.url),l.url)));about.append(links);}
-    // Its tracks on the radio: where each plays, or its release where none does, and how long it lasts.
-    const played=(e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track')
-      .map(t=>({...t,line:stagesOf(t).map(s=>s.name).join(', ')||t.album||'',fact:t.durationMs?time(t.durationMs/1000):''}));
     if(about.children.length>1)grid.append(about);if(played.length)grid.append(regionSection('onRadio',played));
+    if(wide.matches)drawMap(panel,map,e);
     if(grid.children.length)panel.append(grid);
     // More follows the width and the font: a turned phone, a narrower window or a late Inter can cut a
     // biography that fitted. Open, it stays, to close it again.
@@ -396,6 +423,109 @@
       fit=()=>{const cut=text.scrollHeight>text.clientHeight;more.hidden=!cut&&more.getAttribute('aria-expanded')!=='true';};
       bioWatch=new ResizeObserver(fit);bioWatch.observe(text);document.fonts.ready.then(fit);
     }
+  }
+  // The header and, once painted, the body again: in another language, or switched between the map and the list.
+  const redraw=()=>{if(!selected)return;const body=bodyShown;renderEntity(selected);if(body)renderBody(selected);};
+  // Under the map, a caption says what the map means, or why the name in focus is there, and offers the list; over
+  // the list, it offers the map. The caption's words repeat the names' links, so screen readers skip them.
+  function drawMap(panel,map,e) {
+    const caption=node('p','neighbourhood-caption'),hint=node('span'),toggle=action(word(map?'showList':'showMap'),()=>{
+      listView=Boolean(map);try{localStorage.setItem('pavoia-explorer-view',listView?'list':'map');}catch{/* Storage is optional. */}
+      redraw();panel.querySelector('.neighbourhood-caption')?.querySelector('button')?.focus();
+    },'text-button');
+    if(!map){caption.append(toggle);panel.querySelector('.entity-heading').after(caption);return;}
+    hint.setAttribute('aria-hidden','true');caption.append(hint,toggle);map.after(caption);
+    const plan=plans[e.type];if(!plan)return;
+    const lines=document.createElementNS('http://www.w3.org/2000/svg','svg');lines.setAttribute('class','map-lines');lines.setAttribute('aria-hidden','true');map.prepend(lines);
+    // A name under the pointer or in focus lights its path and its parent's, and the caption says why it is there. A map
+    // with no name on it offers none to pick.
+    let paths=new Map();const light=li=>{
+      for(const path of lines.children)path.removeAttribute('data-lit');
+      for(const path of paths.get(li)||[])path.setAttribute('data-lit','');
+      hint.textContent=paths.has(li)?['.row-name','.row-line','.row-fact'].map(c=>li.querySelector(c)?.textContent).filter(Boolean).join(' · '):paths.size?word('mapHint'):'';
+    };
+    // Positions change only when the window does; a map hidden behind another tab has no size to lay out. A name in
+    // focus that a narrower window drops hands focus to the title, never to the page.
+    const draw=()=>{if(!map.clientWidth)return;paths=layoutMap(map,plan,lines);light(null);if(document.activeElement?.closest?.('.neighbourhood [hidden]'))recordTitle.focus({preventScroll:true});};draw();
+    mapWatch=new ResizeObserver(draw);mapWatch.observe(map);document.fonts.ready.then(draw);
+    for(const type of ['pointerover','focusin'])map.addEventListener(type,event=>light(event.target.closest?.('.region li')));
+    for(const type of ['pointerleave','focusout'])map.addEventListener(type,()=>light(null));
+  }
+  // The map's sides: which regions sit left and right of the record, and how each shows its names. rank: 3 pictured of
+  // 9; full: 4 pictured of 14, down the whole side; r1: up to 4, pictured only; r2: up to 14, plain only.
+  const plans={artist:{left:[['similar','rank'],['worked','rank']],right:[['releases','rank'],['labels','rank']]},
+    track:{left:[['madeBy','r1'],['similar','r2']],right:[['releases','rank'],['labels','rank']]},
+    release:{left:[['madeBy','r1'],['similar','r2']],right:[['similarReleases','rank'],['labels','rank']]},
+    label:{left:[['artists','full']],right:[['similarLabels','rank'],['releases','rank']]}};
+  const rings={rank:[3,9],full:[4,14],r1:[4,4],r2:[0,14]};
+  // The record in the middle and its closest names on two ellipses around it, nearer the middle when closer: plain
+  // arithmetic on the box and the names' measured sizes, so the same records in the same window give the same map. A
+  // plain name hangs in the outer column from a pictured name of its band; any other sits in the inner column. A name
+  // or a region name moves out just enough to clear the header, the trail and what is already placed; a plain name with
+  // no room in its band, or past the edge, leaves the map (the list keeps it). Returns the paths each name lights.
+  function layoutMap(box,plan,lines) {
+    const W=box.clientWidth,H=box.clientHeight,cx=W/2,cy=H/2,rx1=Math.min(.19*W,250),rx2=Math.min(.36*W,470),ry=.62*H,origin=box.getBoundingClientRect();
+    const on=(rx,y)=>rx*Math.sqrt(1-Math.min(1,Math.abs(y-cy)/ry)**2),paths=new Map();
+    const rect=n=>{const r=n.getBoundingClientRect();return {top:r.top-origin.top,bottom:r.bottom-origin.top,inner:0,reach:Math.max(cx-r.left+origin.left,r.right-origin.left-cx),width:r.width,height:r.height};};
+    // How far from the middle a box w wide, from top to bottom, starts when it may not start nearer than x: past each box
+    // already there that it would meet, 16px clear. Each one taken spans from inner to reach, out from the middle.
+    const fit=(x,w,top,bottom,list)=>{for(const o of list.filter(o=>o.top<bottom&&top<o.bottom).sort((a,b)=>a.inner-b.inner))if(o.inner<x+w+16&&x<o.reach+16)x=o.reach+16;return x;};
+    const span=(x,y,w,h)=>({top:y-h/2,bottom:y+h/2,inner:x,reach:x+w});
+    // An outer name starts past its parent's outer edge, its line's start, even where the ellipse runs nearer the middle.
+    const past=p=>p.x+p.width+24,outerX=(i,y)=>Math.max(on(rx2,y),past(i.parent));
+    const head=[box.querySelector('.entity-heading'),box.querySelector('.entity-trail')].filter(Boolean).map(rect).filter(r=>r.width);
+    const regions=[...box.children].filter(n=>n.dataset?.key);
+    for(const r of regions){r.hidden=true;for(const li of r.querySelector('ol')?.children||[])li.hidden=true;}
+    lines.replaceChildren();
+    for(const side of ['left','right']){
+      const sign=side==='left'?-1:1,whole=plan[side].some(([,ring])=>ring!=='rank'),taken=[...head],slot=i=>i.pictured?60:34;
+      // A region with nothing in it keeps its heading and its one sentence, where its first name would be.
+      const rows=plan[side].map(([key,ring])=>{
+        const section=regions.find(r=>r.dataset.key===key),[pictured,most]=rings[ring],note=section?.querySelector('.collection-note');
+        return {section,heading:section?.querySelector('h4'),items:note?[{li:note}]:[...section?.querySelector('ol')?.children||[]].slice(0,most).map((li,k)=>({li,id:li.dataset.id,via:li.dataset.via,pictured:k<pictured}))};
+      }).filter(x=>x.items.length);
+      for(const items of whole?[rows.flatMap(x=>x.items)]:rows.map(x=>x.items))for(const i of items)i.outer=!i.pictured&&items.some(p=>p.pictured&&p.id===i.via);
+      // The stylesheet sizes a pictured name and a plain one differently: mark them, then measure.
+      for(const x of rows){x.section.hidden=false;x.heading.dataset.side=side;for(const i of x.items){i.li.hidden=false;i.li.dataset.side=side;i.li.dataset.ring=i.pictured?'r1':'r2';}}
+      for(const i of rows.flatMap(x=>x.items)){const r=rect(i.li);i.width=r.width;i.height=r.height;}
+      // One band down the side when a region spans it; otherwise the regions share it by the names each stacks.
+      const weight=x=>x.items.filter(i=>!i.outer).reduce((s,i)=>s+slot(i),0)+40,total=rows.reduce((s,x)=>s+weight(x),0);let y=64;
+      const bands=whole?[[rows,64,H-16]]:rows.map(x=>{const h=(H-80-64*(rows.length-1))*weight(x)/total,band=[[x],y,y+h];y+=h+64;return band;});
+      for(const [group,y0,y1] of bands){
+        // The inner column stacks from the middle of its band; when it runs out of room the lowest plain names leave.
+        const inner=group.flatMap(x=>x.items.filter(i=>!i.outer));let need=inner.reduce((s,i)=>s+slot(i),0);
+        while(need>y1-y0){const k=inner.findLastIndex(i=>!i.pictured);if(k<0)break;need-=slot(inner[k]);inner.splice(k,1);}
+        let at=y0+Math.max(0,(y1-y0-need)/2);
+        for(const i of inner){i.y=at+slot(i)/2;at+=slot(i);i.x=fit(on(rx1,i.y),i.width,i.y-i.height/2,i.y+i.height/2,head);i.placed=true;}
+        taken.push(...inner.map(i=>span(i.x,i.y,i.width,i.height)));
+        // Outer names start level with their parent, 30px apart; a sweep from the top keeps 32px between them, and the
+        // column moves up when it runs past its band. A name too wide to fit past its parent is left out first, so the
+        // column has no gap.
+        const outer=group.flatMap(x=>x.items).filter(i=>{const p=i.outer&&inner.find(p=>p.id===i.via);return p&&past(p)+i.width<=cx;}).slice(0,Math.floor((y1-y0)/32));
+        const kids=inner.flatMap(p=>{const k=outer.filter(i=>i.via===p.id);return k.map((i,n)=>Object.assign(i,{parent:p,want:p.y+(n-(k.length-1)/2)*30}));});
+        let last=-Infinity;for(const i of kids){i.y=Math.max(i.want,last+32,y0);last=i.y;}
+        for(const i of kids){if(last>y1)i.y-=last-y1;i.x=fit(outerX(i,i.y),i.width,i.y-i.height/2,i.y+i.height/2,taken);i.placed=i.x+i.width<=cx;}
+        taken.push(...kids.filter(i=>i.placed).map(i=>span(i.x,i.y,i.width,i.height)));
+      }
+      // A region's name sits just above its first name, on the same curve, and inside the map.
+      for(const x of rows){
+        const first=x.items.filter(i=>i.placed).sort((a,b)=>a.y-b.y)[0];if(!first){x.section.hidden=true;continue;}
+        const h=rect(x.heading),hy=first.y-(first.pictured?44:30),hx=fit(Math.min(first.outer?outerX(first,hy):on(rx1,hy),cx-h.width),h.width,hy-h.height,hy,taken);
+        x.heading.style.left=cx+sign*hx+'px';x.heading.style.top=hy+'px';taken.push(span(hx,hy-h.height/2,h.width,h.height));
+      }
+      // Each name placed, and its path: from the side of the middle picture, or from its parent's outer edge, to its own
+      // inner edge, where the stylesheet anchors it.
+      for(const i of rows.flatMap(x=>x.items)){
+        i.li.hidden=!i.placed;if(!i.placed)continue;
+        i.li.style.left=cx+sign*i.x+'px';i.li.style.top=i.y+'px';
+        // A region's one sentence links nowhere, so no line leads to it.
+        if(i.li.localName!=='li')continue;
+        const from=i.parent?[cx+sign*(i.parent.x+i.parent.width+8),i.parent.y]:[cx+sign*68,cy-30],to=[cx+sign*i.x,i.y],m=(from[0]+to[0])/2;
+        const path=document.createElementNS(lines.namespaceURI,'path');path.setAttribute('d',`M${from[0]} ${from[1]}C${m} ${from[1]} ${m} ${to[1]} ${to[0]} ${to[1]}`);lines.append(path);
+        paths.set(i.li,[path,...i.parent?paths.get(i.parent.li).slice(0,1):[]]);
+      }
+    }
+    return paths;
   }
   // On the search page, results that go away while one has focus hand it to the field, never to the
   // page, where Space plays. Opening a record or a tab moves on instead: no keyboard pops up on touch.
@@ -474,7 +604,9 @@
     // Rows kept on screen while the next ones load are out of date: Enter on one opens nothing.
     const list=$('music-content');
     if(list.contains(link)){if(list.getAttribute('aria-busy'))return;clicked=link;}
-    go(href);
+    // The picture of a pictured name on the map, for loadEntity() to glide into the middle.
+    glide=link.closest?.('.neighbourhood li[data-ring=r1]')?.querySelector('.picture')||null;
+    go(href);glide=null;
   });
   // Escape over the modal stations sheet closes that sheet only. Closing keeps the typed query, which
   // Escape would otherwise clear in the search field.
@@ -713,6 +845,8 @@
     // Until a record is on air the page waits for one: the radio's next answer with a track lands it.
     else{landing=true;if(radio.getState().dataFresh)$('discovery-status').textContent=word('nothingOnAir');}
   }
+  // Crossing 1100px swaps the map and the list; focus in the record goes back to its title.
+  wide.addEventListener('change',()=>{const held=$('entity-inspector').contains(document.activeElement);redraw();if(held&&selected)recordTitle.focus({preventScroll:true});});
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
