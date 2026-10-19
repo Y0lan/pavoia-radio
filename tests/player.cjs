@@ -1605,6 +1605,16 @@ test('a failed follow refresh of an empty History says it is empty again, and a 
  assert.equal(e.historyRequests.length,sent+1,'past midnight, Today has become Yesterday: History is drawn again');
 });
 
+test('History left open past midnight follows the radio again and names its days anew',async()=>{
+ const e=setup({journey:true});await flush();
+ e.response=onAirNow('2');await e.poll();await flush();
+ e.historyReply=answer({items:[{id:'2',title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});routeTo(e,'#history');await flush();
+ const sent=e.historyRequests.length;await e.poll();await flush();assert.equal(e.historyRequests.length,sent,'the same play, the same day: nothing to ask');
+ e.setWall(86400000);e.response=onAirNow('2');await e.poll();await flush();
+ assert.equal(e.historyRequests.length,sent+1,'past midnight the next radio answer draws History again');
+ await e.poll();await flush();assert.equal(e.historyRequests.length,sent+1,'once');
+});
+
 test('History reads time, title and artist on one grid at every width, under sticky day names, with red only for Now',()=>{
  const rules=cssRules(),phone=cssRules('(max-width:760px)'),small=cssRules('(max-width:600px)');
  assert.match(rules.get('.history-row'),/display:grid; grid-template-columns:5rem minmax\(0,1fr\); gap:16px; align-items:baseline; padding:12px 0;.* scroll-margin-top:44px;/,'a row reached with Tab scrolls clear of the sticky day name');
