@@ -673,6 +673,11 @@
   const today = () => new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   // History's address: a stage, and a day only when it is one before today; today is the live list.
   const historyAt = (stage,day) => '#history/'+stage+(day&&day<today()?'/'+day:'');
+  // A day an address can name: a real calendar date the Day field accepts, from its 1970-01-01 minimum, before today.
+  const pastDay = day => {
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<'1970-01-01'||day>=today())return false;
+    const [y,m,d]=day.split('-').map(Number);return new Date(Date.UTC(y,m-1,d)).toISOString().slice(0,10)===day;
+  };
   // A tab's route alone names it: Roots carries the last search (#explore?q=…), History and Statistics their last place.
   const tab = link => link.getAttribute('href').split(/[/?]/)[0].slice(1);
   // Today and yesterday by name, older days by weekday and date.
@@ -719,7 +724,7 @@
       if(tab(link)===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
     }
     if(next!=='explore'){
-      hop?.abort();selected=null;$('discovery-results').hidden=true;hideRecord();mapWatch?.disconnect();
+      hop?.abort();hop=null;selected=null;$('discovery-results').hidden=true;hideRecord();mapWatch?.disconnect();
       $('history-day-label').hidden=next!=='history';if($('history-day').max!==today())$('history-day').max=today();if(next!=='history')$('history-more').hidden=true;fillRow();
     }
   }
@@ -950,10 +955,11 @@
     if(id)return loadEntity(id);
     if(name)return byName(first,name);
     // History and Statistics read their stage, and History its day, from the address. A bare or unknown stage is the one
-    // on air, and a day that is not one before today is none; the address is rewritten to say so, and the tab keeps it.
+    // on air, and a day that is not a real one before today is none; the address is rewritten to say so, and the tab
+    // keeps it.
     if(section!=='explore'){
       musicScope=[...radio.stations.map(s=>s.id),...section==='statistics'?['radio','library']:[]].includes(first)?first:radio.getState().stage;
-      musicDay=section==='history'&&/^\d{4}-\d{2}-\d{2}$/.test(second||'')&&second<today()?second:'';
+      musicDay=section==='history'&&pastDay(second||'')?second:'';
       const place=section==='history'?historyAt(musicScope,musicDay):'#statistics/'+musicScope;
       if(location.hash!==place)history.replaceState(history.state,'',place);
       for(const link of document.querySelectorAll('.explorer-nav a'))if(tab(link)===section)link.setAttribute('href',place);

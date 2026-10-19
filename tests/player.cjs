@@ -40,6 +40,9 @@ const cssRules=(media='')=>{
   }
   return found;
 };
+// Stylesheet rules in source order, as [media, selector list, declarations]: of two rules for one selector, the later wins.
+const ordered=()=>blocks(web('style.css').replace(/\/\*[\s\S]*?\*\//g,'')).flatMap(([prelude,body])=>prelude.startsWith('@media ')?blocks(body).map(([selector,declarations])=>[prelude.slice(7),selector,declarations]):[['',prelude,body]]);
+const lastAt=(media,selector)=>ordered().findLastIndex(([m,list])=>m===media&&list.split(/,\s*/).includes(selector));
 const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date(clock.now).toISOString()}});
 
 function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=null,storage={getItem:()=>null,setItem(){}},journey=false,media=[]}={}) {
@@ -568,7 +571,9 @@ test('the bar is opaque, keeps 96px on desktop and fits 120px on a phone',()=>{
  const rows=body=>/grid-template-rows:([^;]+)/.exec(body)[1].split(' ').reduce((sum,row)=>sum+parseFloat(row),0);
  assert.ok(rows(player)+12+12+1<=96,'desktop rows, padding and border fit the 96px bar');
  assert.match(phone.get(':root'),/--bar:calc\(120px \+ env\(safe-area-inset-bottom\)\)/);
- assert.match(phone.get('.player'),/grid-template-columns:44px 44px minmax\(0,1fr\);.*padding:12px 12px calc\(11px \+ env\(safe-area-inset-bottom\)\)/);
+ assert.match(phone.get('.player'),/grid-template-columns:44px 44px minmax\(0,1fr\);.*padding:12px var\(--gutter\) calc\(11px \+ env\(safe-area-inset-bottom\)\)/,'the cover starts on the gutter');
+ assert.match(phone.get('.poster'),/padding:clamp\(180px,30svh,300px\) var\(--gutter\) 24px/,'where the stage title starts');
+ assert.match(phone.get('.player:not([data-status=paused],[data-status=playing]) #playback-status'),/padding:8px var\(--gutter\);/,'Connecting… and the other transient words start on the cover\'s edge too');
  assert.equal(rows(phone.get('.player'))+12+11+1,120,'phone rows, padding and border fill the bar exactly, so the page above stays clear');
  assert.match(phone.get('.dock-cover, .dock-artwork'),/width:44px; height:44px/,'the cover matches the play button');
  assert.match(phone.get('.player .player-release'),/grid-column:1 \/ -1; grid-row:3/,'the release line takes the full width');
@@ -596,6 +601,28 @@ test('a remembered volume only applies where its slider is shown',async()=>{
 test('external links carry a drawn arrow that screen readers skip',()=>{
  assert.match(cssRules().get('a[target="_blank"]:not(.stage-spotify)::after, .stage-spotify>span:first-child::after'),/content:'\\2009↗' \/ ''/);
  for(const name of ['index.html','app.js','journey.js'])assert.doesNotMatch(web(name),/↗/,name+' types no arrow into a label');
+});
+
+test('the radio page reads one size per line and one underline, and the Bus names itself on a wide screen',()=>{
+ const rules=cssRules(),mid=cssRules('(min-width:860px)'),wide=cssRules('(min-width:1101px)'),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.player-credits'),/font:12px Inter,sans-serif/);
+ assert.match(rules.get('.player .artist-credit span'),/font-size:inherit/,'the artist line stays 12px, a credited link or plain text');
+ // From 860px the action line holds the larger words in German with a 12-photo count and a classic scrollbar; from 1101px
+ // the rail holds the Bus name. Narrower, each keeps the sizes that hold it on one line, so the stage title never moves.
+ assert.match(rules.get('.stage-action'),/font-size:14px/);
+ assert.match(mid.get('.change-photo, #photo-count'),/font:14px Inter,sans-serif; font-variant-numeric:tabular-nums/,'Next photo, its count and Photo only read 14px, like the playlist link, in figures of one width');
+ assert.deepEqual(ordered().filter(([,list,declarations])=>list.split(/,\s*/).includes('#photo-count')&&/(?<![\w-])color:/.test(declarations)),[],'the count takes its button\'s colour at every width, so it brightens with Next photo on hover');
+ for(const selector of ['.change-photo','#photo-count'])assert.ok(lastAt('(min-width:860px)',selector)>lastAt('',selector),'the 860px rule comes after the rule it overrides: '+selector);
+ assert.match(rules.get('.change-photo'),/font:12px Inter,sans-serif/);assert.match(rules.get('#photo-count'),/font:11px var\(--mono\)/);assert.match(phone.get('.change-photo'),/font:12px\/18px Inter,sans-serif/,'narrower, the line keeps the sizes it had');
+ assert.match(rules.get('a[target="_blank"]:not(.stage-spotify)::after, .stage-spotify>span:first-child::after'),/display:inline-block/,'the arrow is its own box, so the underline stops at the words');
+ assert.match(rules.get('.record-sleeve'),/opacity:\.55;/,'the sleeve\'s printed type stays behind the title');
+ assert.match(wide.get('.bus-link .special-name'),/display:inline; margin-left:var\(--s2\); font:19px\/2\.3 var\(--serif\)/,'the Bus shows its name in the rail\'s type, as Essentials does');
+ assert.match(wide.get('.bus-link::after'),/inset:auto 0 4px 26px/,'its line runs under the name, past the 18px bus and its 8px gap');
+ assert.ok(lastAt('(min-width:1101px)','.bus-link::after')>lastAt('','.bus-link::after'),'the wide rule comes after the rule it overrides');
+ assert.match(rules.get('#language'),/margin-right:-15px/,'the DE word ends on the gutter');assert.match(rules.get('#language button'),/min-width:44px; min-height:44px/,'and each button keeps 44px');
+ const values=property=>new Set([...web('style.css').replace(/\/\*[\s\S]*?\*\//g,'').matchAll(new RegExp('(?<![\\w-])'+property+':([^;}]+)','g'))].map(m=>m[1].trim()));
+ assert.deepEqual([...values('text-underline-offset')],['3px'],'one underline offset');
+ assert.deepEqual([...values('border-radius')].sort(),['0','18px 18px 0 0','2px','50%','inherit'],'square, 2px corners, circles, and the sheet\'s top');
 });
 
 test('every class in the stylesheet is used by the page',()=>{
@@ -1928,6 +1955,7 @@ test('a stage in Statistics is a place: its photo, name and numbers, then its to
  assert.deepEqual([strip.attrs.role,strip.children.length,strip.children.map(b=>[b.attrs.role,b.attrs['aria-label'],b.style.height??'',b.dataset.empty??null]).slice(0,3),axis.children.map(n=>n.textContent)],
   ['list',7,[['listitem','2019: 30 tracks',30/215*100+'%',null],['listitem','2020: 0 tracks','',''],['listitem','2021: 215 tracks','100%',null]],['2019','2021 · 215','2025']],'one bar a year from the first to the last, the empty years kept; the first year, the peak and the last under it');
  assert.deepEqual([axis.children[1].className,axis.children[1].style.left],['years-peak',`clamp(11ch, ${2.5/7*100}%, calc(100% - 11ch))`],'the peak sits under its own bar, the third of seven, and 2ch clear of the years at each end');
+ assert.match(cssRules('(max-width:760px)').get('.years'),/height:80px/);assert.ok(lastAt('(max-width:760px)','.years')>lastAt('','.years'),'the 80px phone strip comes after the 120px rule it overrides');
  assert.match(cssRules().get('.years-axis'),/position:relative;/);assert.match(cssRules().get('.years-peak'),/position:absolute; top:0; transform:translateX\(-50%\)/,'centred where the script puts it');
  assert.deepEqual(rows(regions[4]),[['#explore/plex_207593','I Choose YouCHANEY','4×'],['#explore/plex_119020','Au revoir ParisRodriguez Jr.','3×'],[null,'No idSomeone','3×'],['#explore/plex_4','FourA','3×'],['#explore/plex_5','FiveB','3×']],'five at most, no picture, the plays as the fact');
  const details=byClass(content,'stage-notes')[0];
@@ -2030,6 +2058,25 @@ test('a name from the statistics opens the one record of its type and name, or t
  routeTo(e,'#explore/label/Ki');await flush();
  assert.deepEqual([e.location.hash,e.elements['discovery-query'].value,e.elements['discovery-results'].hidden,searches().length],['#explore?q=Ki','Ki',false,4],'two labels of that name: the search for it');
  e.visit('#explore/artist/'+'a'.repeat(201));await flush();assert.equal(e.elements.explorer.open,false,'a name over 200 characters is no place');
+});
+
+test('a name still being looked up when the listener leaves for History or Statistics never rewrites the address',async()=>{
+ const e=setup({journey:true});await flush();e.historyReply=answer(played(5));
+ // A browser's fetch rejects an aborted request with an AbortError.
+ e.discovery=url=>url.includes('/search?')?new Promise((_resolve,reject)=>e.discoveryRequests.at(-1).signal.addEventListener('abort',()=>reject(new DOMException('This operation was aborted','AbortError')))):entity(url.split('/').pop());
+ for(const [away,place] of [['#history/fontanna','#history/fontanna'],['#statistics/fontanna','#statistics/fontanna']]){
+  routeTo(e,'#explore/artist/Jasper%20Tygner');await flush();const lookup=e.discoveryRequests.at(-1);
+  e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};routeTo(e,away);await flush();
+  assert.deepEqual([lookup.signal.aborted,e.location.hash,e.elements['music-view'].hidden,e.elements['discovery-query'].value],[true,place,false,''],'the lookup is dropped, and the listener stays where they went: '+away);
+ }
+});
+
+test('a History address names a real day the Day field can hold, from 1970 to yesterday, or no day',async()=>{
+ const e=setup({journey:true});await flush();e.historyReply=answer(played(5));
+ for(const [day,kept] of [['2024-02-29',true],['1970-01-01',true],['2025-02-29',false],['2026-02-31',false],['2026-04-31',false],['2026-13-01',false],['2026-00-10',false],['1969-12-31',false],['0001-01-01',false]]){
+  e.visit('#history/fontanna/'+day);await flush();
+  assert.deepEqual([e.location.hash,e.elements['history-day'].value],kept?['#history/fontanna/'+day,day]:['#history/fontanna',localDay(new Date())],day);
+ }
 });
 
 test('the first three artists and labels of a stage get their picture and their record in place, unless the listener saves data',async()=>{
