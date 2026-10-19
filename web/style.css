@@ -14,6 +14,8 @@
   --ease: cubic-bezier(.22, 1, .36, 1);
   --press: 140ms; --hover: 180ms; --panel: 240ms;
   --gutter: clamp(20px, 3.6vw, 56px); --bar: 96px; --focus: 50% 45%;
+  /* One spacing scale: --s1 to --s5 inside a view, --s6 between views and major sections; --top is the explorer's bar. */
+  --s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --top:72px;
   font-family: Inter, sans-serif; font-synthesis: none; background: var(--ink);
 }
 * { box-sizing: border-box; }
@@ -25,7 +27,7 @@ img { display: block; }
 a { color: inherit; text-decoration: none; }
 /* The arrow marks a link that leaves the site; the empty alternative keeps screen readers from reading it. */
 a[target="_blank"]:not(.stage-spotify)::after, .stage-spotify>span:first-child::after { content:'\2009↗' / ''; }
-p, h1, h2 { margin: 0; font-weight: 400; }
+p, h1, h2 { margin: 0; font-size: inherit; font-weight: 400; }
 :focus-visible { outline: 2px solid var(--cream); outline-offset: 3px; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
@@ -250,82 +252,109 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   #live-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
-.eyebrow { font:11px/1.7 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
-/* A plain dialog that stops above the player bar; its shadow dims the inert page around it. */
-#explorer { position:fixed; inset:16px 16px calc(var(--bar) + 16px); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain; padding:28px; border:1px solid var(--line); background:var(--surface); color:var(--cream); box-shadow:0 0 0 100vmax rgb(11 10 9 / .8); opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete; }
+.eyebrow { font:11px/1.4 var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+/* A plain dialog that fills the page above the player bar, edge to edge: no frame, no band of photo around it.
+   Its scroll padding is the sticky bar and room for a focus ring, so whatever Tab reaches scrolls into view whole,
+   under the bar, not behind it. */
+#explorer { position:fixed; inset:0 0 var(--bar); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain; padding:0 0 var(--s6); scroll-padding-top:calc(var(--top) + var(--s2)); border:0; background:var(--surface); color:var(--cream); opacity:0; transform:translateY(12px); transition:opacity var(--panel) var(--ease), transform var(--panel) var(--ease), display var(--panel) allow-discrete; }
 #explorer[open] { opacity:1; transform:none; }
 /* The explorer takes focus while a record opened from a result loads; it is a place, not a control. */
 #explorer:focus { outline:none; }
 @starting-style { #explorer[open] { opacity:0; transform:translateY(12px); } }
-/* One header row: the tabs, the search on the Roots tab, and ✕ at the far end. */
-.explorer-top { display:flex; align-items:center; gap:24px; padding-bottom:12px; border-bottom:1px solid var(--line); }
-#explorer button, #explorer input { font:inherit; color:var(--cream); border:1px solid #4b4640; background:transparent; min-height:44px; padding:10px 14px; }
-#explorer button { cursor:pointer; }
-#explorer button:hover { background:var(--raised); }
-/* The actions: Try again and Show earlier tracks. */
-#explorer :is(#music-status button, #history-more) { padding:10px 16px; border-color:var(--soft); font:14px Inter,sans-serif; }
-#explorer :is(#music-status button, #history-more):hover { border-color:var(--cream); }
-/* Quiet text actions: a stage to tune, More, and the rest of a group. */
-#explorer .text-button { padding:0; border:0; background:none; color:var(--soft); font:13px Inter,sans-serif; text-decoration:underline; text-underline-offset:4px; }
-#explorer .text-button:hover { color:var(--cream); }
-#explorer :is(.text-button, .preview-toggle):hover { background:none; }
-/* 16px keeps iOS from zooming into the field. */
-#explorer input { border-color:var(--muted); font:16px Inter,sans-serif; }
+/* One header row on the page grid: the tabs, the search on the Roots tab, and ✕ at the far end. It stays at the top
+   while the explorer scrolls; everything under it starts on the gutter, like the hero and the player bar. */
+.explorer-top { position:sticky; top:0; z-index:2; display:flex; align-items:center; height:var(--top); padding:0 var(--gutter); gap:var(--s4); background:var(--surface); border-bottom:1px solid var(--line); }
+#explorer > :not(.explorer-top, audio) { margin-inline:var(--gutter); }
+/* The ✕ glyph, not its 44px target, ends on the gutter. */
+#explorer #explorer-close { margin-right:-12px; }
+#explorer button { min-height:44px; padding:0; border:0; background:none; color:var(--cream); font:inherit; cursor:pointer; }
+/* The bordered actions: Try again and Show earlier tracks. Box borders are the line, and darken to muted under a pointer. */
+#explorer :is(#music-status button, #history-more) { min-height:44px; padding:0 var(--s3); font:14px Inter,sans-serif; border:1px solid var(--line); }
+#explorer :is(#music-status button, #history-more):hover { border-color:var(--muted); }
+/* Quiet text actions, More and Show all: soft at rest, cream and underlined under a pointer or the keyboard. */
+#explorer .text-button { color:var(--soft); font:14px Inter,sans-serif; }
+#explorer .text-button:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+/* Fields: 16px keeps iOS from zooming. */
+#explorer :is(input, select) { height:44px; padding:0 var(--s3); font:16px Inter,sans-serif; color:var(--cream); background:transparent; border:1px solid var(--line); border-radius:0; }
+#explorer :is(input, select):is(:hover, :focus) { border-color:var(--muted); }
+/* The select draws the stations sheet's chevron instead of the platform arrow. */
+#explorer select { max-width:100%; appearance:none; padding-right:40px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f0ede5' stroke-opacity='.78' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right var(--s3) center / 14px no-repeat; }
+#explorer select option { background:var(--surface); }
 #explorer input::placeholder { color:var(--muted); opacity:1; }
 /* ✕ in the header leaves the explorer; the browser's own clear mark would be a second one. */
 #discovery-query::-webkit-search-cancel-button { appearance:none; }
 #explorer :is(input, select):focus-visible { outline-offset:-1px; }
 .discovery-search { flex:0 1 360px; min-width:0; }
 .discovery-search input { width:100%; min-width:0; text-overflow:ellipsis; }
-.explore-workspace { margin-top:32px; }
+.explore-workspace { margin-top:var(--s5); }
 /* A hop keeps the last record in place, dimmed, until the next one is drawn. */
 .explore-workspace[aria-busy=true] { opacity:.45; transition:opacity var(--panel) var(--ease); }
-/* The profile: a picture that holds its box, then the trail, the type, the name and its facts, all from
-   the top, so the title stays put from record to record. */
-.entity-heading { display:grid; grid-template-columns:120px minmax(0,1fr); align-items:start; gap:24px; }
-.picture { flex-shrink:0; width:40px; height:40px; border-radius:2px; background:var(--raised); overflow:hidden; }
+/* The profile: the trail across the top, then a picture that holds its box beside the type, the name and its
+   facts, all from the top, so the title stays put from record to record. */
+.entity-heading { display:grid; grid-template-columns:120px minmax(0,1fr); align-items:start; gap:var(--s4); }
+/* A picture is round for an artist, square with 2px corners for the rest, with a 1px inner edge so a white cover
+   does not read as a blank tile. Until its image shows, it holds the name's first letter. */
+.picture { position:relative; display:grid; place-items:center; flex-shrink:0; width:40px; height:40px; border-radius:2px; overflow:hidden; font:20px var(--serif); color:var(--soft); background:var(--raised); }
+.picture::before { content:attr(data-initial) / ''; }
+.picture:has(> img:not([hidden]))::before { visibility:hidden; }
+.picture::after { content:""; position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px var(--line); }
 .picture[data-type=artist] { border-radius:50%; }
-.picture img { width:100%; height:100%; object-fit:cover; }
-.entity-heading .picture { width:120px; height:120px; }
-.entity-trail { margin-bottom:6px; font-size:12px; line-height:1.6; color:var(--soft); }
-.entity-trail a:hover { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+.picture img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
+.entity-heading .picture { width:120px; height:120px; font-size:56px; }
+/* The trail is one line that clips nothing: each step cuts its own name short, so every link keeps words to show
+   and its whole focus ring. */
+.entity-trail { grid-column:1 / -1; display:flex; gap:var(--s1); white-space:nowrap; font-size:12px; line-height:1.4; color:var(--soft); }
+.entity-trail > :is(a, [aria-current]) { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.entity-trail a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 .entity-trail [aria-current] { color:var(--cream); }
-.entity-heading h3 { width:fit-content; max-width:100%; margin:2px 0 0; font:44px/1.05 var(--serif); overflow-wrap:anywhere; }
-.entity-meta { margin-top:10px; font-size:14px; line-height:1.5; color:var(--soft); }
-.entity-tags { margin-top:4px; font:11px/1.6 var(--mono); color:var(--muted); }
+.entity-heading h3 { width:fit-content; max-width:100%; margin:var(--s1) 0 0; font:44px/1.05 var(--serif); overflow-wrap:anywhere; }
+.entity-meta { margin-top:var(--s2); font-size:14px; line-height:1.4; color:var(--soft); }
+.entity-tags { margin-top:var(--s1); font-size:12px; line-height:1.4; color:var(--soft); }
 /* The preview plays in place: the player's circle and icons, and what it does next. */
-#explorer .preview-toggle { display:inline-flex; align-items:center; gap:12px; margin-top:14px; padding:0; border:0; background:none; font:14px Inter,sans-serif; font-variant-numeric:tabular-nums; }
+#explorer .preview-toggle { display:inline-flex; align-items:center; gap:var(--s3); margin-top:var(--s3); font:14px Inter,sans-serif; font-variant-numeric:tabular-nums; }
 .preview-icon { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--soft); border-radius:50%; }
 .preview-icon svg { grid-area:1 / 1; width:16px; height:16px; fill:currentColor; }
 .preview-icon .icon-start { margin-left:2px; }
 .preview-toggle:hover .preview-icon { border-color:var(--cream); }
 .preview-toggle[data-playing] .preview-icon { background:var(--cream); color:var(--ink); }
 .preview-toggle:not([data-playing]) .icon-stop, .preview-toggle[data-playing] .icon-start { display:none; }
-.entity-links { display:flex; flex-wrap:wrap; gap:6px 16px; margin-top:20px; padding-block:10px; font-size:13px; line-height:1.5; color:var(--soft); }
-.entity-links a:hover { color:var(--cream); }
-.entity-radio { display:flex; flex-wrap:wrap; align-items:center; gap:0 16px; font-size:13px; color:var(--muted); }
+.entity-links { display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--s2) var(--s3); margin-top:var(--s3); padding-block:var(--s2); font-size:14px; line-height:1.4; color:var(--soft); }
+.entity-links>span { font-size:12px; color:var(--muted); }
+.entity-links a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+/* Named sites need no arrow: the line says they are elsewhere. */
+.entity-links a[href]::after { content:none; }
+/* The stages read as a sentence: their names carry a quiet underline at rest. */
+.entity-radio { display:flex; flex-wrap:wrap; align-items:center; gap:0 var(--s3); font-size:14px; color:var(--muted); }
+#explorer .entity-radio .text-button { text-decoration:underline; text-decoration-color:var(--muted); text-underline-offset:3px; }
+#explorer .entity-radio .text-button:is(:hover, :focus-visible) { text-decoration-color:currentColor; }
 .entity-radio .essentials-icon { fill:currentColor; }
-.entity-bio { max-width:65ch; margin-top:12px; }
+.entity-bio { max-width:65ch; margin-top:var(--s6); }
+/* Without a biography, the links line keeps the same distance from the roots. */
+.root-groups + .entity-links { margin-top:var(--s6); }
 /* Cut, the paragraphs run on, so no blank line ends on a lone ellipsis; open, they part again. */
 .entity-bio>p:first-child { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; overflow:hidden; font-size:14px; line-height:1.7; color:var(--soft); }
 .entity-bio:has([aria-expanded=true])>p:first-child { -webkit-line-clamp:unset; white-space:pre-line; }
-.bio-foot { display:flex; flex-wrap:wrap; align-items:center; gap:0 16px; min-height:44px; font-size:12px; color:var(--muted); }
+.bio-foot { display:flex; flex-wrap:wrap; align-items:center; gap:0 var(--s3); min-height:44px; font-size:12px; color:var(--muted); }
 .bio-foot a { color:var(--soft); }
-/* The roots: one curve per group from the profile, drawn like the footer's, down to a column each. */
-.roots-band { display:block; width:100%; height:72px; margin-top:28px; color:var(--soft); opacity:.5; }
-.roots-band path { fill:none; stroke:currentColor; stroke-width:1.2; vector-effect:non-scaling-stroke; }
-.root-groups, .discovery-results { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:28px 32px; }
-.discovery-results { margin-top:16px; }
-.root-group h4 { margin:0 0 8px; font:22px/1.2 var(--serif); }
-.root-group h4 small { margin-left:8px; font:11px var(--mono); color:var(--muted); }
+/* The roots: a column per group, under the profile. */
+.root-groups, .discovery-results { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:var(--s5); }
+.root-groups { margin-top:var(--s5); }
+.discovery-results { margin-top:var(--s5); }
+.root-group h4 { margin:0 0 var(--s2); font:22px/1.2 var(--serif); }
+.root-group h4 small { margin-left:var(--s2); font:11px var(--mono); color:var(--muted); }
 /* A single group, such as a label's artists, flows across the width. */
-.root-group:only-of-type .root-nodes { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0 24px; }
-.root-node { display:flex; align-items:center; gap:12px; min-height:52px; margin-inline:-8px; padding:6px 8px; }
-.root-node:hover { background:var(--raised); }
-.root-node>span:last-child { display:grid; gap:2px; min-width:0; }
-.root-name { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; font-size:14px; line-height:1.35; }
-.root-node small { font:11px/1.4 var(--mono); color:var(--muted); }
-.root-line { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--soft); }
+.root-group:only-of-type .root-nodes { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0 var(--s4); }
+/* One row for every list in the explorer: a 40px picture, a time or nothing, then a name over its second line,
+   and a fact on the right. No border, no background; a pointer or the keyboard underlines the name. */
+.row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:var(--s3); min-height:56px; padding-block:var(--s2); }
+.row:has(> time) { grid-template-columns:64px minmax(0,1fr) auto; scroll-margin-top:56px; }
+.row:not(:has(> .picture, > time)) { grid-template-columns:minmax(0,1fr) auto; }
+.row-text { display:grid; min-width:0; }
+.row-name, .row-line { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; line-height:1.4; }
+.row-name { font-size:14px; color:var(--cream); }
+.row-line { font-size:12px; color:var(--soft); }
+.row-fact, .row > time { font:11px/1.4 var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); white-space:nowrap; }
+.row[href]:is(:hover, :focus-visible) .row-name { text-decoration:underline; text-underline-offset:3px; }
 @media (min-width:761px) and (max-width:1100px) {
   .player .transport-track { display:grid; grid-template-columns:minmax(0,1fr); gap:2px; }
   .player .transport-time { display:flex; justify-content:space-between; gap:12px; }
@@ -394,76 +423,61 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .player .artist-credit { min-height:24px; }
   #track-clock { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
   .player:not([data-status=paused],[data-status=playing]) #playback-status { position:absolute; inset:auto 0 100%; padding:8px 12px; background:var(--ink); font:12px Inter,sans-serif; pointer-events:none; }
-  .entity-heading { grid-template-columns:88px minmax(0,1fr); gap:16px; }
-  .entity-heading .picture { width:88px; height:88px; }
+  .entity-heading { grid-template-columns:88px minmax(0,1fr); gap:var(--s3); }
+  .entity-heading .picture { width:88px; height:88px; font-size:40px; }
   .entity-heading h3 { font-size:32px; }
-  /* Phones stack the groups, each hanging from its own thin line. */
-  .roots-band { display:none; }
+  /* Phones stack the groups. */
   .root-groups, .discovery-results { grid-auto-flow:row; }
-  .root-groups { margin-top:32px; }
-  .root-group { padding-left:16px; border-left:1px solid var(--line); }
-  #explorer { inset:0 0 var(--bar); padding:18px; border:0; }
-  #explorer .history-day { top:-18px; }
-  /* The tabs and ✕ share the row; the search takes the full width under them. */
-  .explorer-top { flex-wrap:wrap; gap:12px; }
-  .discovery-search { order:1; flex-basis:100%; }
+  /* The tabs and ✕ share the row; the search takes the full width under them. The bar scrolls away with the page,
+     so only the focus ring needs room. */
+  .explorer-top { position:static; height:auto; flex-wrap:wrap; row-gap:var(--s2); padding-block:var(--s2); }
+  .discovery-search { order:1; flex-basis:100%; margin-bottom:var(--s2); }
+  #explorer { scroll-padding-top:var(--s2); }
 }
 /* Under 375px the arrows would push the photo tools onto a second line, as German does at 360px. */
 @media (max-width:374px) { .station-position svg { display:none; } }
 @media (max-width:360px) { .top { padding-inline:16px; } .wordmark { width:108px; height:41px; } .wordmark img { width:89px; } .station-status { gap:6px; } }
 
-.explorer-nav { display:flex; flex-wrap:wrap; flex-shrink:0; gap:12px 28px; margin-right:auto; }
-.explorer-nav a { color:var(--soft); text-underline-offset:7px; padding:12px 0; min-height:44px; }
+.explorer-nav { display:flex; flex-wrap:wrap; flex-shrink:0; gap:var(--s4); margin-right:auto; }
+/* The tabs read in the heading style; the current one takes the checked stage's 1px line under the word. */
+.explorer-nav a { position:relative; display:flex; align-items:center; min-height:44px; font:22px/1.2 var(--serif); color:var(--soft); }
 .explorer-nav a:hover, .explorer-nav a[aria-current] { color:var(--cream); }
-/* The current tab takes the checked stage's 1px underline. */
-.explorer-nav a[aria-current] { text-decoration-line:underline; }
-.music-filters { display:flex; gap:20px; flex-wrap:wrap; margin:24px 0; }
-.music-filters label { display:grid; gap:8px; color:var(--soft); font-size:13px; }
-#explorer select { min-height:44px; padding:10px 32px 10px 12px; border:1px solid var(--muted); background:var(--surface); color:var(--cream); font:inherit; max-width:100%; }
-/* The Day field reads at the size and inset of the Stage select beside it. */
-#explorer #history-day { font:inherit; padding:10px 12px; }
-#music-status { margin:16px 0; }
-/* History: the time, then the title over its artist, on every width. Each row is a link to its track. */
-.history-row { display:grid; grid-template-columns:5rem minmax(0,1fr); gap:16px; align-items:baseline; padding:12px 0; border-top:1px solid var(--line); scroll-margin-top:44px; }
-.history-row time { font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--soft); white-space:nowrap; }
+.explorer-nav a::after { content:""; position:absolute; inset:auto 0 8px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
+.explorer-nav a[aria-current]::after { transform:scaleX(1); }
+.music-filters { display:flex; gap:var(--s3) var(--s4); flex-wrap:wrap; margin:var(--s4) 0; }
+.music-filters label { display:grid; gap:var(--s2); color:var(--soft); font-size:12px; }
+#music-status { margin:var(--s3) 0; }
 /* Red is what you hear: a 6px dot before Now, on the track on air. */
-.history-row[aria-current] time::before { content:""; display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--red); vertical-align:1px; }
-.history-record { display:grid; gap:2px; overflow-wrap:anywhere; }
-.history-record strong { font:500 15px/1.4 Inter,sans-serif; color:var(--cream); }
-.history-record>span { font-size:13px; color:var(--soft); }
-.history-row[href]:hover strong { text-decoration:underline; text-underline-offset:3px; }
-/* Each local day opens on its name, which stays in view while its rows scroll under it. A sticky top
-   counts from inside the explorer's padding, so minus that padding puts it on the edge, with no row above it.
-   The last 5px under the name are margin, not padding, so the focus ring of the row below stays in view;
-   a row reached with Tab scrolls clear of the name (scroll-margin-top above). */
-.history-day { position:sticky; top:-28px; z-index:1; margin:0 0 5px; padding:12px 0 7px; background:var(--surface); font:11px var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+.row[aria-current] time::before { content:""; display:inline-block; width:6px; height:6px; margin-right:var(--s2); border-radius:50%; background:var(--red); vertical-align:1px; }
+/* Each local day opens on its name, which stays in view under the explorer's bar while its rows scroll under it.
+   Its opaque bottom padding hides a row before it reaches the name; the margin under that keeps the focus ring of
+   the row below in view. A row reached with Tab scrolls clear of the name (scroll-margin-top on the row). */
+.history-day { position:sticky; top:var(--top); z-index:1; margin:0 0 var(--s2); padding:var(--s4) 0 var(--s2); background:var(--surface); font:22px/1.2 var(--serif); color:var(--cream); }
 /* A refresh keeps the rows in place, dimmed and out of reach, until the next ones replace them. */
 #music-content[aria-busy=true] { opacity:.45; pointer-events:none; transition:opacity var(--hover) var(--ease); }
 /* Wide enough for its longest label, Frühere Tracks anzeigen, so Loading… and Try again swap in place. */
-#history-more { margin:24px 0; min-width:12.5rem; }
+#history-more { margin:var(--s4) 0; min-width:12.5rem; }
 #history-more[aria-busy=true] { opacity:.45; cursor:default; }
-.music-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:24px; padding:28px 0; margin:0; border-bottom:1px solid var(--line); }
-.music-summary dt { color:var(--soft); font-size:13px; }
-.music-summary dd { font:clamp(28px,4vw,52px)/1.2 var(--serif); font-variant-numeric:tabular-nums; margin:10px 0 0; }
-.music-charts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:40px 64px; margin:40px 0; }
-.music-chart h3, .played-ranking h3 { font:24px var(--serif); margin:0 0 18px; }
-.chart-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:6px 16px; margin:16px 0; font-size:13px; }
+/* On a phone the explorer's bar scrolls away, so the day names stick to the top edge. */
+@media (max-width:760px) { .history-day { top:0; } }
+.music-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--s4); padding:var(--s4) 0; margin:0; border-bottom:1px solid var(--line); }
+.music-summary dt { color:var(--soft); font-size:12px; }
+.music-summary dd { font:22px/1.2 var(--serif); font-variant-numeric:tabular-nums; margin:var(--s2) 0 0; }
+.music-charts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--s5) var(--s6); margin:var(--s5) 0; }
+.music-chart h3, .played-ranking h3 { font:22px/1.2 var(--serif); margin:0 0 var(--s3); }
+.chart-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s1) var(--s3); margin:var(--s3) 0; font-size:14px; }
 .chart-row>span:first-child { overflow-wrap:anywhere; }
-.chart-count { font-variant-numeric:tabular-nums; color:var(--soft); white-space:nowrap; }
-.chart-row meter { grid-column:1/-1; width:100%; height:5px; appearance:none; border:0; background:#302a24; }
-.chart-row meter::-webkit-meter-bar { background:#302a24; border:0; border-radius:0; }
-.chart-row meter::-webkit-meter-optimum-value { background:#b49b7c; }
-.chart-row meter::-moz-meter-bar { background:#b49b7c; }
-.played-ranking { margin-top:32px; }
-#explorer .connection-row { display:flex; align-items:center; gap:14px; border:0; border-top:1px solid var(--line); width:100%; text-align:left; padding:12px 0; font-size:13px; }
-#explorer .played-ranking .connection-row { justify-content:space-between; }
-.played-ranking .connection-row>span:first-child { overflow-wrap:anywhere; }
-.played-ranking .connection-row>span:nth-child(2) { flex:none; }
+.chart-count { font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); white-space:nowrap; }
+.chart-row meter { grid-column:1/-1; width:100%; height:5px; appearance:none; border:0; background:var(--line); }
+.chart-row meter::-webkit-meter-bar { background:var(--line); border:0; border-radius:0; }
+.chart-row meter::-webkit-meter-optimum-value { background:var(--cream); }
+.chart-row meter::-moz-meter-bar { background:var(--cream); }
+.played-ranking { margin-top:var(--s5); }
 @media (max-width:600px) {
   .music-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .music-charts { grid-template-columns:1fr; gap:32px; }
+  .music-charts { grid-template-columns:1fr; gap:var(--s5); }
   #history-more { width:100%; }
   .music-filters label { width:100%; }
-  .explorer-nav { gap:6px 20px; font-size:13px; }
+  .explorer-nav { gap:var(--s3); }
 }
-#explorer .collection-note { color:var(--soft); font-size:13px; line-height:1.6; max-width:75ch; margin:12px 0; }
+#explorer .collection-note { color:var(--soft); font-size:12px; line-height:1.4; max-width:75ch; margin-block:var(--s3); }

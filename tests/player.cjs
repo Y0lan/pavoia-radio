@@ -56,7 +56,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     prepend(...children){for(const child of children.reverse())this.insertBefore(child,this.children[0]);}
     insertBefore(child,before){const index=this.children.indexOf(before);child.parent=this;if(index<0)this.children.push(child);else this.children.splice(index,0,child);}
     before(child){this.parent.insertBefore(child,this);}
-    replaceChildren(...children){this.children=[];this.append(...children);}
+    replaceChildren(...children){this.textContent='';this.children=[];this.append(...children);}
     descendants(){return this.children.flatMap(c=>typeof c==='object'?[c,...c.descendants()]:[]);}
     // A class (.name), a tag, or the journey's [data-kind] lookup.
     querySelector(selector){
@@ -830,7 +830,7 @@ test('a result replaces the search in the explorer\'s entry, and the Roots tab r
  const tab=()=>e.elements['roots-tab'].getAttribute('href'),current=()=>e.nav.map(link=>link.getAttribute('aria-current'));
  assert.deepEqual(current(),['page',null,null],'Roots stays the current tab though its link carries the search');
  link('#history');link(tab());await flush();
- assert.deepEqual([e.location.hash,results.hidden,query.value,e.discoveryRequests.length,e.elements['discovery-status'].textContent],['#explore?q=jimi',false,'jimi',searches+1,'1 result'],'the Roots tab returns to the same results, without searching again');
+ assert.deepEqual([e.location.hash,results.hidden,query.value,e.discoveryRequests.length,textOf(e.elements['discovery-status'])],['#explore?q=jimi',false,'jimi',searches+1,'1 result'],'the Roots tab returns to the same results, without searching again, and says their count to screen readers only');
  query.value='jules';query.emit('input');e.fire(300);await flush();
  assert.deepEqual([e.discoveryRequests.at(-1).url,tab()],['/api/discovery/search?q=jules','#explore?q=jules'],'the Roots tab follows the last search');
  query.value='j';query.emit('input');assert.deepEqual([e.location.hash,tab()],['#explore','#explore'],'and a cleared field');
@@ -1042,25 +1042,35 @@ test('the explorer header is one row: tabs, the search on Roots, and ✕',async(
 test('the explorer frame stops above the player bar and its controls read in Inter',()=>{
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
  assert.match(rules.get(':root'),/--surface: #141210; --raised: rgb\(240 237 229 \/ \.06\);/);
- assert.match(rules.get('#explorer'),/position:fixed; inset:16px 16px calc\(var\(--bar\) \+ 16px\); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain;.*background:var\(--surface\);.*box-shadow:0 0 0 100vmax rgb\(11 10 9 \/ \.8\);.*transform:translateY\(12px\)/);
- assert.ok(/z-index:10/.test(rules.get('.player')),'the player bar sits above the shadow');
- assert.match(phone.get('#explorer'),/inset:0 0 var\(--bar\)/,'on a phone it fills the screen above the bar');
+ assert.match(rules.get(':root'),/--s1:4px; --s2:8px; --s3:16px; --s4:24px; --s5:40px; --s6:64px; --top:72px;/,'one spacing scale');
+ assert.match(rules.get('#explorer'),/position:fixed; inset:0 0 var\(--bar\); z-index:9; width:auto; height:auto; max-width:none; max-height:none; margin:0; overflow:auto; overscroll-behavior:contain; padding:0 0 var\(--s6\); scroll-padding-top:calc\(var\(--top\) \+ var\(--s2\)\); border:0; background:var\(--surface\);.*transform:translateY\(12px\)/,'edge to edge above the bar, on every width; whatever Tab reaches scrolls into view whole, ring included, under the sticky bar');
+ assert.doesNotMatch(rules.get('#explorer'),/box-shadow|inset:16px/,'no frame and no band of dimmed photo around it');
+ assert.equal(phone.get('#explorer').trim(),'scroll-padding-top:var(--s2);','the same frame on a phone, where the bar scrolls away and only the ring needs room');
+ assert.ok(/z-index:10/.test(rules.get('.player')),'the player bar stays above it');
  assert.ok(![...rules.keys(),...phone.keys()].some(selector=>selector.includes('#explorer')&&selector.includes('backdrop')),'a plain dialog has no backdrop');
  assert.match(web('style.css'),/@starting-style \{ #explorer\[open\] \{ opacity:0; transform:translateY\(12px\); \} \}/,'the sheet\'s 12px rise');
  assert.match(rules.get('body:has(dialog[open])'),/overflow:hidden/,'either dialog locks the page scroll');
  assert.ok(!rules.has('body:has(#stations-sheet[open])'));
  assert.ok(!/#141210|#2c2722/.test([...rules.entries()].filter(([selector])=>selector!==':root').map(([,body])=>body).join()),'surfaces and hovers use the tokens');
- assert.match(rules.get('#explorer button:hover'),/background:var\(--raised\)/);
+ assert.ok(![...rules.keys()].some(selector=>/#explorer.*:hover/.test(selector)&&/background/.test(rules.get(selector))),'no hover boxes');
+ assert.match(rules.get('.explorer-top'),/position:sticky; top:0; z-index:2; display:flex; align-items:center; height:var\(--top\); padding:0 var\(--gutter\); gap:var\(--s4\); background:var\(--surface\); border-bottom:1px solid var\(--line\);/,'the bar stays at the top, on the page grid');
+ assert.match(rules.get('#explorer > :not(.explorer-top, audio)'),/margin-inline:var\(--gutter\)/,'everything under it starts on the gutter, like the hero and the player bar');
+ assert.doesNotMatch(rules.get('#explorer .collection-note'),/margin:/,'a note keeps the gutter: only its block margins are its own');
+ assert.match(rules.get('#explorer #explorer-close'),/margin-right:-12px/,'the ✕ glyph ends on the gutter');
+ assert.match(rules.get('p, h1, h2'),/font-size: inherit;/,'the hidden explorer title takes no size of its own');
+ assert.match(phone.get('.explorer-top'),/position:static; height:auto; flex-wrap:wrap; row-gap:var\(--s2\); padding-block:var\(--s2\);/,'on a phone the bar scrolls away');
  assert.match(rules.get('.discovery-search input'),/text-overflow:ellipsis/,'a long query ends on an ellipsis');
  assert.match(rules.get('#explorer input::placeholder'),/color:var\(--muted\); opacity:1;/,'the placeholder, now the field\'s only visible name, reads at 5.4:1 in the palette');
  assert.match(rules.get('#discovery-query::-webkit-search-cancel-button'),/appearance:none/,'one ✕ in the header row: the browser\'s clear mark goes');
  assert.match(rules.get('html'),/scrollbar-gutter:stable/,'locking the page scroll keeps the scrollbar\'s room, so the player bar does not move');
  const actions='#explorer :is(#music-status button, #history-more)';
- assert.match(rules.get(actions),/padding:10px 16px; border-color:var\(--soft\); font:14px Inter,sans-serif;/,'Try again and Older tracks');
- assert.match(rules.get(actions+':hover'),/border-color:var\(--cream\)/);
- assert.match(rules.get('#explorer button, #explorer input'),/min-height:44px/);
- assert.match(rules.get('#explorer input'),/border-color:var\(--muted\); font:16px Inter,sans-serif;/,'16px keeps iOS from zooming');
- assert.match(rules.get('#explorer select'),/border:1px solid var\(--muted\); background:var\(--surface\)/);
+ assert.match(rules.get(actions),/min-height:44px; padding:0 var\(--s3\); font:14px Inter,sans-serif; border:1px solid var\(--line\);/,'Try again and Show earlier tracks');
+ assert.match(rules.get(actions+':hover'),/border-color:var\(--muted\)/);
+ assert.match(rules.get('#explorer button'),/min-height:44px/);
+ assert.match(rules.get('#explorer :is(input, select)'),/height:44px; padding:0 var\(--s3\); font:16px Inter,sans-serif; color:var\(--cream\); background:transparent; border:1px solid var\(--line\); border-radius:0;/,'16px keeps iOS from zooming; the box border is the line');
+ assert.match(rules.get('#explorer :is(input, select):is(:hover, :focus)'),/border-color:var\(--muted\)/);
+ assert.match(rules.get('#explorer select'),/appearance:none; padding-right:40px; background:url\("data:image\/svg\+xml,/,'the chevron is a data: image, which the CSP allows');
+ assert.ok(!/#4b4640|#302a24|#b49b7c/i.test(web('style.css')),'no off-token colours');
  assert.match(rules.get('#explorer :is(input, select):focus-visible'),/outline-offset:-1px/,'the ring sits on the border');
  assert.ok(!rules.has('.discovery-search>div'));assert.doesNotMatch(rules.get('.discovery-search'),/mono/);
  assert.match(rules.get('.discovery-search'),/flex:0 1 360px/,'360px on the right of the row');
@@ -1069,11 +1079,14 @@ test('the explorer frame stops above the player bar and its controls read in Int
  assert.match(rules.get('.explorer-nav'),/flex-shrink:0;.*margin-right:auto/,'the tabs sit left and never wrap for the search');
  assert.match(rules.get('#close-stations, #explorer #explorer-close'),/width:44px; height:44px; padding:0; border:0;/,'both ✕ are the same 44px button');
  assert.ok(![...rules.keys(),...phone.keys()].some(selector=>/explorer-controls|explorer-top h2/.test(selector)),'no 11px mono controls and no serif title left in the header');
- assert.match(rules.get('.explorer-nav a[aria-current]'),/text-decoration-line:underline/);
- assert.ok(![...rules.values()].some(body=>/text-decoration-thickness/.test(body)),'the current tab takes the 1px underline of a checked stage');
- assert.match(rules.get('#explorer .collection-note'),/color:var\(--soft\); font-size:13px/,'notes read the same in every tab');
+ assert.match(rules.get('.explorer-nav a'),/font:22px\/1\.2 var\(--serif\); color:var\(--soft\)/,'the tabs read in the heading style');
+ assert.match(rules.get('.explorer-nav a::after'),/position:absolute; inset:auto 0 8px; height:1px; background:currentColor; transform:scaleX\(0\)/);
+ assert.match(rules.get('.explorer-nav a[aria-current]::after'),/transform:scaleX\(1\)/,'the current tab takes the 1px line of a checked stage');
+ assert.ok(![...rules.values()].some(body=>/text-decoration-thickness/.test(body)),'the current tab takes the 1px line of a checked stage');
+ assert.deepEqual([...rules].filter(([selector,body])=>/#explorer|\.explorer|\.entity|\.row|\.root|\.history|\.music|\.chart/.test(selector)&&/text-underline-offset:(?!3px)/.test(body)).map(([selector])=>selector),[],'one underline offset in the explorer: 3px');
+ assert.match(rules.get('#explorer .collection-note'),/color:var\(--soft\); font-size:12px/,'notes read the same in every tab');
  assert.ok(!rules.has('#music-view .collection-note'));
- assert.match(rules.get('.explore-workspace'),/margin-top:32px/);assert.match(rules.get('.discovery-results'),/margin-top:16px/);
+ assert.match(rules.get('.explore-workspace'),/margin-top:var\(--s5\)/);assert.match(rules.get('.discovery-results'),/margin-top:var\(--s5\)/,'results start where a record does');
 });
 
 // Step 6: the Roots tab is one profile with its roots under it, and every name is a link.
@@ -1082,7 +1095,7 @@ const inspector=e=>e.elements['entity-inspector'];
 const links=(over={})=>[{kind:'wikidata',url:'https://www.wikidata.org/wiki/Q1'},{kind:'other',url:'https://www.after.life/'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},
  {kind:'musicbrainz',url:'https://musicbrainz.org/artist/1'},{kind:'twitter',url:'https://twitter.com/a'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},{kind:'juno',url:'https://www.junodownload.com/artists/A'},
  {kind:'wikipedia',url:'https://en.wikipedia.org/wiki/A'},{kind:'lastfm',url:'https://www.last.fm/music/A'},{kind:'resident_advisor',url:'https://ra.co/dj/a'},{kind:'spotify',url:'https://open.spotify.com/artist/1'},{kind:'apple_music',url:'https://music.apple.com/artist/1'},{kind:'javascript',url:'javascript:alert(1)'}];
-const recondite=(over={})=>({entity:{id:'art_000000000001',type:'artist',title:'Recondite',country:'DE',tags:['techno','house','electronic','acid house','acid'],links:links(),
+const recondite=(over={})=>({entity:{id:'art_000000000001',type:'artist',title:'Recondite',country:'DE',tags:['techno','seen_live','house','Electronic','acid house','acid','minimal'],links:links(),
  bio:'Recondite is a German musician.',bioSource:'wikipedia',bioUrl:'https://en.wikipedia.org/wiki/A',image:'/api/discovery/media/'+'a'.repeat(40),playlists:[],connections:[],...over},included:[]});
 const roots=()=>{
  const people=['primary','featured','similar/related','collaboration/shared_release','remix','related','musicbrainz:member of band','artist','remixer'];
@@ -1101,47 +1114,62 @@ test('the Roots tab is one column: the profile on top, its roots under it, and n
  assert.doesNotMatch(cssRules().get('.explore-workspace'),/grid-template-columns/,'one column');
  assert.ok(!cssRules('(max-width:760px)').has('.explore-workspace'));
  const e=setup({journey:true});await flush();e.discovery=()=>roots();e.visit('#explore/art_000000000001');await flush();
- assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading','roots-band','root-groups'],'the profile, then the band, then the groups');
+ assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading','root-groups'],'the profile, then the groups, with no band between them');
+ for(const gone of ['roots-band',"drawing('0 0 1000 72'"])assert.ok(!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
 });
 
 test('the profile keeps its picture box, names its type above the title and reads one line of facts',async()=>{
  const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
  await show(recondite());
  const box=byClass(inspector(e),'picture')[0],img=box.children[0];
- assert.deepEqual([box.dataset.type,img.alt,img.getAttribute('src')],['artist','Portrait','/api/discovery/media/'+'a'.repeat(40)]);
+ assert.deepEqual([box.dataset.type,box.dataset.initial,img.alt,img.getAttribute('src')],['artist','R','Portrait','/api/discovery/media/'+'a'.repeat(40)],'the box holds the first letter until the image shows');
  const heading=byClass(inspector(e),'entity-heading')[0],about=heading.children[1];
  assert.deepEqual(about.children.map(n=>n.localName+'.'+(n.className||'')),['p.eyebrow','h3.','p.entity-meta','p.entity-tags'],'the type above the title, then its facts');
  assert.deepEqual([about.children[0].textContent,about.children[1].textContent,about.children[1].tabIndex],['Artist','Recondite',-1]);
  assert.equal(about.children[2].textContent,'Germany','a country code reads as its name');
- assert.equal(about.children[3].textContent,'techno · house · electronic · acid house','four tags at most');
+ assert.equal(about.children[3].textContent,'techno, house, acid house, acid','four tags at most, in words: no bookkeeping tag with _, and not electronic, which every record shares');
  await show(recondite({id:'lab_000000000001',type:'label',title:'Afterlife',country:'',tags:[],image:null}));
  const empty=byClass(inspector(e),'picture')[0];
- assert.deepEqual([empty.dataset.type,empty.children[0].hidden,empty.children[0].alt],['label',true,'Label logo'],'no image keeps the box, empty');
+ assert.deepEqual([empty.dataset.type,empty.dataset.initial,empty.children[0].hidden,empty.children[0].alt],['label','A',true,'Label logo'],'no image keeps the box, with the first letter in it');
  assert.equal(byClass(inspector(e),'entity-meta').length,0,'no facts, no line');
  await show({entity:{id:'trk_000000000001',type:'track',title:'Abandoned Soul',artist:'Jimi Jules',album:'Watergate Records 2008-2018',releaseDate:'2019-01-01',connections:[]},included:[]});
  assert.equal(byClass(inspector(e),'entity-meta')[0].textContent,'Jimi Jules · Watergate Records 2008-2018 · 2019','a track: artist, release, year');
  assert.equal(byClass(inspector(e),'picture')[0].children[0].alt,'Cover');
  await show({entity:{id:'rel_000000000001',type:'release',title:'Theater II EP',artist:'Recondite',album:'',releaseDate:'2017-07-21',connections:[]},included:[]});
  assert.equal(byClass(inspector(e),'entity-meta')[0].textContent,'Recondite · 2017','a release: artist, year');
+ await show(recondite({id:'art_000000000005',title:'  émile',tags:['seen_live']}));
+ assert.deepEqual([byClass(inspector(e),'picture')[0].dataset.initial,byClass(inspector(e),'entity-tags').length],['É',0],'the first letter of the trimmed name, in capitals; no tag left, no line');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({country:'IT'}));
  assert.deepEqual([byClass(inspector(e),'entity-meta')[0].textContent,byClass(inspector(e),'picture')[0].children[0].alt],['Italien','Porträt']);
  await show(recondite({id:'lab_000000000002',type:'label'}));assert.equal(byClass(inspector(e),'picture')[0].children[0].alt,'Label-Logo');
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
- assert.match(rules.get('.picture'),/border-radius:2px; background:var\(--raised\)/);assert.match(rules.get('.picture[data-type=artist]'),/border-radius:50%/);
- assert.match(rules.get('.entity-heading .picture'),/width:120px; height:120px/);assert.match(phone.get('.entity-heading .picture'),/width:88px; height:88px/);
+ assert.match(rules.get('.picture'),/position:relative; display:grid; place-items:center;.*border-radius:2px;.*font:20px var\(--serif\); color:var\(--soft\); background:var\(--raised\)/);assert.match(rules.get('.picture[data-type=artist]'),/border-radius:50%/);
+ assert.match(rules.get('.picture::before'),/content:attr\(data-initial\) \/ ''/,'the letter, which screen readers skip');
+ assert.match(rules.get('.picture:has(> img:not([hidden]))::before'),/visibility:hidden/,'a shown image hides the letter, also behind a transparent logo');
+ assert.match(rules.get('.picture::after'),/position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px var\(--line\)/,'a 1px inner edge, so a white cover is no blank tile');
+ assert.match(rules.get('.picture img'),/position:absolute; inset:0;/);
+ assert.match(rules.get('.entity-heading .picture'),/width:120px; height:120px; font-size:56px/);assert.match(phone.get('.entity-heading .picture'),/width:88px; height:88px; font-size:40px/);
  assert.match(rules.get('.entity-heading'),/grid-template-columns:120px minmax\(0,1fr\); align-items:start/,'the box is reserved before the image loads, and the title starts at its top');
  assert.match(rules.get('.entity-heading h3'),/font:44px\/1\.05 var\(--serif\)/);assert.match(phone.get('.entity-heading h3'),/font-size:32px/);
- assert.match(rules.get('.eyebrow'),/font:11px\/1\.7 var\(--mono\); letter-spacing:\.08em; text-transform:uppercase; color:var\(--muted\)/);
- assert.match(rules.get('.entity-meta'),/font-size:14px;.*color:var\(--soft\)/);assert.match(rules.get('.entity-tags'),/font:11px\/1\.6 var\(--mono\); color:var\(--muted\)/);
+ assert.match(rules.get('.eyebrow'),/font:11px\/1\.4 var\(--mono\); letter-spacing:\.08em; text-transform:uppercase; color:var\(--muted\)/);
+ assert.match(rules.get('.entity-meta'),/font-size:14px; line-height:1\.4; color:var\(--soft\)/);assert.match(rules.get('.entity-tags'),/font-size:12px; line-height:1\.4; color:var\(--soft\)/,'tags read as a second line, in Inter');
 });
 
 test('external links sit in one line, listening services first, named, each address once',async()=>{
  const e=setup({journey:true});await flush();e.discovery=()=>recondite();e.visit('#explore/art_000000000001');await flush();
- const line=byClass(inspector(e),'entity-links')[0];
- assert.deepEqual(line.children.map(a=>a.textContent),['Spotify','Apple Music','Wikipedia','Resident Advisor','Discogs','X','MusicBrainz','Last.fm','after.life','junodownload.com'],'all of them, in a fixed order, Wikidata and unsafe links dropped');
- assert.deepEqual([line.children[0].target,line.children[0].rel,line.children[8].href],['_blank','noopener noreferrer','https://www.after.life/']);
- assert.equal(inspector(e).children.indexOf(line),1,'right after the profile and its facts, before the biography');
- assert.match(cssRules().get('.entity-links'),/display:flex; flex-wrap:wrap; gap:6px 16px;.*padding-block:10px; font-size:13px;.*color:var\(--soft\)/);
+ const line=byClass(inspector(e),'entity-links')[0],[label,...sites]=line.children;
+ assert.deepEqual([label.localName,label.textContent],['span','Elsewhere'],'the line says where it leads');
+ assert.deepEqual(sites.map(a=>a.textContent),['Spotify','Apple Music','Wikipedia','Resident Advisor','Discogs','X','MusicBrainz','Last.fm','after.life','junodownload.com'],'all of them, in a fixed order, Wikidata and unsafe links dropped');
+ assert.deepEqual([sites[0].target,sites[0].rel,sites[8].href],['_blank','noopener noreferrer','https://www.after.life/']);
+ assert.deepEqual(inspector(e).children.map(n=>n.className),['entity-heading','entity-bio','entity-links'],'last: after the roots and the biography');
+ const rules=cssRules();
+ assert.match(rules.get('.entity-links'),/display:flex; flex-wrap:wrap;.*font-size:14px; line-height:1\.4; color:var\(--soft\)/);
+ assert.match(rules.get('.entity-links>span'),/font-size:12px; color:var\(--muted\)/);
+ assert.match(rules.get('.root-groups + .entity-links'),/margin-top:var\(--s6\)/,'without a biography, as far from the roots as the biography would be');
+ assert.match(rules.get('.entity-links a[href]::after'),/content:none/,'no arrows: the line already says they leave');
+ assert.match(rules.get('.entity-links a:is(:hover, :focus-visible)'),/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px/);
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
+ assert.equal(byClass(inspector(e),'entity-links')[0].children[0].textContent,'Anderswo');
 });
 
 test('the biography reads open, offers More only when it is cut, and credits its source once',async()=>{
@@ -1181,8 +1209,9 @@ test('On the radio tunes a stage in place, and a favourite shows the Essentials 
  const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
  const playlists=[{code:'LIF',station:'Lost in Feelings'},{code:'X',station:'Not a stage'},{code:'ESS',station:'Essentials'}];
  await show(recondite({playlists,favorite:true}));
- const line=byClass(inspector(e),'entity-radio')[0],tunes=byClass(line,'text-button');
+ const line=byClass(inspector(e),'entity-radio')[0],tunes=byClass(line,'text-button'),about=byClass(inspector(e),'entity-heading')[0].children.at(-1);
  assert.deepEqual([line.localName,line.textContent,tunes.map(b=>b.textContent)],['p','On the radio',['Lost in Feelings','Essentials']],'each stage that plays it, by name');
+ assert.ok(about.children.at(-1)===line,'in the title column, after the facts and tags');
  const heart=line.descendants().find(n=>n.attrs?.role==='img');
  assert.deepEqual([heart.attrs['aria-label'],heart.attrs.class,heart.attrs['aria-hidden'],heart.parent.children[1]],['Essentials favourite','essentials-icon',undefined,tunes[1]],'the heart goes with Essentials');
  tunes[0].emit('click');assert.deepEqual([e.window.Pavoia.getState().stage,e.elements.explorer.open,e.location.hash],['palac-feel',true,'#explore/art_000000000001'],'the stage it is on stays');
@@ -1195,6 +1224,7 @@ test('On the radio tunes a stage in place, and a favourite shows the Essentials 
  e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({playlists,favorite:true}));
  assert.deepEqual([byClass(inspector(e),'entity-radio')[0].textContent,inspector(e).descendants().find(n=>n.attrs?.role==='img').attrs['aria-label']],['Im Radio','Essentials-Favorit']);
  assert.match(cssRules().get('.entity-radio .essentials-icon'),/fill:currentColor/);
+ assert.match(cssRules().get('#explorer .entity-radio .text-button'),/text-decoration:underline; text-decoration-color:var\(--muted\); text-underline-offset:3px/,'stage names in a sentence carry a quiet underline at rest');
 });
 
 test('a preview plays in place under the title, counts its seconds, and ends when its profile is left',async()=>{
@@ -1233,31 +1263,38 @@ test('the roots group records by kind, credits first, and say a relation only wh
  const artists=groups[0].children[1].children;
  assert.deepEqual(artists.map(a=>a.getAttribute('href')),['#explore/art_000000000100','#explore/art_000000000101','#explore/art_000000000107','#explore/art_000000000108','#explore/art_000000000103','#explore/art_000000000104'],'credits, then shared records, six at first');
  assert.deepEqual(artists.map(a=>a.children[1].children.map(textOf)),[['Artist 0'],['Artist 1','Featuring'],['Artist 7'],['Artist 8','Remixed by'],['Artist 3','Collaboration'],['Artist 4','Remix']],'a relation that repeats the heading is left out');
- assert.deepEqual([artists[0].className,artists[0].children[0].className,artists[0].children[0].dataset.type,artists[0].children[0].children[0].hidden],['root-node','picture','artist',true],'a 40px box waits where there is no image');
- const more=byClass(groups[0],'text-button')[0];assert.equal(more.textContent,'+ 3 more');
+ assert.deepEqual([artists[0].className,artists[0].children[0].className,artists[0].children[0].dataset.type,artists[0].children[0].dataset.initial,artists[0].children[0].children[0].hidden],['row','picture','artist','A',true],'a 40px box holds the first letter where there is no image');
+ assert.deepEqual([artists[1].children[1].className,...artists[1].children[1].children.map(n=>n.localName+'.'+n.className)],['row-text','span.row-name','span.row-line'],'one row: the name over its second line, no small mono relation');
+ const more=byClass(groups[0],'text-button')[0];assert.equal(more.textContent,'Show all 9');
  more.emit('click');
  assert.deepEqual([artists.length,groups[0].children.includes(more),e.document.activeElement,artists.slice(6).map(a=>textOf(a.children[1]))],[9,false,artists[6],['Artist 6Band member','Artist 2Similar','Artist 5']],'the column grows in place, focus on the first name it showed');
  assert.equal(textOf(groups[3].children[1].children[0]),'Label','no relation under a label');
- const band=inspector(e).children.find(n=>n.attrs?.class==='roots-band');
- assert.deepEqual([band.attrs.viewBox,band.attrs.preserveAspectRatio,band.attrs['aria-hidden'],band.children.map(p=>p.attrs.d)],['0 0 1000 72','none','true',['M500 0C500 40 10 32 10 72','M500 0C500 40 260 32 260 72','M500 0C500 40 510 32 510 72','M500 0C500 40 760 32 760 72']],'one curve per group, to where its heading starts');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
  assert.deepEqual(byClass(inspector(e),'root-group').map(g=>g.children[0].textContent),['Künstler','Veröffentlichungen','Tracks','Labels']);
- assert.equal(byClass(inspector(e),'text-button')[0].textContent,'+ 3 weitere');
+ assert.equal(byClass(inspector(e),'text-button')[0].textContent,'Alle 9 zeigen');
+ assert.ok(!/moreRoots/.test(web('journey.js')),'the old "+ 3 more" words are gone');
  e.discovery=()=>({entity:{id:'lab_000000000001',type:'label',title:'Label',connections:[]},included:[]});e.visit('#explore/lab_000000000001');await flush();
- assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading'],'no roots, no band');
+ assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading'],'no roots, nothing under the profile');
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
- assert.match(rules.get('.roots-band path'),/fill:none; stroke:currentColor; stroke-width:1\.2; vector-effect:non-scaling-stroke/);
- assert.match(rules.get('.roots-band'),/height:72px;.*color:var\(--soft\); opacity:\.5/,'the footer roots\' stroke');
- assert.match(rules.get('.root-groups, .discovery-results'),/display:grid; grid-auto-flow:column; grid-auto-columns:minmax\(0,1fr\)/,'one column per group');
+ assert.match(rules.get('.root-groups, .discovery-results'),/display:grid; grid-auto-flow:column; grid-auto-columns:minmax\(0,1fr\); gap:var\(--s5\)/,'one column per group');
+ assert.match(rules.get('.root-groups'),/margin-top:var\(--s5\)/,'40px under the profile');assert.match(rules.get('.entity-bio'),/margin-top:var\(--s6\)/,'64px down to the biography');
  assert.match(rules.get('.root-group:only-of-type .root-nodes'),/grid-template-columns:repeat\(auto-fill,minmax\(220px,1fr\)\)/,'a single group flows across');
- assert.match(rules.get('.root-node'),/min-height:52px/);assert.match(rules.get('.root-node:hover'),/background:var\(--raised\)/);assert.doesNotMatch(rules.get('.root-node'),/border/);
- assert.match(rules.get('.root-name'),/-webkit-line-clamp:2;.*font-size:14px/);assert.match(rules.get('.root-node small'),/font:11px\/1\.4 var\(--mono\); color:var\(--muted\)/);
+ assert.match(rules.get('.row'),/display:grid; grid-template-columns:40px minmax\(0,1fr\) auto; align-items:center; gap:var\(--s3\); min-height:56px; padding-block:var\(--s2\);/);
+ assert.doesNotMatch(rules.get('.row'),/border|background|margin/,'no border, no hover box, nothing sticking out of the column');
+ assert.match(rules.get('.row:not(:has(> .picture, > time))'),/grid-template-columns:minmax\(0,1fr\) auto/,'a ranking without pictures');
+ assert.match(rules.get('.row-name, .row-line'),/overflow:hidden; text-overflow:ellipsis; white-space:nowrap;/,'one line each');
+ assert.match(rules.get('.row-name'),/font-size:14px; color:var\(--cream\)/);assert.match(rules.get('.row-line'),/font-size:12px; color:var\(--soft\)/);
+ assert.match(rules.get('.row-fact, .row > time'),/font:11px\/1\.4 var\(--mono\); font-variant-numeric:tabular-nums; color:var\(--muted\)/);
+ assert.match(rules.get('.row[href]:is(:hover, :focus-visible) .row-name'),/text-decoration:underline; text-underline-offset:3px/,'a pointer or the keyboard underlines the name');
+ assert.ok(![...rules.keys()].some(selector=>/\.root-node(?![\w-])|root-name|root-line|roots-band/.test(selector)),'the old row and the band are gone');
  assert.match(rules.get('.root-group h4'),/font:22px\/1\.2 var\(--serif\)/);assert.match(rules.get('.root-group h4 small'),/font:11px var\(--mono\); color:var\(--muted\)/);
- assert.match(phone.get('.roots-band'),/display:none/);assert.match(phone.get('.root-groups, .discovery-results'),/grid-auto-flow:row/,'phones stack the groups');
- assert.match(phone.get('.root-group'),/padding-left:16px; border-left:1px solid var\(--line\)/);
+ assert.match(phone.get('.root-groups, .discovery-results'),/grid-auto-flow:row/,'phones stack the groups');
+ assert.ok(!phone.has('.root-group'),'with no line down their side');
+ assert.match(rules.get('#explorer .text-button'),/color:var\(--soft\); font:14px Inter,sans-serif;/);assert.doesNotMatch(rules.get('#explorer .text-button'),/underline/,'Show all has no underline at rest');
+ assert.match(rules.get('#explorer .text-button:is(:hover, :focus-visible)'),/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px/);
 });
 
-test('search results use the same groups and names, and say how many there are',async()=>{
+test('search results use the same groups and rows, show a line only when the list is cut or empty, and say their count unseen',async()=>{
  const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'],status=e.elements['discovery-status'];
  const items=[{id:'trk_000000000001',type:'track',title:'Taum',artist:'Recondite',album:'Taum'},{id:'art_000000000001',type:'artist',title:'Recondite',artist:'',album:''},{id:'rel_000000000001',type:'release',title:'Taum',artist:'Recondite',album:''}];
  let answer={items};e.discovery=url=>url.includes('/search?')?answer:entity(url.split('/').pop());
@@ -1265,13 +1302,14 @@ test('search results use the same groups and names, and say how many there are',
  e.visit('#explore');await search('recondite');
  assert.deepEqual(results.children.map(g=>g.children[0].textContent),['Artists','Releases','Tracks'],'grouped like the roots');
  assert.deepEqual(results.children.map(g=>g.children[1].children.map(a=>[a.getAttribute('href'),a.children[1].children.map(textOf)])),[[['#explore/art_000000000001',['Recondite']]],[['#explore/rel_000000000001',['Taum','Recondite']]],[['#explore/trk_000000000001',['Taum','Recondite · Taum']]]],'a release names its artist, a track its artist and album');
- assert.equal(status.textContent,'3 results');
- answer={items:items.slice(0,1)};await search('taum');assert.equal(status.textContent,'1 result');
- answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.equal(status.textContent,'First 40 results. Add a word to narrow them.');
- answer={items:[]};await search('zz');assert.equal(status.textContent,'No matches in the radio catalogue.');
- e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore');answer={items};await search('recondite');assert.equal(status.textContent,'3 Treffer');
- answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.equal(status.textContent,'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.');
- assert.match(cssRules().get('.root-line'),/font-size:12px; color:var\(--soft\)/,'the second line reads in Inter');
+ const unseen=()=>[status.children.map(n=>n.className),textOf(status)];
+ assert.deepEqual(unseen(),[['visually-hidden'],'3 results'],'the results speak for themselves on screen; the status still says how many, since an emptied status is not announced');
+ assert.deepEqual([results.children[1].children[1].children[0].className,results.children[1].children[1].children[0].children[1].children[1].className],['row','row-line'],'each result is one row, its second line the row\'s');
+ answer={items:items.slice(0,1)};await search('taum');assert.deepEqual(unseen(),[['visually-hidden'],'1 result']);
+ answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.deepEqual([status.children.map(n=>n.className),textOf(status)],[[undefined],'First 40 results. Add a word to narrow them.'],'the cut list keeps its visible note');
+ answer={items:[]};await search('zz');assert.equal(textOf(status),'No matches in the radio catalogue.');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore');answer={items};await search('recondite');assert.deepEqual(unseen(),[['visually-hidden'],'3 Treffer']);
+ answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.equal(textOf(status),'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.');
 });
 
 test('every name in the player bar is a link the explorer routes, and openTrack still opens a track',async()=>{
@@ -1298,6 +1336,10 @@ test('the trail steps back through the records of this visit',async()=>{
  for(const n of [2,3]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
  const steps=()=>trail().children.filter(n=>n.attrs['aria-hidden']!=='true');
  assert.deepEqual([trail().localName,trail().attrs['aria-label'],textOf(trail())],['nav','Path','Name art_000000000001 / Name art_000000000002 / Name art_000000000003']);
+ assert.ok(byClass(inspector(e),'entity-heading')[0].children[0]===trail(),'the header\'s first line, out of the title column');
+ assert.match(cssRules().get('.entity-trail'),/grid-column:1 \/ -1; display:flex; gap:var\(--s1\); white-space:nowrap;/,'across the picture and the title, on one line');
+ assert.doesNotMatch(cssRules().get('.entity-trail'),/overflow/,'the line clips nothing: a focused link keeps its whole ring, and focus cannot scroll the line blank');
+ assert.match(cssRules().get('.entity-trail > :is(a, [aria-current])'),/min-width:0; overflow:hidden; text-overflow:ellipsis;/,'each step cuts its own name short, so every link keeps words to show');
  assert.deepEqual(steps().map(n=>[n.localName,n.getAttribute('href'),n.attrs['aria-current']]),[['a','#explore/art_000000000001',undefined],['a','#explore/art_000000000002',undefined],['span',null,'page']],'the current record is not a link');
  for(const n of [4,5,6]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
  assert.deepEqual(steps().map(n=>n.textContent),['Name art_000000000003','Name art_000000000004','Name art_000000000005','Name art_000000000006'],'the last four');
@@ -1333,6 +1375,15 @@ test('a hop keeps the record in place, dimmed, then starts the next one at its t
  assert.match(cssRules().get('.explore-workspace[aria-busy=true]'),/opacity:\.45; transition:opacity var\(--panel\) var\(--ease\)/);
 });
 
+test('the explorer takes focus itself when it opens, so no tab shows a ring on a page just loaded',async()=>{
+ const e=setup({journey:true,hash:'#statistics'});await flush();
+ assert.deepEqual([e.elements.explorer.open,e.document.activeElement===e.elements.explorer,e.elements.explorer.focusOptions?.preventScroll],[true,true,true],'a direct load of #statistics leaves focus on the explorer');
+ const footer=setup({journey:true});await flush();footer.discovery=url=>entity(url.split('/').pop(),'track');
+ footer.elements['go-deeper'].emit('click');
+ assert.ok(footer.document.activeElement===footer.elements.explorer,'so does the footer button, while the record loads');
+ await flush();assert.equal(footer.document.activeElement.tabIndex,-1,'then the record\'s title takes it');
+});
+
 // Step 7: History finds a time and keeps the place it was left at.
 const routeTo=(e,href)=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
 // A History page: n tracks six minutes apart from `start` back, echoing the asked bounds as the server does.
@@ -1341,7 +1392,7 @@ const playedFrom=Date.now(),played=(n,start=0,next=null)=>({items:Array.from({le
 // With no until the server ends at its own now, as playbackHistory does.
 const answer=page=>url=>{const q=new URL(url,'http://radio').searchParams;return {from:q.get('from'),until:q.get('until')||new Date().toISOString(),...page};};
 const asked=e=>new URL(e.historyRequests.at(-1).url,'http://radio').searchParams;
-const historyRows=e=>byClass(e.elements['music-content'],'history-row');
+const historyRows=e=>byClass(e.elements['music-content'],'row');
 // A status line as read: its own words, or the error and its Try again.
 const said=n=>n.children.length?n.children.map(textOf).join(''):n.textContent;
 const localDay=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
@@ -1355,10 +1406,11 @@ test('History rows are links that read the time, then the title over its artist,
  const items=[[0,10,'101'],[0,0,'102'],[1,23,'103'],[3,12,'x1']].map(([back,hour,id],i)=>({id,title:'Title '+i,artist:'Artist '+i,startedAt:day(back,hour)}));
  e.historyReply=answer({items,next:null});routeTo(e,'#history');await flush();
  const kids=e.elements['music-content'].children,older=new Date(items[3].startedAt).toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long'});
- assert.deepEqual(kids.map(n=>n.localName+'.'+n.className),['h3.history-day','a.history-row','a.history-row','h3.history-day','a.history-row','h3.history-day','a.history-row'],'a heading opens each local day');
+ assert.deepEqual(kids.map(n=>n.localName+'.'+n.className),['h3.history-day','a.row','a.row','h3.history-day','a.row','h3.history-day','a.row'],'a heading opens each local day');
  assert.deepEqual(kids.filter(n=>n.localName==='h3').map(n=>n.textContent),['Today','Yesterday',older]);
  const row=kids[1];
- assert.deepEqual([row.getAttribute('href'),row.events.click,row.children.map(n=>n.localName+'.'+(n.className||''))],['#explore/plex_101',undefined,['time.','span.history-record']],'a link with no handler of its own, and no stage cell');
+ assert.deepEqual([row.getAttribute('href'),row.events.click,row.children.map(n=>n.localName+'.'+(n.className||''))],['#explore/plex_101',undefined,['time.','span.row-text']],'a link with no handler of its own, and no stage cell: the time first, then the one row\'s text');
+ assert.deepEqual(row.children[1].children.map(n=>n.localName+'.'+n.className),['span.row-name','span.row-line'],'the title over its artist, with no bold');
  assert.deepEqual([row.children[0].textContent,row.children[0].dateTime,row.children[1].children.map(n=>n.textContent)],[new Date(items[0].startedAt).toLocaleTimeString('en',{timeStyle:'short'}),items[0].startedAt,['Title 0','Artist 0']],'the short time only');
  assert.equal(kids[6].getAttribute('href'),null,'a track without a valid id is no link');
  follow(e,row);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/plex_101',2],'the document handler routes it through go(), so it replaces the explorer\'s one entry');
@@ -1605,6 +1657,19 @@ test('a failed follow refresh of an empty History says it is empty again, and a 
  assert.equal(e.historyRequests.length,sent+1,'past midnight, Today has become Yesterday: History is drawn again');
 });
 
+test('the Day field shows today rather than mm/dd/yyyy, and moves on past midnight while History follows the radio',async()=>{
+ const e=setup({journey:true});await flush();const day=e.elements['history-day'],status=e.elements['music-status'];
+ e.response=onAirNow('2');await e.poll();await flush();
+ e.historyReply=answer({items:[{id:'2',title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});routeTo(e,'#history');await flush();
+ assert.deepEqual([day.value,asked(e).get('until'),historyRows(e)[0].getAttribute('aria-current')],[localDay(new Date()),null,'true'],'today, shown by itself, is no picked day: the list ends at the server\'s now and marks Now');
+ e.setWall(86400000);await e.poll();await flush();
+ assert.deepEqual([day.value,asked(e).get('until')],[localDay(new Date(Date.now()+86400000)),null],'past midnight the field moves on with the list, which still follows the radio');
+ day.value='2026-03-28';day.emit('change');await flush();e.setWall(2*86400000);await e.poll();await flush();
+ assert.deepEqual([day.value,asked(e).get('until')],['2026-03-28',new Date(2026,2,29).toISOString()],'a picked day stays picked');
+ e.historyReply=answer({items:[],next:null});day.value='';day.emit('change');await flush();
+ assert.deepEqual([day.value,status.textContent],[localDay(new Date(Date.now()+2*86400000)),'Nothing has played on this stage yet.'],'a cleared field shows today again, and the list is the live one');
+});
+
 test('History left open past midnight follows the radio again and names its days anew',async()=>{
  const e=setup({journey:true});await flush();
  e.response=onAirNow('2');await e.poll();await flush();
@@ -1615,18 +1680,40 @@ test('History left open past midnight follows the radio again and names its days
  await e.poll();await flush();assert.equal(e.historyRequests.length,sent+1,'once');
 });
 
-test('History reads time, title and artist on one grid at every width, under sticky day names, with red only for Now',()=>{
+test('Statistics hides a count that is zero or repeats another, and its most played tracks are rows that link to them',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop(),'track');
+ const stats={scope:'palac-feel',tracks:1094,artists:751,releases:562,durationMs:441949205,updatedAt:'2026-10-19T04:35:27Z',coverage:{artists:1094,labels:949,years:1084,genres:0},topArtists:[{name:'Soel',count:16}],years:[],labels:[],genres:[],stages:[]};
+ const music=(over={})=>({plays:2818,distinctPlayed:1094,unplayed:0,earliest:'2026-10-06T03:40:35Z',top:[{id:'118636',title:'Metal_Swinging',artist:'Delay Grounds',plays:3},{id:'x1',title:'No id',artist:'Someone',plays:2}],...over});
+ e.response={...status('First'),...stats,...music()};routeTo(e,'#statistics');await flush();
+ const content=e.elements['music-content'],counts=()=>byClass(content,'broadcast-summary')[0].children.map(d=>d.children[0].textContent);
+ assert.deepEqual(counts(),['Broadcast starts'],'every track played, none left: no 1,094 a second time and no 0');
+ const rows=byClass(content,'row');
+ assert.deepEqual(rows.map(r=>[r.localName,r.getAttribute('href'),r.events.click,r.children.map(n=>n.className),r.children[0].children.map(n=>n.textContent),r.children[1].textContent]),
+  [['a','#explore/plex_118636',undefined,['row-text','row-fact'],['Metal_Swinging','Delay Grounds'],'3×'],['a',null,undefined,['row-text','row-fact'],['No id','Someone'],'2×']],'a row per track, title over artist, plays as a fact; a track without an id is no link');
+ follow(e,rows[0]);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/plex_118636',2],'the document handler routes it in the explorer\'s one entry');
+ e.response={...status('First'),...stats,...music({distinctPlayed:900,unplayed:194})};routeTo(e,'#statistics');await flush();
+ assert.deepEqual(counts(),['Broadcast starts','Different tracks played','Selected tracks not played'],'counts that say something stay');
+ assert.ok(!/(?<![\w$])plays:'/.test(web('journey.js')),'the plays word went with the button');
+ const rules=cssRules();
+ assert.ok(![...rules.keys()].some(selector=>/connection-row/.test(selector)),'the button rows are gone');
+ assert.match(rules.get('.chart-row meter'),/background:var\(--line\)/);assert.match(rules.get('.chart-row meter::-webkit-meter-optimum-value'),/background:var\(--cream\)/);assert.match(rules.get('.chart-row meter::-moz-meter-bar'),/background:var\(--cream\)/,'bars are cream on the line');
+ assert.match(rules.get('.music-summary dd'),/font:22px\/1\.2 var\(--serif\)/);assert.match(rules.get('.music-chart h3, .played-ranking h3'),/font:22px\/1\.2 var\(--serif\)/,'numbers and headings in the heading style');
+ assert.match(rules.get('.music-summary dt'),/font-size:12px/);assert.match(rules.get('.chart-count'),/font:11px var\(--mono\)/);
+});
+
+test('History reads time, title and artist on the one row at every width, under sticky day names, with red only for Now',()=>{
  const rules=cssRules(),phone=cssRules('(max-width:760px)'),small=cssRules('(max-width:600px)');
- assert.match(rules.get('.history-row'),/display:grid; grid-template-columns:5rem minmax\(0,1fr\); gap:16px; align-items:baseline; padding:12px 0;.* scroll-margin-top:44px;/,'a row reached with Tab scrolls clear of the sticky day name');
- assert.ok(![...phone.keys(),...small.keys()].some(selector=>/history-row|history-record/.test(selector)),'the same grid on a phone');
- assert.match(rules.get('.history-row time'),/font:11px var\(--mono\)/,'times are small facts');
- assert.match(rules.get('.history-record strong'),/font:500 15px\/1\.4 Inter,sans-serif; color:var\(--cream\)/);
- assert.match(rules.get('.history-record>span'),/font-size:13px; color:var\(--soft\)/);
- assert.match(rules.get('.history-day'),/position:sticky; top:-28px; z-index:1; margin:0 0 5px; padding:12px 0 7px; background:var\(--surface\); font:11px var\(--mono\);.*text-transform:uppercase; color:var\(--muted\)/,'a sticky day name sits on the explorer\'s edge, over its 28px padding, and leaves the focus ring under it in view');
- assert.match(rules.get('#explorer'),/padding:28px/);assert.match(phone.get('#explorer'),/padding:18px/);assert.match(phone.get('#explorer .history-day'),/top:-18px/);
+ assert.match(rules.get('.row:has(> time)'),/grid-template-columns:64px minmax\(0,1fr\) auto; scroll-margin-top:56px;/,'a row reached with Tab scrolls clear of the sticky day name; the explorer\'s scroll padding clears the bar and the ring');
+ assert.ok(!phone.has('.row:has(> time)'),'the same margin on a phone');
+ assert.ok(![...rules.keys(),...phone.keys(),...small.keys()].some(selector=>/history-row|history-record/.test(selector)),'History rows are the explorer\'s one row');
+ assert.match(rules.get('.row-fact, .row > time'),/font:11px\/1\.4 var\(--mono\)/,'times are small facts');
+ assert.match(rules.get('.history-day'),/position:sticky; top:var\(--top\); z-index:1; margin:0 0 var\(--s2\); padding:var\(--s4\) 0 var\(--s2\); background:var\(--surface\); font:22px\/1\.2 var\(--serif\); color:var\(--cream\);/,'a day name in the heading style sticks under the bar; its opaque bottom padding hides a row before it reaches the name, and the margin under that keeps the focus ring of the row below in view');
+ assert.doesNotMatch(rules.get('.history-day'),/mono|uppercase|letter-spacing/);
+ assert.match(phone.get('.history-day'),/top:0/);assert.match(rules.get('.explorer-top'),/z-index:2/,'the bar stays over the day names');
+ assert.ok(![...rules.values()].some(body=>/font:500|font-weight:500/.test(body)),'no Inter 500 left');
  assert.match(rules.get('#music-content[aria-busy=true]'),/opacity:\.45; pointer-events:none; transition:opacity var\(--hover\) var\(--ease\)/);
  assert.match(small.get('#history-more'),/width:100%/);
  assert.match(rules.get('#history-more'),/min-width:12\.5rem/,'the longest label, Frühere Tracks anzeigen, fits: Loading… and Try again swap in a box of the same width');
- assert.deepEqual([/^ font:inherit; padding:10px 12px; $/.test(rules.get('#explorer #history-day')),/font:inherit/.test(rules.get('#explorer select'))],[true,true],'the Day field reads at the Stage select\'s size and inset');
- assert.deepEqual([...rules].filter(([selector,body])=>/history/.test(selector)&&/--red/.test(body)).map(([selector])=>selector),['.history-row[aria-current] time::before'],'red marks Now only');
+ assert.ok(!rules.has('#explorer #history-day'),'the Day field is a field like the others');assert.match(rules.get('.music-filters label'),/color:var\(--soft\); font-size:12px/);
+ assert.deepEqual([...rules].filter(([selector,body])=>/row|history/.test(selector)&&/--red/.test(body)).map(([selector])=>selector),['.row[aria-current] time::before'],'red marks Now only');
 });
