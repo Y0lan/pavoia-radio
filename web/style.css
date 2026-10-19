@@ -190,10 +190,10 @@ body[data-wanted] .icon-pause { display:block; }
 /* Names that do not fit scroll sideways, by finger, trackpad, wheel or Tab, never cut. The 6px
    padding holds the 5px focus ring inside the scroller; a fade marks each side where names wait. */
 .player .credited-artists { display:block; min-width:0; flex:1 1 0; padding:6px; margin:-6px; gap:0; flex-wrap:nowrap; white-space:nowrap; overflow-x:auto; overflow-y:hidden; scrollbar-width:none; overscroll-behavior-x:contain; }
-.player .credited-artists:is([data-before], [data-more]) { --before:#000; --more:#000; mask-image:linear-gradient(to right, var(--before) 6px, #000 40px, #000 calc(100% - 40px), var(--more) calc(100% - 6px)); }
-.player .credited-artists[data-before] { --before:transparent; }
-.player .credited-artists[data-more] { --more:transparent; }
-.player .credited-artists:has(:focus-visible) { mask-image:none; }
+:is(.player .credited-artists, .stage-row):is([data-before], [data-more]) { --before:#000; --more:#000; mask-image:linear-gradient(to right, var(--before) 6px, #000 40px, #000 calc(100% - 40px), var(--more) calc(100% - 6px)); }
+:is(.player .credited-artists, .stage-row)[data-before] { --before:transparent; }
+:is(.player .credited-artists, .stage-row)[data-more] { --more:transparent; }
+:is(.player .credited-artists, .stage-row):has(:focus-visible) { mask-image:none; }
 .player .artist-credit { display:inline-flex; vertical-align:top; min-height:24px; gap:0; color:inherit; font:inherit; }
 .player .artist-credit:not(:last-child)::after { content:',\a0' / ''; }
 .player .artist-credit span { display:block; line-height:24px; white-space:nowrap; }
@@ -270,22 +270,21 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 /* The ✕ glyph, not its 44px target, ends on the gutter. */
 #explorer #explorer-close { margin-right:-12px; }
 #explorer button { min-height:44px; padding:0; border:0; background:none; color:var(--cream); font:inherit; cursor:pointer; }
-/* The bordered actions: Try again and Show earlier tracks. Box borders are the line, and darken to muted under a pointer. */
-#explorer :is(#music-status button, #history-more) { min-height:44px; padding:0 var(--s3); font:14px Inter,sans-serif; border:1px solid var(--line); }
-#explorer :is(#music-status button, #history-more):hover { border-color:var(--muted); }
+/* The bordered actions: Try again, Show earlier tracks and Switch to this stage. Box borders are the line, and darken to
+   muted under a pointer. */
+#explorer :is(#music-status button, #history-more, .stage-switch) { min-height:44px; padding:0 var(--s3); font:14px Inter,sans-serif; border:1px solid var(--line); }
+#explorer :is(#music-status button, #history-more, .stage-switch):hover { border-color:var(--muted); }
+#explorer .stage-switch { margin-top:var(--s3); }
 /* Quiet text actions, More and Show all: soft at rest, cream and underlined under a pointer or the keyboard. */
 #explorer .text-button { color:var(--soft); font:14px Inter,sans-serif; }
 #explorer .text-button:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 /* Fields: 16px keeps iOS from zooming. */
-#explorer :is(input, select) { height:44px; padding:0 var(--s3); font:16px Inter,sans-serif; color:var(--cream); background:transparent; border:1px solid var(--line); border-radius:0; }
-#explorer :is(input, select):is(:hover, :focus) { border-color:var(--muted); }
-/* The select draws the stations sheet's chevron instead of the platform arrow. */
-#explorer select { max-width:100%; appearance:none; padding-right:40px; background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23f0ede5' stroke-opacity='.78' stroke-width='1.5'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") right var(--s3) center / 14px no-repeat; }
-#explorer select option { background:var(--surface); }
+#explorer input { height:44px; padding:0 var(--s3); font:16px Inter,sans-serif; color:var(--cream); background:transparent; border:1px solid var(--line); border-radius:0; }
+#explorer input:is(:hover, :focus) { border-color:var(--muted); }
 #explorer input::placeholder { color:var(--muted); opacity:1; }
 /* ✕ in the header leaves the explorer; the browser's own clear mark would be a second one. */
 #discovery-query::-webkit-search-cancel-button { appearance:none; }
-#explorer :is(input, select):focus-visible { outline-offset:-1px; }
+#explorer input:focus-visible { outline-offset:-1px; }
 .discovery-search { flex:0 1 360px; min-width:0; }
 .discovery-search input { width:100%; min-width:0; text-overflow:ellipsis; }
 .explore-workspace { margin-top:var(--s5); }
@@ -294,6 +293,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 /* The profile: the trail across the top, then a picture that holds its box beside the type, the name and its
    facts, all from the top, so the title stays put from record to record. */
 .entity-heading { display:grid; grid-template-columns:120px minmax(0,1fr); align-items:start; gap:var(--s4); }
+.entity-heading:not(:has(> .picture)) { grid-template-columns:minmax(0,1fr); }
 /* A picture is round for an artist, square with 2px corners for the rest, with a 1px inner edge so a white cover
    does not read as a blank tile. Until its image shows, it holds the name's first letter. */
 .picture { position:relative; display:grid; place-items:center; flex-shrink:0; width:40px; height:40px; border-radius:2px; overflow:hidden; font:20px var(--serif); color:var(--soft); background:var(--raised); }
@@ -304,21 +304,23 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .picture img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }
 .entity-heading .picture { width:120px; height:120px; font-size:56px; }
 /* The trail is one line that clips nothing: each step cuts its own name short, so every link keeps words to show
-   and its whole focus ring. */
+   and its whole focus ring. A step is as wide as its name until fitTrail() cuts the oldest ones first. */
 .entity-trail { grid-column:1 / -1; display:flex; gap:var(--s1); white-space:nowrap; font-size:12px; line-height:1.4; color:var(--soft); }
+.entity-trail > * { flex:none; }
 .entity-trail > :is(a, [aria-current]) { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .entity-trail a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 .entity-trail [aria-current] { color:var(--cream); }
 .entity-heading h3 { width:fit-content; max-width:100%; margin:var(--s1) 0 0; font:44px/1.05 var(--serif); overflow-wrap:anywhere; }
 .eyebrow .on-air span::before { content:""; display:inline-block; width:6px; height:6px; margin-right:var(--s1); border-radius:50%; background:var(--red); vertical-align:1px; }
-/* One line under the title, which keeps its height while it is empty. Stage names are buttons in a sentence: a quiet
-   underline at rest, and the word itself as the target, so a wrapped line never puts one stage's target over
-   another's. Each stage keeps its heart and its count on its own line, and its focus ring inside the spaces. */
+/* One line under the title, which keeps its height while it is empty. Stage names, and See what played, are links in a
+   sentence: a quiet underline at rest, and the word itself as the target, so a wrapped line never puts one stage's
+   target over another's. Each stage keeps its heart and its count on its own line, and its focus ring inside the
+   spaces. */
 .entity-line { min-height:1.4em; margin-top:var(--s2); font-size:14px; line-height:1.4; color:var(--soft); }
 .entity-line > span { white-space:nowrap; }
 .entity-line small { font:11px/1.4 var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
-#explorer .entity-line .text-button { min-height:0; text-decoration:underline; text-decoration-color:var(--muted); text-underline-offset:3px; }
-#explorer .entity-line .text-button:is(:hover, :focus-visible) { text-decoration-color:currentColor; outline-offset:1px; }
+.entity-line a { white-space:nowrap; text-decoration:underline; text-decoration-color:var(--muted); text-underline-offset:3px; }
+.entity-line a:is(:hover, :focus-visible) { color:var(--cream); text-decoration-color:currentColor; outline-offset:1px; }
 .entity-line .essentials-icon { fill:currentColor; }
 .entity-tags { margin-top:var(--s3); font-size:12px; line-height:1.4; color:var(--soft); }
 /* The preview plays in place: the player's circle and icons, and what it does next. */
@@ -347,7 +349,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .region ol { margin:0; padding:0; list-style:none; }
 /* About and On the radio close the record in the same grid, side by side on a wide screen: On the radio takes the
    last column, About the ones before it. */
-@media (min-width:761px) { .regions > .record-about { grid-column:1 / -2; } }
+@media (min-width:761px) { .regions > :is(.record-about, .release-years) { grid-column:1 / -2; } }
 /* One row for every list in the explorer: a 40px picture, a time or nothing, then a name over its second line,
    and a fact on the right. No border, no background; a pointer or the keyboard underlines the name. */
 .row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:var(--s3); min-height:56px; padding-block:var(--s2); }
@@ -383,7 +385,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer .neighbourhood .region > p { margin:0; }
 .neighbourhood .row { display:flex; min-height:44px; padding:0; }
 .neighbourhood [data-side=left] .row { flex-direction:row-reverse; text-align:right; }
-.neighbourhood :is(.row-line, .row-fact) { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
+.neighbourhood :is(.row-line, .row-fact), #music-content .region[data-key] .row-line { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; }
 .neighbourhood .row-name { max-width:150px; }
 .neighbourhood [data-ring=r1] .row-name { white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 /* A plain name is one line behind a 5px dot, 32px tall so the 34px slots of the layout never overlap. */
@@ -402,6 +404,10 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .neighbourhood-caption > span { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-align:center; }
 .neighbourhood-caption .text-button { flex:none; }
 .neighbourhood ~ .regions { padding-top:var(--s5); border-top:1px solid var(--line); }
+/* A stage's map sits under its stage row, so it is shorter by the row and its margins; its counts are the point, so they
+   stay beside the names. */
+#music-content .neighbourhood { height:clamp(480px, calc(100dvh - var(--bar) - var(--top) - 72px - 44px - 2 * var(--s4)), 700px); }
+#music-content .neighbourhood .row-fact { position:static; width:auto; height:auto; overflow:visible; clip-path:none; }
 /* The names and lines fade in once, at the body paint; a pictured name clicked on the map glides into the middle. */
 @media (prefers-reduced-motion: no-preference) {
   .neighbourhood :is(.region, .map-lines) { transition:opacity 180ms ease; }
@@ -497,7 +503,18 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .explorer-nav a:hover, .explorer-nav a[aria-current] { color:var(--cream); }
 .explorer-nav a::after { content:""; position:absolute; inset:auto 0 8px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
 .explorer-nav a[aria-current]::after { transform:scaleX(1); }
-.music-filters { display:flex; gap:var(--s3) var(--s4); flex-wrap:wrap; margin:var(--s4) 0; }
+.music-filters { display:flex; align-items:end; gap:var(--s3) var(--s4); flex-wrap:wrap; margin:var(--s4) 0; }
+/* The stage row reads like the radio's stage rail: serif 19px, soft, the current stage cream with a 1px line under it. */
+.stage-row { position:relative; flex:1 1 0; display:flex; flex-wrap:wrap; gap:0 var(--s3); min-width:0; }
+.stage-row a { position:relative; display:flex; align-items:center; min-height:44px; font:19px/1.2 var(--serif); color:var(--soft); white-space:nowrap; }
+.stage-row a:is(:hover, [aria-current]) { color:var(--cream); }
+.stage-row a[aria-current]::after { content:""; position:absolute; inset:auto 0 8px; height:1px; background:currentColor; }
+/* On a phone the stage row stays one line that scrolls sideways, from edge to edge with the gutter inside; the Day field
+   goes under it. A scroller clips what passes its edges: 6px above and below hold a focus ring, as in the player's credits. */
+@media (max-width:760px) {
+  .stage-row { flex:1 0 calc(100% + 2 * var(--gutter)); flex-wrap:nowrap; margin-inline:calc(-1 * var(--gutter)); padding-inline:var(--gutter); overflow-x:auto; scrollbar-width:none; padding-block:6px; margin-block:-6px; }
+  .years { height:80px; }
+}
 .music-filters label { display:grid; gap:var(--s2); color:var(--soft); font-size:12px; }
 #music-status { margin:var(--s3) 0; }
 /* Red is what you hear: a 6px dot before Now, on the track on air. */
@@ -513,22 +530,19 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #history-more[aria-disabled=true] { opacity:.45; cursor:default; }
 /* On a phone the explorer's bar scrolls away, so the day names stick to the top edge. */
 @media (max-width:760px) { .history-day { top:0; } }
-.music-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--s4); padding:var(--s4) 0; margin:0; border-bottom:1px solid var(--line); }
-.music-summary dt { color:var(--soft); font-size:12px; }
-.music-summary dd { font:22px/1.2 var(--serif); font-variant-numeric:tabular-nums; margin:var(--s2) 0 0; }
-.music-charts { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--s5) var(--s6); margin:var(--s5) 0; }
-.music-chart h3, .played-ranking h3 { font:22px/1.2 var(--serif); margin:0 0 var(--s3); }
-.chart-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:var(--s1) var(--s3); margin:var(--s3) 0; font-size:14px; }
-.chart-row>span:first-child { overflow-wrap:anywhere; }
-.chart-count { font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); white-space:nowrap; }
-.chart-row meter { grid-column:1/-1; width:100%; height:5px; appearance:none; border:0; background:var(--line); }
-.chart-row meter::-webkit-meter-bar { background:var(--line); border:0; border-radius:0; }
-.chart-row meter::-webkit-meter-optimum-value { background:var(--cream); }
-.chart-row meter::-moz-meter-bar { background:var(--cream); }
-.played-ranking { margin-top:var(--s5); }
+/* Release years: one cream bar a year from the first to the last, an empty year a line, and the first year, the peak and
+   the last under it in mono. */
+.years { display:flex; align-items:flex-end; gap:2px; height:120px; }
+.years > span { flex:1; min-height:1px; background:var(--cream); }
+.years > [data-empty] { background:var(--line); }
+.years-axis { position:relative; display:flex; justify-content:space-between; margin-top:var(--s2); font:11px/1.4 var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
+/* The peak's label is centred under its bar; the script sets how far along. */
+.years-peak { position:absolute; top:0; transform:translateX(-50%); white-space:nowrap; }
+/* How the numbers are counted: a quiet text button that opens the notes. */
+.stage-notes { margin-top:var(--s4); }
+.stage-notes summary { width:fit-content; min-height:44px; line-height:44px; font-size:12px; color:var(--soft); cursor:pointer; }
+.stage-notes summary:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 @media (max-width:600px) {
-  .music-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .music-charts { grid-template-columns:1fr; gap:var(--s5); }
   #history-more { width:100%; }
   .music-filters label { width:100%; }
   .explorer-nav { gap:var(--s3); }
