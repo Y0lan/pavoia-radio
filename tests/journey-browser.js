@@ -10,7 +10,7 @@ async page => {
   await page.waitForFunction(()=>document.getElementById('audio').currentTime>1);
   await page.locator('#go-deeper').click();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
-  await page.locator('.root-groups a').first().click();
+  await page.locator('.regions a').first().click();
   await page.waitForFunction(()=>{const w=document.getElementById('explore-workspace');return !w.hidden&&!w.hasAttribute('aria-busy');});
   assert(await page.locator('#audio').evaluate(a=>!a.paused),'Entity navigation stopped live playback');
   await page.locator('#discovery-query').fill('Jimi Jules');

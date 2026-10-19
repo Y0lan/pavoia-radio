@@ -5,7 +5,8 @@ const { resolve } = require('node:path');
 const { runInNewContext, runInContext } = require('node:vm');
 const web = name => readFileSync(resolve(__dirname, '../web/'+name), 'utf8');
 const source = web('app.js');
-const flush = async () => { for (let i=0;i<8;i++) await Promise.resolve(); };
+// Enough turns for a hop: its payload, its credited artists and its naming fetch, each through fetch() and json().
+const flush = async () => { for (let i=0;i<32;i++) await Promise.resolve(); };
 // One clock for the page under test and the measurements it receives; tests move it forward by hand.
 const clock = {now: Date.now()};
 // Just enough CSS matching for the key handler: tags, [attr] and [attr=value], :focus-visible and :not() lists.
@@ -147,7 +148,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   };
   runInNewContext(source,context);
   env.run=code=>runInContext(code,context);
-  if(journey){elements['discovery-query'].value='';elements['history-day'].value='';elements['history-day'].validity={valid:true};runInContext(web('journey.js'),context);}
+  if(journey){elements['discovery-query'].value='';elements['history-day'].value='';elements['history-day'].validity={valid:true};runInContext(web('closeness.js'),context);runInContext(web('journey.js'),context);}
   return env;
 }
 
@@ -787,9 +788,9 @@ test('every way into the explorer lands on music: the record on air, or one line
  deeper.emit('click');await flush();assert.equal(e.location.hash,'#explore/plex_123','before the roots answer, the radio track opens');
  e.elements['explorer-close'].emit('click');
  e.discovery=url=>url.includes('/track/')?entity('trk_0123456789ab','track'):entity(url.split('/').pop());await e.poll();await flush();
- deeper.emit('click');await flush();assert.deepEqual([e.location.hash,last()],['#explore/trk_0123456789ab','/api/discovery/entity/trk_0123456789ab'],'then the record as the roots know it');
+ deeper.emit('click');await flush();assert.deepEqual([e.location.hash,last()],['#explore/trk_0123456789ab','/api/discovery/track/123'],'then the record as the roots know it, from the payload the player bar already has');
  roots();await flush();
- assert.deepEqual([e.location.hash,last()],['#explore/trk_0123456789ab','/api/discovery/entity/trk_0123456789ab'],'the empty Roots tab shows the record on air in place');
+ assert.deepEqual([e.location.hash,last()],['#explore/trk_0123456789ab','/api/discovery/track/123'],'the empty Roots tab shows the record on air in place');
  e.elements['explorer-close'].emit('click');
  e.response={track:null,audience:{available:false,listeners:null}};await e.poll();await flush();
  deeper.emit('click');assert.equal(e.location.hash,'#explore','nothing on air: the search');
@@ -1086,61 +1087,224 @@ test('the explorer frame stops above the player bar and its controls read in Int
  assert.deepEqual([...rules].filter(([selector,body])=>/#explorer|\.explorer|\.entity|\.row|\.root|\.history|\.music|\.chart/.test(selector)&&/text-underline-offset:(?!3px)/.test(body)).map(([selector])=>selector),[],'one underline offset in the explorer: 3px');
  assert.match(rules.get('#explorer .collection-note'),/color:var\(--soft\); font-size:12px/,'notes read the same in every tab');
  assert.ok(!rules.has('#music-view .collection-note'));
- assert.match(rules.get('.explore-workspace'),/margin-top:var\(--s5\)/);assert.match(rules.get('.discovery-results'),/margin-top:var\(--s5\)/,'results start where a record does');
+ assert.match(rules.get('.explore-workspace'),/margin-top:var\(--s5\)/);assert.match(rules.get('.regions'),/margin-top:var\(--s5\)/,'results start where the regions of a record do');
 });
 
-// Step 6: the Roots tab is one profile with its roots under it, and every name is a link.
+// Step 6, then explorer v2 step 2: a record is a header, then what is close to it, ranked, then About and On the radio.
 const byClass=(root,name)=>root.descendants().filter(n=>(n.className||n.attrs?.class||'').split(' ').includes(name));
 const inspector=e=>e.elements['entity-inspector'];
+const cls=n=>n.className||n.attrs?.class;
 const links=(over={})=>[{kind:'wikidata',url:'https://www.wikidata.org/wiki/Q1'},{kind:'other',url:'https://www.after.life/'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},
  {kind:'musicbrainz',url:'https://musicbrainz.org/artist/1'},{kind:'twitter',url:'https://twitter.com/a'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},{kind:'juno',url:'https://www.junodownload.com/artists/A'},
  {kind:'wikipedia',url:'https://en.wikipedia.org/wiki/A'},{kind:'lastfm',url:'https://www.last.fm/music/A'},{kind:'resident_advisor',url:'https://ra.co/dj/a'},{kind:'spotify',url:'https://open.spotify.com/artist/1'},{kind:'apple_music',url:'https://music.apple.com/artist/1'},{kind:'javascript',url:'javascript:alert(1)'}];
 const recondite=(over={})=>({entity:{id:'art_000000000001',type:'artist',title:'Recondite',country:'DE',tags:['techno','seen_live','house','Electronic','acid house','acid','minimal'],links:links(),
  bio:'Recondite is a German musician.',bioSource:'wikipedia',bioUrl:'https://en.wikipedia.org/wiki/A',image:'/api/discovery/media/'+'a'.repeat(40),playlists:[],connections:[],...over},included:[]});
-const roots=()=>{
- const people=['primary','featured','similar/related','collaboration/shared_release','remix','related','musicbrainz:member of band','artist','remixer'];
- const included=[...people.map((_,i)=>({id:'art_00000000010'+i,type:'artist',title:'Artist '+i})),{id:'rel_000000000001',type:'release',title:'Release'},{id:'trk_000000000001',type:'track',title:'Track'},{id:'lab_000000000001',type:'label',title:'Label'},{id:'pl_000000000001',type:'playlist',title:'Playlist'}];
- const connections=[{id:'lab_000000000001',relation:'label'},...people.map((relation,i)=>({id:'art_00000000010'+i,relation})),{id:'trk_000000000001',relation:'track'},{id:'rel_000000000001',relation:'release'},{id:'pl_000000000001',relation:'playlist'},{id:'art_000000000999',relation:'similar'}];
- return {entity:{id:'art_000000000001',type:'artist',title:'Recondite',connections},included};
+// Each show() opens its own record: the explorer keeps every payload it fetched, so one id is one record.
+const shower=e=>{let shows=0;return async data=>{const id=data.entity.id.slice(0,-3)+String(++shows).padStart(3,'0');data={...data,entity:{...data.entity,id}};e.discovery=()=>data;e.visit('#explore/'+id);await flush();};};
+// A neighbourhood as the API sends it: a record, the records it links to in full, and theirs by id only.
+const id=(prefix,n)=>prefix+'_'+String(n).padStart(12,'0');
+const rec=(key,title,connections=[],more={})=>({id:key,type:{art:'artist',rel:'release',lab:'label',trk:'track'}[key.slice(0,3)],title,connections:connections.map(([to,relation])=>({id:to,relation})),...more});
+const hood=()=>{
+ const A=n=>id('art',n),R=n=>id('rel',n),L=n=>id('lab',n),T=n=>id('trk',n);
+ const centre=rec(A(1),'Recondite',[[A(101),'similar'],[A(102),'similar'],[A(104),'similar'],[A(103),'remix/shared_release'],[R(1),'release'],[R(2),'release'],[L(1),'label'],[T(1),'track'],[T(2),'track'],[T(3),'track']],
+  {country:'DE',tags:['techno','ambient','seen_live'],links:links(),bio:'Recondite is a German musician.',bioSource:'wikipedia',bioUrl:'https://en.wikipedia.org/wiki/A'});
+ const eulberg=rec(A(101),'Dominik Eulberg',[[A(201),'similar'],[R(3),'release']],{tags:['techno','ambient','seen_live'],trackCount:4});
+ const extrawelt=rec(A(102),'Extrawelt',[[A(201),'similar'],[R(3),'release'],[R(4),'release']],{trackCount:1});
+ const kiasmos=rec(A(104),'Kiasmos',[[A(201),'similar'],[T(4),'track']],{trackCount:5});
+ const jimi=rec(A(103),'Jimi Jules',[[A(202),'remix']],{trackCount:11});
+ const taum=rec(R(1),'Taum',[[L(1),'label']],{releaseDate:'2022-03-04'}),theater=rec(R(2),'Theater II EP',[],{releaseDate:'2017-07-21'}),plangent=rec(L(1),'Plangent',[[A(203),'artist']]);
+ const tracks=[[1,'Lost in Feelings'],[2,'Lost in Feelings'],[3,'Essentials']].map(([n,station])=>rec(T(n),'Track '+n,[],{album:'Taum',durationMs:424000,playlists:[{code:'X',station}]}));
+ // Eulberg's own payload names Hemmann and Shared EP, and two artists that are close, but not in sound.
+ const named=[rec(A(201),'Marek Hemmann',[],{trackCount:3}),rec(R(3),'Shared EP',[],{releaseDate:'2020-01-01'}),rec(A(202),'Only Remixed'),rec(A(203),'Label Mate')];
+ // Kiasmos's track comes with its own payload only.
+ return {[A(1)]:{entity:centre,included:[eulberg,extrawelt,kiasmos,jimi,taum,theater,plangent,...tracks]},[A(101)]:{entity:eulberg,included:named},
+  [A(104)]:{entity:kiasmos,included:[rec(T(4),'Track 4',[],{playlists:[{code:'LIF',station:'Lost in Feelings'}]})]}};
 };
+// The regions around the record, as read: each heading and its rows. On the radio, after them in their grid, is not one of them.
+const regionsOf=e=>byClass(byClass(inspector(e),'regions')[0]||inspector(e),'region').filter(r=>r.attrs['aria-labelledby']!=='r-onRadio').map(r=>[textOf(r.children[0]),...byClass(r,'row').map(a=>[a.getAttribute('href').slice(9),...a.children.slice(1).map(textOf)].join('|'))]);
 
-test('the Roots tab is one column: the profile on top, its roots under it, and no map',async()=>{
+test('a record reads its header, then what is close to it, then About and On the radio, with no map',async()=>{
  const html=web('index.html'),journey=web('journey.js'),css=web('style.css');
  assert.match(html,/<div class="explore-workspace" id="explore-workspace" hidden><section id="entity-inspector" aria-label="Details"><\/section><\/div>\s*<audio id="preview-audio" preload="none"><\/audio>/,'one section, and the preview audio outside any banner');
+ assert.match(html,/<script src="app\.js" defer><\/script>\s*<script src="closeness\.js" defer><\/script>\s*<script src="journey\.js" defer><\/script>/,'closeness.js loads before journey.js, from the same origin');
+ assert.doesNotMatch(web('closeness.js'),/^\s*(?:import|export)\b|document|fetch\(|word\(/m,'a plain script: no module syntax, no page, no network, no words');
  for(const gone of ['connection-map','map-caption','map-center','map-node','mapNote','preview-banner','preview-stop','preview-title'])assert.ok(!html.includes(gone)&&!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
- for(const gone of ['renderMap','relatedTitle','entity-connections','relation-kind','entity-badges','favorite-badge','favorite-mark','previewPending','moreBio','function navigate','openEntity','search-result','entity-subtitle',"'details'"])assert.ok(!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
+ for(const gone of ['renderMap','relatedTitle','entity-connections','relation-kind','entity-badges','favorite-badge','favorite-mark','previewPending','moreBio','function navigate','openEntity','search-result','entity-subtitle',"'details'",'renderRoots','function groups','tier=','telling','root-group','root-node','entity-meta','entity-radio','moreRoots'])assert.ok(!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
  assert.doesNotMatch(journey+css,/entity-link(?!s)/,'entity-link is gone');
  assert.ok(!css.includes('#efb7b0'),'no pink');
  assert.doesNotMatch(cssRules().get('.explore-workspace'),/grid-template-columns/,'one column');
- assert.ok(!cssRules('(max-width:760px)').has('.explore-workspace'));
- const e=setup({journey:true});await flush();e.discovery=()=>roots();e.visit('#explore/art_000000000001');await flush();
- assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading','root-groups'],'the profile, then the groups, with no band between them');
+ const e=setup({journey:true});await flush();const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;e.visit('#explore/art_000000000001');await flush();
+ assert.deepEqual([inspector(e).children.map(cls),byClass(inspector(e),'regions')[0].children.slice(-2).map(cls)],[['entity-heading','regions'],['record-about','region']],'the header, the regions, then About and On the radio on the same grid');
  for(const gone of ['roots-band',"drawing('0 0 1000 72'"])assert.ok(!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
 });
 
+test('a record lists what is close to it, ranked, each name with its reason in words and a fact',async()=>{
+ const e=setup({journey:true});await flush();const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;
+ const sent=e.discoveryRequests.length;routeTo(e,'#explore/art_000000000001');await flush();
+ assert.deepEqual(regionsOf(e),[
+  ['Similar artists 4','art_000000000201|Marek HemmannSimilar to Dominik Eulberg, Extrawelt and 1 more|3 tracks','art_000000000101|Dominik EulbergSimilar to Recondite|4 tracks','art_000000000104|KiasmosSimilar to Recondite|5 tracks','art_000000000102|ExtraweltSimilar to Recondite|1 track'],
+  ['Worked with 1','art_000000000103|Jimi JulesRemix · Shared release|11 tracks'],
+  ['Releases 3','rel_000000000001|TaumPlangent|2022','rel_000000000002|Theater II EP|2017','rel_000000000003|Shared EPBy Dominik Eulberg and Extrawelt|2020'],
+  ['Labels 1','lab_000000000001|Plangent']],
+  'the closest first, ties to the artist with more tracks; an artist that only remixed or shares a label is never called similar; own releases newest first, then those its artists share');
+ assert.deepEqual(e.discoveryRequests.slice(sent).map(r=>r.url),['/api/discovery/entity/art_000000000001','/api/discovery/entity/art_000000000101'],'one naming request: the neighbour that names Hemmann and Shared EP, the smaller of two');
+ const similar=byClass(inspector(e),'region')[0],row=byClass(similar,'row')[0];
+ assert.deepEqual([similar.localName,similar.attrs['aria-labelledby'],similar.children[0].localName,similar.children[0].id,similar.children[1].localName,similar.children[1].children[0].localName,row.parent.localName],['section','r-similar','h4','r-similar','ol','li','li'],'a region reads as a heading, then a list');
+ assert.deepEqual([row.className,row.children.map(cls),row.children[1].children.map(cls)],['row',['picture','row-text','row-fact'],['row-name','row-line']],'each name is one row: picture, name over its reason, and a fact');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
+ assert.deepEqual(regionsOf(e).map(r=>r.slice(0,2)),[['Ähnliche Künstler 4','art_000000000201|Marek HemmannÄhnlich wie Dominik Eulberg, Extrawelt und 1 weitere|3 Tracks'],['Gearbeitet mit 1','art_000000000103|Jimi JulesRemix · Gemeinsame Veröffentlichung|11 Tracks'],['Veröffentlichungen 3','rel_000000000001|TaumPlangent|2022'],['Labels 1','lab_000000000001|Plangent']],'the same, in German, with no request');
+ assert.equal(e.discoveryRequests.slice(sent).filter(r=>r.url.includes('/entity/')).length,2,'a record already fetched opens from the cache');
+ const rules=cssRules(),phone=cssRules('(max-width:760px)');
+ assert.match(rules.get('.regions'),/display:grid; grid-template-columns:repeat\(auto-fit,minmax\(280px,1fr\)\); gap:var\(--s5\); margin-top:var\(--s5\);/);
+ assert.match(phone.get('.regions'),/grid-template-columns:minmax\(0,1fr\)/,'one column on a phone');
+ assert.match(rules.get('.region h4, .record-about h4'),/font:22px\/1\.2 var\(--serif\)/);assert.match(rules.get('.region h4 small'),/font:11px var\(--mono\);.*color:var\(--muted\)/);
+ assert.match(rules.get('.region ol'),/margin:0; padding:0; list-style:none;/);
+});
+
+test('a region shows six names until the listener asks, says when it is empty, and leaves out the rest',async()=>{
+ const e=setup({journey:true});await flush();const A=n=>id('art',n),L=n=>id('lab',n),R=n=>id('rel',n);
+ // A label with eight artists: two share Other with it, one shares Third; a release fetched later points back to it.
+ const artists=[1,2,3,4,5,6,7,8].map(n=>rec(A(n),'Artist '+n,n===1?[[L(2),'label'],[L(3),'label']]:n===2?[[L(2),'label']]:[],{trackCount:10-n}));
+ const label={entity:rec(L(1),'Afterlife',artists.map(a=>[a.id,'artist'])),included:artists};
+ // Artist 2 names Other with fewer connections than Artist 1, and brings the release that points back.
+ const named={entity:artists[1],included:[rec(L(2),'Other'),rec(L(3),'Third'),rec(R(1),'Back Pointer',[[L(1),'label']],{artist:'Artist 1',releaseDate:'2024-01-01'})]};
+ e.discovery=url=>({[L(1)]:label,[A(2)]:named})[url.split('/').pop()]||null;
+ e.visit('#explore/'+L(1));await flush();
+ assert.deepEqual(regionsOf(e).map(r=>[r[0],r.length-1]),[['Artists 8',6],['Similar labels 1',1],['Releases 1',1]],'six names at first; Third shares one artist only, so it is left out when Other shares two');
+ assert.deepEqual(regionsOf(e).slice(1).map(r=>r[1]),['lab_000000000002|Other2 artists in common','rel_000000000001|Back PointerArtist 1|2024'],'a release fetched later that points back to the label is one of its releases');
+ const artistsRegion=byClass(inspector(e),'region')[0],more=byClass(artistsRegion,'text-button')[0];
+ assert.equal(more.textContent,'Show all 8');more.emit('click');
+ const rows=byClass(artistsRegion,'row');
+ assert.deepEqual([rows.length,artistsRegion.children.includes(more),e.document.activeElement===rows[6]],[8,false,true],'the list grows in place and focus moves to the first new row');
+ // A label whose releases are not in any payload yet says so; an artist with no similar artist keeps the heading.
+ e.discovery=url=>url.endsWith(L(9))?{entity:rec(L(9),'Quiet',[[A(9),'artist']]),included:[rec(A(9),'Alone',[],{trackCount:1})]}:url.endsWith(A(11))?{entity:rec(A(11),'Chlär',[[L(11),'label'],[R(11),'release']]),included:[rec(L(11),'C O U P'),rec(R(11),'Don’t Give Yourselves',[[L(11),'label']],{releaseDate:'2021-01-01'})]}:{entity:rec(A(12),'Nobody'),included:[]};
+ e.visit('#explore/'+L(9));await flush();
+ assert.deepEqual(byClass(inspector(e),'region').map(r=>textOf(r)),['Artists 1Alone1 track','Similar labels 0No similar labels in the collection yet.','Releases 0This label’s releases are not listed yet.']);
+ e.visit('#explore/'+A(11));await flush();
+ assert.deepEqual(byClass(inspector(e),'region').map(r=>textOf(r.children[0])+'|'+textOf(r.children[1])),['Similar artists 0|No similar artists in the collection yet.','Releases 1|Don’t Give YourselvesC O U P2021','Labels 1|C O U P'],'Worked with, empty, is left out');
+ e.visit('#explore/'+A(12));await flush();
+ assert.deepEqual(inspector(e).children.slice(1).map(n=>[cls(n),n.textContent]),[['collection-note','Nothing in the collection is linked to Nobody yet.']],'nothing close at all: one sentence instead');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/'+A(12));await flush();
+ assert.equal(inspector(e).children[1].textContent,'In der Sammlung ist noch nichts mit Nobody verbunden.');
+});
+
+test('a hop paints its header at once from a record already fetched, and its body once: when the names arrive, or 2.5 s after',async()=>{
+ const e=setup({journey:true});await flush();const data=hood();let release;e.elements['explore-workspace'].append(inspector(e));
+ e.discovery=url=>{const key=url.split('/').pop();return key==='art_000000000101'?new Promise(resolve=>{release=()=>resolve(data[key]);}):data[key]||null;};
+ e.visit('#explore/art_000000000001');await flush();
+ const title=()=>inspector(e).descendants().find(n=>n.localName==='h3');
+ assert.deepEqual([inspector(e).children.map(cls),e.document.activeElement===title(),[...e.timers.values()].some(t=>t.delay===2500)],[['entity-heading'],true,true],'the header shows and takes focus while the names load');
+ release();await flush();
+ assert.deepEqual([inspector(e).children.map(cls),[...e.timers.values()].some(t=>t.delay===2500)],[['entity-heading','regions'],false],'then the body, once');
+ // Extrawelt came in Recondite's payload: its header shows with no wait, before its own payload answers.
+ const before=e.discoveryRequests.length;let late;e.discovery=()=>new Promise(resolve=>{late=resolve;});
+ follow(e,byClass(inspector(e),'row').find(a=>a.getAttribute('href')==='#explore/art_000000000102'));await flush();
+ assert.deepEqual([title().textContent,e.elements['explore-workspace'].getAttribute('aria-busy'),e.document.activeElement===title(),inspector(e).children.map(cls),e.discoveryRequests.length],['Extrawelt',null,true,['entity-heading'],before+1],'a name already fetched opens at once, at its title');
+ e.fire(2500);await flush();
+ assert.deepEqual(regionsOf(e),[['Similar artists 1','art_000000000201|Marek HemmannSimilar to Extrawelt|3 tracks'],['Releases 1','rel_000000000003|Shared EP|2020']],'2.5 s later the body paints with the records it has, each heading counting the names it lists');
+ const shown=[...inspector(e).descendants()];late({entity:data.art_000000000001.included[1],included:[]});await flush();
+ assert.ok(sameRows(inspector(e).descendants(),shown),'a payload that answers after the paint changes nothing on the page');
+ const saving=setup({journey:true,saveData:true});await flush();saving.discovery=url=>data[url.split('/').pop()]||null;
+ routeTo(saving,'#explore/art_000000000001');await flush();
+ assert.deepEqual([saving.discoveryRequests.filter(r=>r.url.includes('/entity/')).length,regionsOf(saving)[0].length-1,regionsOf(saving)[0][0]],[1,3,'Similar artists 3'],'Save-Data sends no naming request and shows the names it has, under their count');
+});
+
+test('a track shown from a copy another payload included gets its preview from its own payload, and keeps it after that payload comes again',async()=>{
+ const T1='trk_000000000001',track=data=>({entity:{...data.art_000000000001.included.find(r=>r.id===T1),previewUrl:'/api/discovery/preview/'+T1},included:[]});
+ const title=e=>inspector(e).descendants().find(n=>n.localName==='h3'),toggle=e=>byClass(inspector(e),'preview-toggle')[0];
+ const e=setup({journey:true});await flush();const data=hood();data[T1]=track(data);e.discovery=url=>data[url.split('/').pop()]||null;e.elements['explore-workspace'].append(inspector(e));
+ e.visit('#explore/art_000000000001');await flush();
+ follow(e,byClass(inspector(e),'row').find(a=>a.getAttribute('href')==='#explore/'+T1));
+ assert.deepEqual([title(e).textContent,toggle(e)],['Track 1',undefined],'its header shows at once from the copy Recondite included, which has no preview');
+ await flush();
+ assert.deepEqual([Boolean(toggle(e)),e.document.activeElement===title(e)],[true,true],'its own payload draws the header again with the preview, and focus stays on the title');
+ // Its payload first, then Recondite's, which includes a copy of it: the record kept is still its payload's.
+ const back=setup({journey:true});await flush();back.discovery=url=>data[url.split('/').pop()]||null;
+ back.visit('#explore/'+T1);await flush();routeTo(back,'#explore/art_000000000001');await flush();routeTo(back,'#explore/'+T1);
+ assert.ok(toggle(back),'back on the track, its header shows the preview at once');
+});
+
+test('a record shown from a name at hand stays when its own payload fails, and its body paints with the records at hand',async()=>{
+ const e=setup({journey:true});await flush();const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;e.elements['explore-workspace'].append(inspector(e));
+ e.visit('#explore/art_000000000001');await flush();
+ // Extrawelt came in Recondite's payload; its own fails.
+ follow(e,byClass(inspector(e),'row').find(a=>a.getAttribute('href')==='#explore/art_000000000102'));await flush();
+ const title=inspector(e).descendants().find(n=>n.localName==='h3');
+ assert.deepEqual([title.textContent,e.document.activeElement===title,e.elements['explore-workspace'].hidden,e.elements['discovery-status'].textContent,textOf(byClass(inspector(e),'entity-trail')[0])],['Extrawelt',true,false,'','Recondite / Extrawelt'],'the header, its focus and its place in the trail stay');
+ assert.deepEqual(regionsOf(e),[['Similar artists 1','art_000000000201|Marek HemmannSimilar to Extrawelt|3 tracks'],['Releases 1','rel_000000000003|Shared EP|2020']],'as at the deadline');
+ e.discovery=()=>null;routeTo(e,'#explore/art_000000000999');await flush();
+ assert.deepEqual([e.elements['explore-workspace'].hidden,e.elements['discovery-status'].textContent],[true,'These details are unavailable. Try another record or search again.'],'a record with nothing at hand still says it is unavailable');
+});
+
+test('a track with no profiles yet names its artist and release in its line, and says so in one note only',async()=>{
+ for(const [language,line,note] of [['en','Someone · Somewhere · 5:01','Artist and release profiles are not available for this track yet.'],['de','Someone · Somewhere · 5:01','Für diesen Track gibt es noch keine Künstler- und Veröffentlichungsprofile.']]){
+  const e=setup({journey:true});await flush();e.setLanguage(language);
+  e.discovery={entity:{id:'plex_123',plexId:'123',type:'track',title:'A Track Without Profiles',artist:'Someone',album:'Somewhere',durationMs:301000,basicDetails:true,connections:[]},included:[]};
+  e.visit('#explore/plex_123');await flush();
+  assert.deepEqual([textOf(byClass(inspector(e),'entity-line')[0]),byClass(inspector(e),'collection-note').map(n=>n.textContent),byClass(inspector(e),'regions').length],[line,[note],0]);
+ }
+});
+
+test('the track on air opens with no request, says it is on air, and puts its dot out in place when it leaves',async()=>{
+ const e=setup({journey:true});await flush();
+ const track={entity:rec('trk_0123456789ab','Abandoned Soul',[['art_000000000001','primary'],['art_000000000002','remixer'],['lab_000000000001','label']],{durationMs:423993,playlists:[{code:'ANB',station:'As Night Begins'}]}),included:[rec('art_000000000001','Jimi Jules',[['art_000000000003','similar']],{trackCount:11}),rec('art_000000000002','Recondite',[['art_000000000003','similar']],{trackCount:7}),rec('lab_000000000001','Watergate Records')]};
+ const credit=n=>({entity:track.included[n],included:[rec('art_000000000003','Guy Gerber',[],{trackCount:3})]});
+ e.discovery=url=>url.endsWith('/track/123')?track:url.endsWith('art_000000000001')?credit(0):url.endsWith('art_000000000002')?credit(1):null;
+ await e.poll();await flush();const sent=e.discoveryRequests.length;e.elements['go-deeper'].emit('click');await flush();
+ assert.deepEqual(e.discoveryRequests.slice(sent).map(r=>r.url),['/api/discovery/entity/art_000000000001','/api/discovery/entity/art_000000000002'],'no request for the track itself, only its credited artists, together');
+ const heading=byClass(inspector(e),'entity-heading')[0],eyebrow=heading.children[1].children[0];
+ assert.deepEqual([textOf(eyebrow),byClass(eyebrow,'on-air').length],['Track · On air',1],'Track · ● On air');
+ assert.deepEqual(regionsOf(e),[['Made by 2','art_000000000001|Jimi JulesArtist|11 tracks','art_000000000002|ReconditeRemixed by|7 tracks'],['Similar artists 1','art_000000000003|Guy GerberSimilar to Jimi Jules and Recondite|3 tracks'],['Labels 1','lab_000000000001|Watergate Records']]);
+ const title=e.document.activeElement;e.response=onAirNow('456');await e.poll();await flush();
+ assert.deepEqual([textOf(eyebrow),byClass(heading,'entity-heading').length,byClass(inspector(e),'entity-heading')[0]===heading,e.document.activeElement===title],['Track',0,true,true],'a new track on air puts the dot out in place: nothing is drawn again and focus stays');
+ assert.match(cssRules().get('.eyebrow .on-air span::before'),/width:6px; height:6px;.*border-radius:50%; background:var\(--red\)/);
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.response=status('First');await e.poll();await flush();e.elements['go-deeper'].emit('click');await flush();
+ assert.equal(textOf(byClass(inspector(e),'entity-heading')[0].children[1].children[0]),'Track · Auf Sendung');
+});
+
+test('the explorer keeps the last 16 payloads, and starts its records again past 3,000',async()=>{
+ const e=setup({journey:true});await flush();const workspace=e.elements['explore-workspace'],A=n=>id('art',n);
+ // Artist 1 brings Kept along; artist 40 brings 3,000 tracks.
+ let hold=null;e.discovery=url=>{const n=parseInt(url.split('_').pop(),10);
+  const data={entity:rec(A(n),n===9999?'Kept':'Artist '+n),included:n===1?[rec(A(9999),'Kept')]:n===40?Array.from({length:3000},(_,i)=>rec(id('trk',400000+i),'Track')):[]};
+  return n===9999?new Promise(resolve=>{hold=()=>resolve(data);}):data;};
+ const entityRequests=()=>e.discoveryRequests.filter(r=>r.url.includes('/entity/')).length;
+ for(let n=1;n<=17;n++){routeTo(e,'#explore/'+A(n));await flush();}
+ let sent=entityRequests();routeTo(e,'#explore/'+A(2));await flush();
+ assert.equal(entityRequests(),sent,'one of the last 16 opens from the cache');
+ routeTo(e,'#explore/'+A(1));await flush();
+ assert.equal(entityRequests(),sent+1,'the 17th from the end was let go, and is asked again');
+ routeTo(e,'#explore/'+A(2));await flush();assert.equal(entityRequests(),sent+1,'opening a payload makes it the newest: the oldest went instead');
+ routeTo(e,'#explore/'+A(40));await flush();for(let n=3;n<=17;n++){routeTo(e,'#explore/'+A(n));await flush();}
+ routeTo(e,'#explore/'+A(9999));
+ assert.deepEqual([workspace.getAttribute('aria-busy'),inspector(e).descendants().find(n=>n.localName==='h3').textContent],['true','Artist 17'],'past 3,000 records the cache starts again from the payloads it keeps: Kept, whose payload went, waits for its own');
+ hold();await flush();assert.equal(inspector(e).descendants().find(n=>n.localName==='h3').textContent,'Kept');
+ assert.match(web('journey.js'),/\/\/ ponytail: clear-all cap, an LRU if hops get slow/);
+});
+
 test('the profile keeps its picture box, names its type above the title and reads one line of facts',async()=>{
- const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
+ const e=setup({journey:true});await flush();const show=shower(e);
  await show(recondite());
  const box=byClass(inspector(e),'picture')[0],img=box.children[0];
  assert.deepEqual([box.dataset.type,box.dataset.initial,img.alt,img.getAttribute('src')],['artist','R','Portrait','/api/discovery/media/'+'a'.repeat(40)],'the box holds the first letter until the image shows');
  const heading=byClass(inspector(e),'entity-heading')[0],about=heading.children[1];
- assert.deepEqual(about.children.map(n=>n.localName+'.'+(n.className||'')),['p.eyebrow','h3.','p.entity-meta','p.entity-tags'],'the type above the title, then its facts');
+ assert.deepEqual(about.children.map(n=>n.localName+'.'+(n.className||'')),['p.eyebrow','h3.','p.entity-line'],'the type above the title, then one line');
  assert.deepEqual([about.children[0].textContent,about.children[1].textContent,about.children[1].tabIndex],['Artist','Recondite',-1]);
- assert.equal(about.children[2].textContent,'Germany','a country code reads as its name');
- assert.equal(about.children[3].textContent,'techno, house, acid house, acid','four tags at most, in words: no bookkeeping tag with _, and not electronic, which every record shares');
+ assert.equal(textOf(about.children[2]),'Germany','a country code reads as its name');
  await show(recondite({id:'lab_000000000001',type:'label',title:'Afterlife',country:'',tags:[],image:null}));
  const empty=byClass(inspector(e),'picture')[0];
  assert.deepEqual([empty.dataset.type,empty.dataset.initial,empty.children[0].hidden,empty.children[0].alt],['label','A',true,'Label logo'],'no image keeps the box, with the first letter in it');
- assert.equal(byClass(inspector(e),'entity-meta').length,0,'no facts, no line');
- await show({entity:{id:'trk_000000000001',type:'track',title:'Abandoned Soul',artist:'Jimi Jules',album:'Watergate Records 2008-2018',releaseDate:'2019-01-01',connections:[]},included:[]});
- assert.equal(byClass(inspector(e),'entity-meta')[0].textContent,'Jimi Jules · Watergate Records 2008-2018 · 2019','a track: artist, release, year');
+ assert.deepEqual(byClass(inspector(e),'entity-line').map(textOf),[''],'no facts: the line stays, empty, and keeps its height');
+ await show({entity:{id:'trk_000000000001',type:'track',title:'Abandoned Soul',artist:'Jimi Jules',album:'Watergate Records 2008-2018',releaseDate:'2019-01-01',durationMs:423993,playlists:[{code:'ANB',station:'As Night Begins'},{code:'X',station:'Not a stage'}],connections:[]},included:[]});
+ assert.equal(textOf(byClass(inspector(e),'entity-line')[0]),'Jimi Jules · Watergate Records 2008-2018 · Plays on As Night Begins · 7:03','a track with no credited artist under Made by: who made it and on what, where it plays, then how long');
  assert.equal(byClass(inspector(e),'picture')[0].children[0].alt,'Cover');
- await show({entity:{id:'rel_000000000001',type:'release',title:'Theater II EP',artist:'Recondite',album:'',releaseDate:'2017-07-21',connections:[]},included:[]});
- assert.equal(byClass(inspector(e),'entity-meta')[0].textContent,'Recondite · 2017','a release: artist, year');
- await show(recondite({id:'art_000000000005',title:'  émile',tags:['seen_live']}));
- assert.deepEqual([byClass(inspector(e),'picture')[0].dataset.initial,byClass(inspector(e),'entity-tags').length],['É',0],'the first letter of the trimmed name, in capitals; no tag left, no line');
+ const release={entity:{id:'rel_000000000001',type:'release',title:'Theater II EP',artist:'Recondite',releaseDate:'2017-07-21',connections:[{id:'trk_000000000009',relation:'track'}]},included:[rec('trk_000000000009','Theater',[],{playlists:[{code:'LIF',station:'Lost in Feelings'}]})]};
+ await show(release);
+ assert.equal(textOf(byClass(inspector(e),'entity-line')[0]),'2017 · On Lost in Feelings','a release: its year, then where its tracks play');
+ await show(recondite({id:'art_000000000005',title:'  émile',country:''}));
+ assert.deepEqual([byClass(inspector(e),'picture')[0].dataset.initial,textOf(byClass(inspector(e),'entity-line')[0])],['É',''],'the first letter of the trimmed name, in capitals');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({country:'IT'}));
- assert.deepEqual([byClass(inspector(e),'entity-meta')[0].textContent,byClass(inspector(e),'picture')[0].children[0].alt],['Italien','Porträt']);
+ assert.deepEqual([textOf(byClass(inspector(e),'entity-line')[0]),byClass(inspector(e),'picture')[0].children[0].alt],['Italien','Porträt']);
  await show(recondite({id:'lab_000000000002',type:'label'}));assert.equal(byClass(inspector(e),'picture')[0].children[0].alt,'Label-Logo');
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
  assert.match(rules.get('.picture'),/position:relative; display:grid; place-items:center;.*border-radius:2px;.*font:20px var\(--serif\); color:var\(--soft\); background:var\(--raised\)/);assert.match(rules.get('.picture[data-type=artist]'),/border-radius:50%/);
@@ -1152,7 +1316,20 @@ test('the profile keeps its picture box, names its type above the title and read
  assert.match(rules.get('.entity-heading'),/grid-template-columns:120px minmax\(0,1fr\); align-items:start/,'the box is reserved before the image loads, and the title starts at its top');
  assert.match(rules.get('.entity-heading h3'),/font:44px\/1\.05 var\(--serif\)/);assert.match(phone.get('.entity-heading h3'),/font-size:32px/);
  assert.match(rules.get('.eyebrow'),/font:11px\/1\.4 var\(--mono\); letter-spacing:\.08em; text-transform:uppercase; color:var\(--muted\)/);
- assert.match(rules.get('.entity-meta'),/font-size:14px; line-height:1\.4; color:var\(--soft\)/);assert.match(rules.get('.entity-tags'),/font-size:12px; line-height:1\.4; color:var\(--soft\)/,'tags read as a second line, in Inter');
+ assert.match(rules.get('.entity-line'),/min-height:1\.4em;.*font-size:14px; line-height:1\.4; color:var\(--soft\)/,'one 14px line that keeps its height while empty');
+});
+
+test('About holds the biography, the tags and the links; On the radio lists its tracks',async()=>{
+ const e=setup({journey:true});await flush();const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;
+ e.visit('#explore/art_000000000001');await flush();
+ const [about,radio]=byClass(inspector(e),'regions')[0].children.slice(-2);
+ assert.deepEqual([about.localName,cls(about),about.attrs['aria-labelledby'],about.children[0].id,about.children.map(n=>n.localName+'.'+(cls(n)||''))],['section','record-about','r-about','r-about',['h4.','div.entity-bio','p.entity-tags','p.entity-links']],'About {title}, then the biography, the tags and the links');
+ assert.deepEqual([about.children[0].textContent,about.children[2].textContent],['About Recondite','techno, ambient'],'tags in words, no bookkeeping tag');
+ assert.deepEqual([textOf(radio.children[0]),byClass(radio,'row').map(a=>[a.getAttribute('href'),...a.children.slice(1).map(textOf)])],['On the radio 3',[['#explore/trk_000000000001','Track 1Lost in Feelings','7:04'],['#explore/trk_000000000002','Track 2Lost in Feelings','7:04'],['#explore/trk_000000000003','Track 3Essentials','7:04']]],'each track, where it plays, and how long');
+ assert.match(cssRules('(min-width:761px)').get('.regions > .record-about'),/grid-column:1 \/ -2/,'side by side on a wide screen: On the radio in the last column of the regions, About across the ones before it');
+ assert.ok(!web('style.css').includes('record-more'),'no second grid, whose columns would miss those of the regions');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
+ assert.deepEqual(byClass(inspector(e),'regions')[0].children.slice(-2).map(n=>textOf(n.children[0])),['Über Recondite','Im Radio 3']);
 });
 
 test('external links sit in one line, listening services first, named, each address once',async()=>{
@@ -1161,11 +1338,10 @@ test('external links sit in one line, listening services first, named, each addr
  assert.deepEqual([label.localName,label.textContent],['span','Elsewhere'],'the line says where it leads');
  assert.deepEqual(sites.map(a=>a.textContent),['Spotify','Apple Music','Wikipedia','Resident Advisor','Discogs','X','MusicBrainz','Last.fm','after.life','junodownload.com'],'all of them, in a fixed order, Wikidata and unsafe links dropped');
  assert.deepEqual([sites[0].target,sites[0].rel,sites[8].href],['_blank','noopener noreferrer','https://www.after.life/']);
- assert.deepEqual(inspector(e).children.map(n=>n.className),['entity-heading','entity-bio','entity-links'],'last: after the roots and the biography');
+ assert.deepEqual(byClass(inspector(e),'record-about')[0].children.map(cls).slice(1),['entity-bio','entity-tags','entity-links'],'last in About: after the biography and the tags');
  const rules=cssRules();
  assert.match(rules.get('.entity-links'),/display:flex; flex-wrap:wrap;.*font-size:14px; line-height:1\.4; color:var\(--soft\)/);
  assert.match(rules.get('.entity-links>span'),/font-size:12px; color:var\(--muted\)/);
- assert.match(rules.get('.root-groups + .entity-links'),/margin-top:var\(--s6\)/,'without a biography, as far from the roots as the biography would be');
  assert.match(rules.get('.entity-links a[href]::after'),/content:none/,'no arrows: the line already says they leave');
  assert.match(rules.get('.entity-links a:is(:hover, :focus-visible)'),/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px/);
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
@@ -1173,7 +1349,7 @@ test('external links sit in one line, listening services first, named, each addr
 });
 
 test('the biography reads open, offers More only when it is cut, and credits its source once',async()=>{
- const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
+ const e=setup({journey:true});await flush();const show=shower(e);
  await show(recondite());
  const bio=()=>byClass(inspector(e),'entity-bio')[0],more=()=>bio().children[1].children[0],credit=()=>bio().children[1].children[1];
  assert.deepEqual([bio().localName,bio().children[0].localName,bio().children[0].textContent,bio().children[0].lang],['div','p','Recondite is a German musician.','en'],'no summary to open first');
@@ -1205,26 +1381,33 @@ test('the biography reads open, offers More only when it is cut, and credits its
  assert.doesNotMatch(rules.get('.entity-bio>p:first-child'),/white-space/,'cut, the paragraphs run on: no blank fourth line with a lone ellipsis');
 });
 
-test('On the radio tunes a stage in place, and a favourite shows the Essentials heart',async()=>{
- const e=setup({journey:true});await flush();const show=async data=>{e.discovery=()=>data;e.visit('#explore/'+data.entity.id);await flush();};
- const playlists=[{code:'LIF',station:'Lost in Feelings'},{code:'X',station:'Not a stage'},{code:'ESS',station:'Essentials'}];
- await show(recondite({playlists,favorite:true}));
- const line=byClass(inspector(e),'entity-radio')[0],tunes=byClass(line,'text-button'),about=byClass(inspector(e),'entity-heading')[0].children.at(-1);
- assert.deepEqual([line.localName,line.textContent,tunes.map(b=>b.textContent)],['p','On the radio',['Lost in Feelings','Essentials']],'each stage that plays it, by name');
- assert.ok(about.children.at(-1)===line,'in the title column, after the facts and tags');
+test('the header line names the stages that play a record: each tunes in place, and a favourite shows the Essentials heart',async()=>{
+ const e=setup({journey:true});await flush();const data=hood();data.art_000000000001.entity.favorite=true;e.discovery=url=>data[url.split('/').pop()]||null;
+ e.visit('#explore/art_000000000001');await flush();
+ const line=byClass(inspector(e),'entity-line')[0],tunes=byClass(line,'text-button'),about=byClass(inspector(e),'entity-heading')[0].children.at(-1);
+ assert.deepEqual([line.localName,textOf(line),tunes.map(b=>b.textContent)],['p','Germany · On Lost in Feelings 2, Essentials 1',['Lost in Feelings','Essentials']],'an artist: its country, then each stage with its count of tracks, the most played first');
+ assert.ok(about.children[2]===line,'in the title column, under the title');
  const heart=line.descendants().find(n=>n.attrs?.role==='img');
  assert.deepEqual([heart.attrs['aria-label'],heart.attrs.class,heart.attrs['aria-hidden'],heart.parent.children[1]],['Essentials favourite','essentials-icon',undefined,tunes[1]],'the heart goes with Essentials');
  tunes[0].emit('click');assert.deepEqual([e.window.Pavoia.getState().stage,e.elements.explorer.open,e.location.hash],['palac-feel',true,'#explore/art_000000000001'],'the stage it is on stays');
  tunes[1].emit('click');await flush();
  assert.deepEqual([e.window.Pavoia.getState().stage,e.elements['player-stage'].textContent,e.elements.explorer.open,e.location.hash],['essentials','Essentials',true,'#explore/art_000000000001'],'the radio switches under the open explorer');
  e.window.Pavoia.tune('nowhere');assert.equal(e.window.Pavoia.getState().stage,'essentials','an unknown stage changes nothing');
- await show(recondite({id:'art_000000000002',playlists:[{station:'Essentials'}],favorite:false}));
- assert.equal(inspector(e).descendants().some(n=>n.attrs?.role==='img'),false,'no favourite, no heart');
- await show(recondite({id:'art_000000000003',playlists:[]}));assert.equal(byClass(inspector(e),'entity-radio').length,0,'no stage, no line');
- e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(recondite({playlists,favorite:true}));
- assert.deepEqual([byClass(inspector(e),'entity-radio')[0].textContent,inspector(e).descendants().find(n=>n.attrs?.role==='img').attrs['aria-label']],['Im Radio','Essentials-Favorit']);
- assert.match(cssRules().get('.entity-radio .essentials-icon'),/fill:currentColor/);
- assert.match(cssRules().get('#explorer .entity-radio .text-button'),/text-decoration:underline; text-decoration-color:var\(--muted\); text-underline-offset:3px/,'stage names in a sentence carry a quiet underline at rest');
+ follow(e,byClass(inspector(e),'row').find(a=>a.getAttribute('href')==='#explore/art_000000000104'));
+ assert.deepEqual([inspector(e).descendants().find(n=>n.localName==='h3').textContent,textOf(byClass(inspector(e),'entity-line')[0])],['Kiasmos',''],'a record already fetched shows at once, before its tracks are known');
+ await flush();assert.equal(textOf(byClass(inspector(e),'entity-line')[0]),'On Lost in Feelings 1','its line fills in with the body, when its own payload brings its tracks');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
+ assert.deepEqual([textOf(byClass(inspector(e),'entity-line')[0]),inspector(e).descendants().find(n=>n.attrs?.role==='img').attrs['aria-label']],['Deutschland · Auf Lost in Feelings 2, Essentials 1','Essentials-Favorit']);
+ data.art_000000000001.entity.favorite=false;const plain=setup({journey:true});await flush();plain.discovery=url=>data[url.split('/').pop()]||null;plain.visit('#explore/art_000000000001');await flush();
+ assert.equal(inspector(plain).descendants().some(n=>n.attrs?.role==='img'),false,'no favourite, no heart');
+ const rules=cssRules();
+ assert.match(rules.get('.entity-line .essentials-icon'),/fill:currentColor/);
+ assert.match(rules.get('#explorer .entity-line .text-button'),/min-height:0; text-decoration:underline; text-decoration-color:var\(--muted\); text-underline-offset:3px/,'stage names in a sentence carry a quiet underline at rest');
+ assert.ok(![...rules.keys()].some(k=>k.includes('.entity-line')&&k.includes('::after')),'the word is the target: on a wrapped line, a target grown past it would cover the stage on the line above');
+ assert.match(rules.get('#explorer .entity-line .text-button:is(:hover, :focus-visible)'),/outline-offset:1px/,'the focus ring fits in the spaces, off the word before and the count after');
+ assert.match(rules.get('.entity-line > span'),/white-space:nowrap/,'a stage keeps its heart and its count on its line');
+ assert.ok(byClass(line,'text-button').every(b=>b.parent.localName==='span'&&b.parent.parent===line),'each stage with its count is one span of the line');
+ assert.match(rules.get('.entity-line small'),/font:11px\/1\.4 var\(--mono\)/,'counts are facts');
 });
 
 test('a preview plays in place under the title, counts its seconds, and ends when its profile is left',async()=>{
@@ -1236,7 +1419,7 @@ test('a preview plays in place under the title, counts its seconds, and ends whe
   e.visit('#explore/trk_0123456789ab');await flush();
   const toggle=()=>byClass(inspector(e),'preview-toggle')[0],label=()=>toggle().children[1].textContent;
   const about=byClass(inspector(e),'entity-heading')[0].children[1];
-  assert.equal(about.children.indexOf(toggle()),2,'right under the title');
+  assert.equal(about.children.indexOf(toggle()),3,'right under the title and its line');
   assert.deepEqual([label(),toggle().getAttribute('data-playing'),byClass(toggle(),'preview-icon')[0].children.map(n=>n.attrs.class)],['Listen · 60 s',null,['icon-start','icon-stop']]);
   toggle().emit('click');await flush();
   assert.deepEqual([audio.src,label(),toggle().getAttribute('data-playing'),e.window.Pavoia.getState().wanted],['/api/discovery/preview/trk_0123456789ab','Stop · 0:00','',false],'it plays in place and pauses the radio');
@@ -1256,29 +1439,8 @@ test('a preview plays in place under the title, counts its seconds, and ends whe
  assert.match(rules.get('.preview-toggle:not([data-playing]) .icon-stop, .preview-toggle[data-playing] .icon-start'),/display:none/);
 });
 
-test('the roots group records by kind, credits first, and say a relation only when it adds something',async()=>{
- const e=setup({journey:true});await flush();e.discovery=()=>roots();e.visit('#explore/art_000000000001');await flush();
- const groups=byClass(inspector(e),'root-group');
- assert.deepEqual(groups.map(g=>textOf(g.children[0])),['Artists9','Releases1','Tracks1','Labels1'],'artists, releases, tracks, labels, each with its count; playlists and missing records stay out');
- const artists=groups[0].children[1].children;
- assert.deepEqual(artists.map(a=>a.getAttribute('href')),['#explore/art_000000000100','#explore/art_000000000101','#explore/art_000000000107','#explore/art_000000000108','#explore/art_000000000103','#explore/art_000000000104'],'credits, then shared records, six at first');
- assert.deepEqual(artists.map(a=>a.children[1].children.map(textOf)),[['Artist 0'],['Artist 1','Featuring'],['Artist 7'],['Artist 8','Remixed by'],['Artist 3','Collaboration'],['Artist 4','Remix']],'a relation that repeats the heading is left out');
- assert.deepEqual([artists[0].className,artists[0].children[0].className,artists[0].children[0].dataset.type,artists[0].children[0].dataset.initial,artists[0].children[0].children[0].hidden],['row','picture','artist','A',true],'a 40px box holds the first letter where there is no image');
- assert.deepEqual([artists[1].children[1].className,...artists[1].children[1].children.map(n=>n.localName+'.'+n.className)],['row-text','span.row-name','span.row-line'],'one row: the name over its second line, no small mono relation');
- const more=byClass(groups[0],'text-button')[0];assert.equal(more.textContent,'Show all 9');
- more.emit('click');
- assert.deepEqual([artists.length,groups[0].children.includes(more),e.document.activeElement,artists.slice(6).map(a=>textOf(a.children[1]))],[9,false,artists[6],['Artist 6Band member','Artist 2Similar','Artist 5']],'the column grows in place, focus on the first name it showed');
- assert.equal(textOf(groups[3].children[1].children[0]),'Label','no relation under a label');
- e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
- assert.deepEqual(byClass(inspector(e),'root-group').map(g=>g.children[0].textContent),['Künstler','Veröffentlichungen','Tracks','Labels']);
- assert.equal(byClass(inspector(e),'text-button')[0].textContent,'Alle 9 zeigen');
- assert.ok(!/moreRoots/.test(web('journey.js')),'the old "+ 3 more" words are gone');
- e.discovery=()=>({entity:{id:'lab_000000000001',type:'label',title:'Label',connections:[]},included:[]});e.visit('#explore/lab_000000000001');await flush();
- assert.deepEqual(inspector(e).children.map(n=>n.className||n.attrs.class),['entity-heading'],'no roots, nothing under the profile');
- const rules=cssRules(),phone=cssRules('(max-width:760px)');
- assert.match(rules.get('.root-groups, .discovery-results'),/display:grid; grid-auto-flow:column; grid-auto-columns:minmax\(0,1fr\); gap:var\(--s5\)/,'one column per group');
- assert.match(rules.get('.root-groups'),/margin-top:var\(--s5\)/,'40px under the profile');assert.match(rules.get('.entity-bio'),/margin-top:var\(--s6\)/,'64px down to the biography');
- assert.match(rules.get('.root-group:only-of-type .root-nodes'),/grid-template-columns:repeat\(auto-fill,minmax\(220px,1fr\)\)/,'a single group flows across');
+test('every row is one row with no box, and Show all is a quiet text button',()=>{
+ const rules=cssRules();
  assert.match(rules.get('.row'),/display:grid; grid-template-columns:40px minmax\(0,1fr\) auto; align-items:center; gap:var\(--s3\); min-height:56px; padding-block:var\(--s2\);/);
  assert.doesNotMatch(rules.get('.row'),/border|background|margin/,'no border, no hover box, nothing sticking out of the column');
  assert.match(rules.get('.row:not(:has(> .picture, > time))'),/grid-template-columns:minmax\(0,1fr\) auto/,'a ranking without pictures');
@@ -1286,29 +1448,28 @@ test('the roots group records by kind, credits first, and say a relation only wh
  assert.match(rules.get('.row-name'),/font-size:14px; color:var\(--cream\)/);assert.match(rules.get('.row-line'),/font-size:12px; color:var\(--soft\)/);
  assert.match(rules.get('.row-fact, .row > time'),/font:11px\/1\.4 var\(--mono\); font-variant-numeric:tabular-nums; color:var\(--muted\)/);
  assert.match(rules.get('.row[href]:is(:hover, :focus-visible) .row-name'),/text-decoration:underline; text-underline-offset:3px/,'a pointer or the keyboard underlines the name');
- assert.ok(![...rules.keys()].some(selector=>/\.root-node(?![\w-])|root-name|root-line|roots-band/.test(selector)),'the old row and the band are gone');
- assert.match(rules.get('.root-group h4'),/font:22px\/1\.2 var\(--serif\)/);assert.match(rules.get('.root-group h4 small'),/font:11px var\(--mono\); color:var\(--muted\)/);
- assert.match(phone.get('.root-groups, .discovery-results'),/grid-auto-flow:row/,'phones stack the groups');
- assert.ok(!phone.has('.root-group'),'with no line down their side');
+ assert.ok(![...rules.keys()].some(selector=>/\.root-node(?![\w-])|root-name|root-line|roots-band|root-group/.test(selector)),'the old rows, groups and band are gone');
  assert.match(rules.get('#explorer .text-button'),/color:var\(--soft\); font:14px Inter,sans-serif;/);assert.doesNotMatch(rules.get('#explorer .text-button'),/underline/,'Show all has no underline at rest');
  assert.match(rules.get('#explorer .text-button:is(:hover, :focus-visible)'),/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px/);
 });
 
-test('search results use the same groups and rows, show a line only when the list is cut or empty, and say their count unseen',async()=>{
+test('search results use the same regions and rows, show a line only when the list is cut or empty, and say their count unseen',async()=>{
  const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'],status=e.elements['discovery-status'];
- const items=[{id:'trk_000000000001',type:'track',title:'Taum',artist:'Recondite',album:'Taum'},{id:'art_000000000001',type:'artist',title:'Recondite',artist:'',album:''},{id:'rel_000000000001',type:'release',title:'Taum',artist:'Recondite',album:''}];
+ const items=[{id:'trk_000000000001',type:'track',title:'Taum',artist:'Recondite',album:'Taum'},{id:'art_000000000001',type:'artist',title:'Recondite',artist:'',album:''},{id:'rel_000000000001',type:'release',title:'Taum',artist:'Recondite',album:'Taum'},{id:'lab_000000000001',type:'label',title:'Plangent',artist:'',album:''}];
  let answer={items};e.discovery=url=>url.includes('/search?')?answer:entity(url.split('/').pop());
  const search=async q=>{query.value=q;e.elements['discovery-search'].emit('submit',{preventDefault(){}});await flush();};
  e.visit('#explore');await search('recondite');
- assert.deepEqual(results.children.map(g=>g.children[0].textContent),['Artists','Releases','Tracks'],'grouped like the roots');
- assert.deepEqual(results.children.map(g=>g.children[1].children.map(a=>[a.getAttribute('href'),a.children[1].children.map(textOf)])),[[['#explore/art_000000000001',['Recondite']]],[['#explore/rel_000000000001',['Taum','Recondite']]],[['#explore/trk_000000000001',['Taum','Recondite · Taum']]]],'a release names its artist, a track its artist and album');
+ assert.match(web('index.html'),/<div id="discovery-results" class="regions" hidden><\/div>/,'the regions grid');
+ assert.deepEqual(results.children.map(g=>[cls(g),g.children[0].id,textOf(g.children[0])]),[['region','q-artists','Artists 1'],['region','q-labels','Labels 1'],['region','q-releases','Releases 1'],['region','q-tracks','Tracks 1']],'artists, labels, releases, tracks, with heading ids of their own');
+ assert.deepEqual(results.children.map(g=>byClass(g,'row').map(a=>[a.getAttribute('href'),a.children[1].children.map(textOf)])),[[['#explore/art_000000000001',['Recondite']]],[['#explore/lab_000000000001',['Plangent']]],[['#explore/rel_000000000001',['Taum','Recondite']]],[['#explore/trk_000000000001',['Taum','Recondite · Taum']]]],'a release names its artist, a track its artist and album');
  const unseen=()=>[status.children.map(n=>n.className),textOf(status)];
- assert.deepEqual(unseen(),[['visually-hidden'],'3 results'],'the results speak for themselves on screen; the status still says how many, since an emptied status is not announced');
- assert.deepEqual([results.children[1].children[1].children[0].className,results.children[1].children[1].children[0].children[1].children[1].className],['row','row-line'],'each result is one row, its second line the row\'s');
+ assert.deepEqual(unseen(),[['visually-hidden'],'4 results'],'the results speak for themselves on screen; the status still says how many, since an emptied status is not announced');
  answer={items:items.slice(0,1)};await search('taum');assert.deepEqual(unseen(),[['visually-hidden'],'1 result']);
  answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.deepEqual([status.children.map(n=>n.className),textOf(status)],[[undefined],'First 40 results. Add a word to narrow them.'],'the cut list keeps its visible note');
+ assert.equal(byClass(results,'text-button')[0].textContent,'Show all 40','a long list shows six at first');
  answer={items:[]};await search('zz');assert.equal(textOf(status),'No matches in the radio catalogue.');
- e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore');answer={items};await search('recondite');assert.deepEqual(unseen(),[['visually-hidden'],'3 Treffer']);
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore');answer={items};await search('recondite');assert.deepEqual(unseen(),[['visually-hidden'],'4 Treffer']);
+ assert.deepEqual(results.children.map(g=>textOf(g.children[0])),['Künstler 1','Labels 1','Veröffentlichungen 1','Tracks 1']);
  answer={items:Array.from({length:40},(_,i)=>({id:'art_'+String(i).padStart(12,'0'),type:'artist',title:'A'+i}))};await search('a');assert.equal(textOf(status),'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.');
 });
 
@@ -1680,6 +1841,47 @@ test('History left open past midnight follows the radio again and names its days
  await e.poll();await flush();assert.equal(e.historyRequests.length,sent+1,'once');
 });
 
+test('past midnight, a History list with earlier pages names its days anew in place, and keeps its rows and its place',async()=>{
+ const e=setup({journey:true});await flush();const content=e.elements['music-content'],explorer=e.elements.explorer;
+ e.response=onAirNow('2');await e.poll();await flush();
+ e.historyReply=answer({items:[{id:'2',title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});routeTo(e,'#history');await flush();
+ e.historyReply=answer(played(50,50,null));e.elements['history-more'].emit('click');await flush();
+ // Each day heading, with the start of the row under it.
+ const heads=()=>content.children.map((n,i,all)=>n.localName==='h3'?[n.textContent,all[i+1].children[0].dateTime]:null).filter(Boolean);
+ const shown=[...content.children],sent=e.historyRequests.length;
+ assert.equal(heads()[0][0],'Today');
+ explorer.scrollTop=2000;e.setWall(86400000);await e.poll();await flush();
+ assert.deepEqual(heads().map(h=>h[0]),heads().map(([,at],i)=>i?new Date(at).toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long'}):'Yesterday'),'Today is Yesterday now, and each heading names the day of the row under it');
+ assert.deepEqual([e.historyRequests.length,sameRows(content.children,shown),explorer.scrollTop],[sent,true,2000],'without a reload: the same rows, both pages, scrolled where they were');
+ await e.poll();await flush();assert.equal(e.historyRequests.length,sent,'once named, the day asks for nothing');
+});
+
+test('Show earlier tracks says it is disabled while any History request runs, and keeps focus',async()=>{
+ const e=setup({journey:true});await flush();const more=e.elements['history-more'],stage=e.elements['music-stage'];
+ let reply;e.historyReply=url=>new Promise(resolve=>{reply=page=>resolve(page&&answer(page)(url));});
+ routeTo(e,'#history');await flush();reply(played(50,0,'9:1'));await flush();
+ more.focus();stage.value='bermuda-day';stage.emit('change');await flush();
+ let sent=e.historyRequests.length;more.emit('click');
+ assert.deepEqual([more.hidden,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.historyRequests.length,e.document.activeElement===more],[false,'true',null,sent,true],'a filter change: the button stays, says it is disabled, asks for nothing, and keeps focus');
+ reply(played(50,50,'9:2'));await flush();
+ assert.deepEqual([more.getAttribute('aria-disabled'),more.hidden,e.document.activeElement===more],[null,false,true],'once the rows are drawn it works again, still focused');
+ stage.value=e.window.Pavoia.getState().stage;stage.emit('change');await flush();reply(played(50,0,'9:1'));await flush();
+ e.response=onAirNow('999');await e.poll();await flush();sent=e.historyRequests.length;more.emit('click');
+ assert.deepEqual([more.getAttribute('aria-disabled'),e.historyRequests.length,e.document.activeElement===more],['true',sent,true],'so does a refresh that follows the radio');
+ reply(played(50,0,'9:1'));await flush();
+ assert.deepEqual([more.getAttribute('aria-disabled'),e.document.activeElement===more],[null,true]);
+ assert.match(cssRules().get('#history-more[aria-disabled=true]'),/opacity:\.45; cursor:default/,'it looks disabled while it is');
+});
+
+test('a day the listener picks stays picked, even the day the field showed by itself, after midnight',async()=>{
+ const e=setup({journey:true});await flush();const day=e.elements['history-day'];
+ e.historyReply=answer(played(50,0,'9:1'));routeTo(e,'#history');await flush();
+ const first=day.value,[y,m,d]=first.split('-').map(Number);
+ day.value='2026-03-28';day.emit('change');await flush();
+ e.setWall(86400000);day.value=first;day.emit('change');await flush();
+ assert.deepEqual([day.value,asked(e).get('until')],[first,new Date(y,m-1,d+1).toISOString()],'picked again after midnight, the day it showed first is a pick, not today');
+});
+
 test('Statistics hides a count that is zero or repeats another, and its most played tracks are rows that link to them',async()=>{
  const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop(),'track');
  const stats={scope:'palac-feel',tracks:1094,artists:751,releases:562,durationMs:441949205,updatedAt:'2026-10-19T04:35:27Z',coverage:{artists:1094,labels:949,years:1084,genres:0},topArtists:[{name:'Soel',count:16}],years:[],labels:[],genres:[],stages:[]};
@@ -1715,5 +1917,11 @@ test('History reads time, title and artist on the one row at every width, under 
  assert.match(small.get('#history-more'),/width:100%/);
  assert.match(rules.get('#history-more'),/min-width:12\.5rem/,'the longest label, Frühere Tracks anzeigen, fits: Loading… and Try again swap in a box of the same width');
  assert.ok(!rules.has('#explorer #history-day'),'the Day field is a field like the others');assert.match(rules.get('.music-filters label'),/color:var\(--soft\); font-size:12px/);
- assert.deepEqual([...rules].filter(([selector,body])=>/row|history/.test(selector)&&/--red/.test(body)).map(([selector])=>selector),['.row[aria-current] time::before'],'red marks Now only');
+ assert.deepEqual([...rules].filter(([selector,body])=>/--red/.test(body)&&/#explorer|\.explorer|\.entity|\.eyebrow|\.row|\.region|\.record|history|music/.test(selector)).map(([selector])=>selector),['.eyebrow .on-air span::before','.row[aria-current] time::before'],'in the explorer, red marks only what plays now: Now in History, and On air on the record');
+});
+
+test('the explorer and the record title take focus as places to read from, with no control ring',()=>{
+ const rules=cssRules();
+ assert.match(rules.get('#explorer:focus'),/outline:none/);
+ assert.match(rules.get('#explorer h3[tabindex="-1"]:focus'),/outline:none/,'a direct load focuses the title: no white box around it');
 });

@@ -12,15 +12,19 @@ async page => {
   await page.locator('#go-deeper').click();
   await page.locator('.explorer-nav a[href="#history"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===50);
-  assert(await page.locator('#history-period').inputValue()==='7','Wrong default history period');
+  const today=await page.evaluate(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');});
+  assert(await page.locator('#history-day').inputValue()===today,'The Day field does not show today');
   const first=await page.locator('#music-content > .row').first().textContent();
   await page.locator('#history-more').click();
   await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===100);
   assert(await page.locator('#music-content > .row').first().textContent()===first,'Older records replaced recent records');
-  await page.locator('#history-period').selectOption('1');
-  await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===50);
+  await page.locator('#history-day').fill(today);
+  await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===50&&!document.getElementById('music-content').hasAttribute('aria-busy'));
+  // History rows name no stage: the list is Ambiance's once its answer is in and its rows are drawn.
+  const ambiance=page.waitForResponse(r=>r.url().includes('/api/radio/ambiance/history?'));
   await page.locator('#music-stage').selectOption('ambiance');
-  await page.waitForFunction(()=>document.querySelector('#music-content > .row small')?.textContent==='Ambiance');
+  await ambiance;
+  await page.waitForFunction(()=>!document.getElementById('music-content').hasAttribute('aria-busy')&&document.querySelectorAll('#music-content > .row').length>0);
   const row=page.locator('#music-content > .row').first();await row.click();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
   await page.goBack();
@@ -45,7 +49,7 @@ async page => {
   assert(await page.locator('#explorer').evaluate(n=>n.scrollWidth<=n.clientWidth+1),'History overflow');
   await page.screenshot({path:'output/playwright/music-history-320.png'});
   await page.route('**/api/radio/fontanna/history?**',r=>r.fulfill({status:503,body:'unavailable'}));
-  await page.locator('#history-period').selectOption('30');
+  await page.locator('#history-day').fill('2026-10-01');
   await page.getByRole('button',{name:'Try again',exact:true}).waitFor();
   assert(await page.locator('#music-content > .row').count()===0,'Failed request retained misleading rows');
   await page.unroute('**/api/radio/fontanna/history?**');

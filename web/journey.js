@@ -33,26 +33,36 @@
       searchLabel:'Artist, track, release or label',searchPlaceholder:'Search artists, tracks, releases, labels',nothingOnAir:'Nothing on air right now. Search to start.',
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
       artist:'Artist',track:'Track',release:'Release',label:'Label',playlist:'Playlist',primary:'Artist',featured:'Featuring',remixer:'Remixed by',
-      similar:'Similar',collaboration:'Collaboration',remix:'Remix','musicbrainz:member of band':'Band member','musicbrainz:collaboration':'Collaboration',
+      similar:'Similar artists',collaboration:'Collaboration',remix:'Remix',shared_release:'Shared release','musicbrainz:member of band':'Band member','musicbrainz:collaboration':'Collaboration',
       favorite:'Essentials favourite',onRadio:'On the radio',bioFrom:'Biography from',more:'More',less:'Less',showAll:'Show all {n}',trail:'Path',elsewhere:'Elsewhere',
       bioEnglish:'Biography in English',held:'Artist details are being checked.',artists:'Artists',tracks:'Tracks',
       preview:'Listen · 60 s',stopPreview:'Stop',previewError:'The preview could not play. Try again.',
       result:'result',results:'results',firstResults:'First 40 results. Add a word to narrow them.',
       basicDetails:'Artist and release profiles are not available for this track yet.',cover:'Release artwork',portrait:'Artist portrait',
       artistImage:'Portrait',releaseImage:'Cover',trackImage:'Cover',labelImage:'Label logo',playlistImage:'Cover',
+      worked:'Worked with',madeBy:'Made by',similarLabels:'Similar labels',similarReleases:'Similar releases',about:'About {title}',onAir:'On air',playsOn:'Plays on',onStage:'On',
+      similarTo:'Similar to {names}',workedWithNames:'Worked with {names}',alsoOn:'Also on {names}',byNames:'By {names}',labelOf:'Label of {names}',alsoBy:'Also by {names}',
+      inCommon:'{n} artists in common',inCommon1:'1 artist in common',moreNames:'{n} more',tracksN:'{n} tracks',tracks1:'1 track',
+      noSimilar:'No similar artists in the collection yet.',noSimilarLabels:'No similar labels in the collection yet.',noSimilarReleases:'No similar releases in the collection yet.',
+      noLabelReleases:'This label’s releases are not listed yet.',nothingLinked:'Nothing in the collection is linked to {title} yet.',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',roots:'Die Wurzeln',back:'Zurück zum Radio',
       spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',
       searchLabel:'Künstler, Track, Veröffentlichung oder Label',searchPlaceholder:'Künstler, Tracks, Alben, Labels suchen',nothingOnAir:'Gerade läuft nichts. Suche, um anzufangen.',
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
       artist:'Künstler',track:'Track',release:'Veröffentlichung',label:'Label',playlist:'Playlist',primary:'Künstler',featured:'Mit',remixer:'Remix von',
-      similar:'Ähnlich',collaboration:'Zusammenarbeit',remix:'Remix','musicbrainz:member of band':'Bandmitglied','musicbrainz:collaboration':'Zusammenarbeit',
+      similar:'Ähnliche Künstler',collaboration:'Zusammenarbeit',remix:'Remix',shared_release:'Gemeinsame Veröffentlichung','musicbrainz:member of band':'Bandmitglied','musicbrainz:collaboration':'Zusammenarbeit',
       favorite:'Essentials-Favorit',onRadio:'Im Radio',bioFrom:'Biografie von',more:'Mehr',less:'Weniger',showAll:'Alle {n} zeigen',trail:'Pfad',elsewhere:'Anderswo',
       bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',artists:'Künstler',tracks:'Tracks',
       preview:'Anhören · 60 s',stopPreview:'Stopp',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
       result:'Treffer',results:'Treffer',firstResults:'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.',
       basicDetails:'Für diesen Track gibt es noch keine Künstler- und Veröffentlichungsprofile.',cover:'Cover der Veröffentlichung',portrait:'Künstlerporträt',
       artistImage:'Porträt',releaseImage:'Cover',trackImage:'Cover',labelImage:'Label-Logo',playlistImage:'Cover',
+      worked:'Gearbeitet mit',madeBy:'Gemacht von',similarLabels:'Ähnliche Labels',similarReleases:'Ähnliche Veröffentlichungen',about:'Über {title}',onAir:'Auf Sendung',playsOn:'Läuft auf',onStage:'Auf',
+      similarTo:'Ähnlich wie {names}',workedWithNames:'Gearbeitet mit {names}',alsoOn:'Auch bei {names}',byNames:'Von {names}',labelOf:'Label von {names}',alsoBy:'Auch von {names}',
+      inCommon:'{n} gemeinsame Künstler',inCommon1:'1 gemeinsamer Künstler',moreNames:'{n} weitere',tracksN:'{n} Tracks',tracks1:'1 Track',
+      noSimilar:'Noch keine ähnlichen Künstler in der Sammlung.',noSimilarLabels:'Noch keine ähnlichen Labels in der Sammlung.',noSimilarReleases:'Noch keine ähnlichen Veröffentlichungen in der Sammlung.',
+      noLabelReleases:'Die Veröffentlichungen dieses Labels sind noch nicht verzeichnet.',nothingLinked:'In der Sammlung ist noch nichts mit {title} verbunden.',
     },
   };
   Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',historyDay:'Day',older:'Show earlier tracks',loadingMore:'Loading…',now:'Now',radioSelection:'All radio selections',library:'Whole music library',noHistory:'Nothing has played on this stage yet.',noDay:'Nothing played on this stage that day.',historyError:'The history could not load.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
@@ -90,31 +100,30 @@
   // A picture keeps its box, round for an artist, while it loads or when there is none, so nothing jumps.
   // Until an image shows, the box holds the name's first letter: never an empty disc.
   function picture(v,alt) {const box=node('span','picture'),img=node('img');box.dataset.type=v.type;box.dataset.initial=[...(v.title||'').trim()][0]?.toLocaleUpperCase()||'';image(img,v.image,alt);box.append(img);return box;}
-  // Every name in the roots and the search is a row that links to its record; a second line says what the name does not.
-  function door(v,line) {const a=node('a','row'),text=node('span','row-text');a.href='#explore/'+v.id;text.append(node('span','row-name',v.title));if(line)text.append(line);a.append(picture(v,''),text);return a;}
-  // Records by kind, in a fixed order, six to a group until the listener asks for the rest, whose
-  // pictures load only then.
-  function groups(items) {
-    return ['artist','release','track','label'].map(type=>{
-      const kind=items.filter(i=>i.v.type===type&&entityID(i.v.id)),doors=list=>list.map(i=>door(i.v,i.line));if(!kind.length)return null;
-      const group=node('section','root-group'),heading=node('h4','',word(type+'s')),list=node('div','root-nodes');
-      heading.append(node('small','',number(kind.length)));list.append(...doors(kind.slice(0,6)));group.append(heading,list);
-      // The button goes once used, so focus moves on to the first name it showed, never to the page.
-      if(kind.length>6){const more=action(word('showAll').replace('{n}',number(kind.length)),()=>{const rest=doors(kind.slice(6));list.append(...rest);more.remove();rest[0].focus();},'text-button');group.append(more);}
-      return group;
-    }).filter(Boolean);
+  // Every name in a region and in the search is a row that links to its record: its picture, the name over the
+  // reason it is there, and a fact on the right.
+  function door(v,line,fact) {const a=node('a','row'),text=node('span','row-text');a.href='#explore/'+v.id;text.append(node('span','row-name',v.title));if(line)text.append(node('span','row-line',line));a.append(picture(v,''),text);if(fact)a.append(node('span','row-fact',fact));return a;}
+  // A region: a heading with the count of its names, then a list, six rows until the listener asks for the rest, whose
+  // pictures load only then: Show all {n} shows that count. One with nothing in it says so in one sentence.
+  function regionSection(key,items,empty,prefix='r') {
+    const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.append(door(i,i.line,i.fact));return li;});
+    heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);heading.append(' ',node('small','',number(items.length)));section.append(heading);
+    if(!items.length){section.append(node('p','collection-note',word(empty)));return section;}
+    list.append(...rows(items.slice(0,6)));section.append(list);
+    // The button goes once used, so focus moves on to the first row it showed, never to the page.
+    if(items.length>6){const more=action(word('showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].children[0].focus();},'text-button');section.append(more);}
+    return section;
   }
-  // Credits first, then the artists it shares records with, then the ones it sounds like. A relation shows
-  // only where the group heading does not already say it.
-  const tier=relation=>['similar','related'].includes(relation)?2:['collaboration','remix','shared_release'].includes(relation)||relation.startsWith('musicbrainz:')?1:0;
-  const telling=['featured','remixer','remix','collaboration','similar','musicbrainz:member of band','musicbrainz:collaboration'];
-  function renderRoots(e,all) {
-    const byID=new Map(all.map(v=>[v.id,v]));
-    const items=(e.connections||[]).filter(c=>byID.has(c.id)).map(c=>({v:byID.get(c.id),relation:c.relation.split('/')[0]}))
-      .sort((a,b)=>tier(a.relation)-tier(b.relation)).map(({v,relation})=>({v,line:telling.includes(relation)?node('span','row-line',word(relation)):null}));
-    const list=groups(items);if(!list.length)return [];
-    const roots=node('div','root-groups');roots.append(...list);return [roots];
+  // {names}: "A", "A and B", or "A, B and 3 more", in the listener's language.
+  function names(ids) {
+    const titles=ids.map(id=>records.get(id)?.title).filter(Boolean),list=new Intl.ListFormat(radio.getState().language,{type:'conjunction'});
+    return titles.length>2?titles[0]+', '+list.format([titles[1],word('moreNames').replace('{n}',number(titles.length-2))]):list.format(titles);
   }
+  // A reason from closeness.js in words: each part states its evidence, and parts read apart by a middle dot.
+  const say=reason=>reason.map(({kind,names:list})=>kind==='relation'?[...new Set(list.map(word))].join(' · '):kind==='text'?list.join(', '):kind==='title'?names(list):
+    kind==='inCommon'&&list.length===1?word('inCommon1'):word(kind).replace('{names}',names(list)).replace('{n}',number(list.length))).filter(Boolean).join(' · ');
+  // An artist counts its tracks, a release shows its year, a label shows nothing.
+  const fact=i=>i.type==='release'?i.fact:i.fact?word(i.fact===1?'tracks1':'tracksN').replace('{n}',number(i.fact)):'';
   // External links: listening services first, then the rest in a fixed order, each address once.
   const services=new Map(Object.entries({spotify:'Spotify',apple_music:'Apple Music',bandcamp:'Bandcamp',soundcloud:'SoundCloud',beatport:'Beatport',deezer:'Deezer',tidal:'Tidal',youtube:'YouTube',website:'Website',wikipedia:'Wikipedia',resident_advisor:'Resident Advisor',discogs:'Discogs',instagram:'Instagram',facebook:'Facebook',twitter:'X',musicbrainz:'MusicBrainz',lastfm:'Last.fm'}));
   const order=[...services.keys()],place=kind=>order.includes(kind)?order.indexOf(kind):order.length;
@@ -123,7 +132,7 @@
   function sites(list) {const seen=new Set();return list.map(l=>({kind:l.kind,url:external(l.url)})).filter(l=>l.url&&l.kind!=='wikidata').sort((a,b)=>place(a.kind)-place(b.kind)).filter(l=>!seen.has(l.url)&&seen.add(l.url));}
   const region=code=>{try{return new Intl.DisplayNames([radio.getState().language],{type:'region'}).of(code);}catch{return code;}};
   const time=n=>Math.floor(n/60)+':'+String(Math.floor(n%60)).padStart(2,'0');
-  let recordTitle=null, bioWatch=null, enriched=null, nowKey='', nowRequest=null, explorerRequest=null, selected=null, preview=null, previewButton=null, trail=[], currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
+  let recordTitle=null, bioWatch=null, enriched=null, nowKey='', nowRequest=null, hop=null, selected=null, bodyShown=false, preview=null, previewButton=null, trail=[], currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
   // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
   // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
   // or ✕ always lands on the page in one step.
@@ -142,8 +151,21 @@
     if(!res.ok)throw new Error('unavailable');
     const data=await res.json();
     if(!entityID(data.entity?.id)||!Array.isArray(data.included))throw new Error('schema');
-    return data;
+    remember(data);return data;
   }
+  // Every payload fetched feeds two caches: the last 16 payloads, and every record they hold, by id. The track on
+  // air comes in through enrich(), so the explorer opens on it with no request.
+  // ponytail: clear-all cap, an LRU if hops get slow
+  const near=PavoiaCloseness,payloads=new Map(),records=new Map();
+  // A copy another payload includes lacks what only a record's own payload brings, such as its preview: it never
+  // replaces the record of a payload kept.
+  const hold=data=>{for(const r of [data.entity,...data.included])if(entityID(r?.id)&&(r===data.entity||!payloads.has(r.id)))records.set(r.id,r);};
+  function remember(data) {
+    payloads.delete(data.entity.id);payloads.set(data.entity.id,data);
+    if(payloads.size>16)payloads.delete(payloads.keys().next().value);
+    hold(data);if(records.size>3000){records.clear();for(const p of payloads.values())hold(p);}
+  }
+  const cached=id=>{const data=payloads.get(id);if(data){payloads.delete(id);payloads.set(id,data);}return data;};
   async function enrich() {
     const s=radio.getState(),key=s.stage+':'+(s.track?.id||'');
     if(key===nowKey){renderPlayer();return;}
@@ -224,7 +246,7 @@
     $('explorer-close').setAttribute('aria-label',word('back'));
     $('explorer-close').title=word('back');
     $('discovery-query').placeholder=word('searchPlaceholder');
-    renderPlayer();if(selected)renderEntity(selected);
+    renderPlayer();if(selected){const body=bodyShown;renderEntity(selected);if(body)renderBody(selected);}
     if(dialog.open&&view!=='explore'){fillStages($('music-stage').value);loadMusic();}
   }
   // Every move into or inside the explorer comes through go(): opening adds the explorer's one entry,
@@ -235,32 +257,77 @@
     else history.pushState({explorer:life},'',hash);
     radio.renderScene();restore();
   }
+  // A hop paints twice, and nothing moves once it shows. The header comes at once from a record already fetched, or
+  // with its payload. The regions, About and On the radio come once: when the payload, the credited artists and the
+  // naming fetch have answered, or 2.5 s after the header at most, with the records at hand. Later answers only fill
+  // the caches.
   async function loadEntity(id) {
     setView('explore');if(preview)finishPreview();
-    selected=null;explorerRequest?.abort();const controller=new AbortController();explorerRequest=controller;
+    selected=null;hop?.abort();const controller=new AbortController();hop=controller;
     // A record opened from a focused result, a History row or a name in the last record keeps focus visible
     // and off the field: on the explorer while it loads, then on the record's title. Touch screens open no keyboard.
     const workspace=$('explore-workspace');
     if([$('discovery-results'),$('music-content'),workspace].some(n=>n.contains(document.activeElement)))dialog.focus({preventScroll:true});
-    // A hop keeps the last record in place, dimmed and out of reach, until the next one is drawn, so its
-    // preview cannot start; only a first load says so.
     $('discovery-results').hidden=true;
-    $('discovery-status').textContent=workspace.hidden?word('loading'):'';if(!workspace.hidden){workspace.setAttribute('aria-busy','true');workspace.inert=true;}
-    const timeout=setTimeout(()=>controller.abort(),10000);
-    try{const data=await request('/api/discovery/entity/'+id,controller.signal);
-      if(explorerRequest!==controller)return;if(id!==data.entity.id){history.replaceState(history.state,'','#explore/'+data.entity.id);radio.renderScene();}
-      selected=data;$('discovery-status').textContent='';workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=false;renderEntity(data);dialog.scrollTop=0;
+    // Every request of the hop shares its controller: the next hop, a tab or closing the explorer drops them all.
+    const timeout=setTimeout(()=>controller.abort(),10000),fetched=async id=>cached(id)||request('/api/discovery/entity/'+id,controller.signal);
+    let wake,start;const deadline=new Promise(resolve=>{start=()=>{wake=setTimeout(resolve,2500);};});
+    const header=e=>{
+      selected=e;$('discovery-status').textContent='';workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=false;renderEntity(e);dialog.scrollTop=0;
       // The new record starts at its title, unless the listener moved focus while it loaded: a field they
       // type in, the player or the volume keeps the keys.
       if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
-    }catch{if(explorerRequest===controller){workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}
-    finally{clearTimeout(timeout);}
+      start();
+    };
+    if(records.has(id))header(records.get(id));
+    // Without it, the last record stays in place, dimmed and out of reach, so its preview cannot start; only a
+    // first load says it is loading.
+    else{$('discovery-status').textContent=workspace.hidden?word('loading'):'';if(!workspace.hidden){workspace.setAttribute('aria-busy','true');workspace.inert=true;}}
+    // Its payload, the credited artists of a track or a small release, then the fewest neighbours that name the rest.
+    const named=(async()=>{
+      const data=await fetched(id),e=data.entity;if(hop!==controller)return;
+      if(id!==e.id){history.replaceState(history.state,'','#explore/'+e.id);radio.renderScene();}
+      // A header drawn from an included copy has no preview: the record's own payload draws it again, before the body,
+      // and focus in it stays on the title.
+      if(selected&&e.previewUrl&&!selected.previewUrl&&!bodyShown){const held=$('entity-inspector').contains(document.activeElement);renderEntity(e);if(held)recordTitle.focus({preventScroll:true});}
+      if(selected)selected=e;else header(e);
+      const ours=[data,...(await Promise.all(near.credited(e).map(a=>fetched(a).catch(()=>null)))).filter(Boolean)];
+      const pool=new Map(ours.flatMap(p=>[p.entity,...p.included]).map(r=>[r.id,r]));
+      await Promise.all(near.namingPlan(near.regions(e,records),pool,payloads,navigator.connection?.saveData===true).map(a=>fetched(a).catch(()=>null)));
+    })();
+    named.catch(()=>{});// An answer that fails after the body painted changes nothing.
+    try{await Promise.race([named,deadline]);if(hop===controller)renderBody(selected);}
+    // A payload that fails after its header showed from a record at hand is as late as one past the deadline: the header
+    // stays, in the trail and with focus, and the body paints with the records at hand.
+    catch{if(hop===controller){if(selected)renderBody(selected);else{workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}}
+    finally{clearTimeout(timeout);clearTimeout(wake);}
   }
   radio.openTrack=id=>{if(entityID('plex_'+id))go('#explore/plex_'+id);};
-  // One column: the trail, the profile, its roots, then the biography and the links that leave the site.
-  function renderEntity(data) {
-    const e=data.entity,all=data.included,panel=$('entity-inspector'),heading=node('div','entity-heading'),about=node('div');
-    bioWatch?.disconnect();
+  // The stages that play a track, by name.
+  const stagesOf=t=>[...new Set((t.playlists||[]).map(p=>radio.stations.find(s=>s.id===p.id||s.name===p.station)).filter(Boolean))];
+  // One line of facts under the title, in a sentence: where it plays, and the one fact its type has. Each stage
+  // tunes the radio in place, the player bar shows the switch, and a favourite keeps the Essentials heart.
+  function recordLine(e) {
+    const line=node('p','entity-line'),count=new Map(),year=/^\d{4}/.exec(e.releaseDate||'')?.[0];
+    const tracks=e.type==='track'?[e]:(e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(Boolean);
+    for(const t of tracks)for(const s of stagesOf(t))count.set(s,(count.get(s)||0)+1);
+    const stages=[...count].sort((a,b)=>b[1]-a[1]).flatMap(([s,n],i)=>{
+      const pair=node('span');if(s.id==='essentials'&&e.favorite){
+        const heart=drawing('0 0 36 36',['M18 30.5S5 22.6 5 13.6A6.6 6.6 0 0 1 18 10.4a6.6 6.6 0 0 1 13 3.2c0 9-13 16.9-13 16.9Z'],'essentials-icon');
+        heart.removeAttribute('aria-hidden');heart.setAttribute('role','img');heart.setAttribute('aria-label',word('favorite'));pair.append(heart);
+      }
+      // An artist counts its tracks on each stage.
+      pair.append(action(s.name,()=>radio.tune(s.id),'text-button'));if(e.type==='artist')pair.append(' ',node('small','',number(n)));return i?[', ',pair]:[pair];
+    });
+    // A track with no credited artist under Made by, such as one with no profiles yet, names its artist and release.
+    const parts=[...e.type==='track'&&!near.credited(e).length?[e.artist,e.album]:[],['artist','label'].includes(e.type)&&e.country&&region(e.country),e.type==='release'&&year,stages.length&&[word(e.type==='track'?'playsOn':'onStage')+' ',...stages],e.type==='track'&&e.durationMs&&time(e.durationMs/1000)];
+    parts.filter(Boolean).forEach((part,i)=>{if(i)line.append(' · ');line.append(...[part].flat());});
+    return line;
+  }
+  // The header: the trail, the picture, the type, the title and its line.
+  function renderEntity(e) {
+    const panel=$('entity-inspector'),heading=node('div','entity-heading'),about=node('div');
+    bioWatch?.disconnect();bodyShown=false;
     // The trail of records opened in this visit; going back to one cuts the trail there.
     const at=trail.findIndex(t=>t.id===e.id);trail.splice(at<0?trail.length:at,Infinity,{id:e.id,title:e.title});
     if(trail.length>1){
@@ -270,35 +337,37 @@
         const step=node(i<shown.length-1?'a':'span','',t.title);if(step.localName==='a')step.href='#explore/'+t.id;else step.setAttribute('aria-current','page');path.append(step);
       });heading.append(path);
     }
-    recordTitle=node('h3','',e.title);recordTitle.tabIndex=-1;about.append(node('p','eyebrow',word(e.type)),recordTitle);
+    // The track on air says so in red, the colour of what plays now; the pavoia:radio listener puts it out in place.
+    const kind=node('p','eyebrow',word(e.type));
+    if(e.id===enriched?.entity.id){const on=node('span','on-air',' · ');on.append(node('span','',word('onAir')));kind.append(on);}
+    recordTitle=node('h3','',e.title);recordTitle.tabIndex=-1;about.append(kind,recordTitle,recordLine(e));
     previewButton=null;
     if(/^\/api\/discovery\/preview\/trk_[a-f0-9]{12}$/.test(e.previewUrl||'')){
       const circle=node('span','preview-icon');circle.append(drawing('0 0 24 24',['M7 4.5v15l13-7.5z'],'icon-start'),drawing('0 0 24 24',['M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z'],'icon-stop'));
       previewButton=action('',()=>{if(preview)finishPreview();else startPreview(e);},'preview-toggle');previewButton.append(circle,node('span'));about.append(previewButton);
     }
     previewState();
-    const meta=[e.artist,e.album,/^\d{4}/.exec(e.releaseDate||'')?.[0],region(e.country||'')].filter(Boolean).join(' · ');
-    if(meta)about.append(node('p','entity-meta',meta));
-    // Library bookkeeping tags (seen_live, batch names) and the tag every record here shares say nothing.
-    const tags=(e.tags||[]).filter(t=>!t.includes('_')&&t.toLowerCase()!=='electronic').slice(0,4);
-    if(tags.length)about.append(node('p','entity-tags',tags.join(', ')));
-    // The stages that play it tune the radio in place; the player bar shows the switch.
-    const stages=(e.playlists||[]).map(p=>radio.stations.find(s=>s.id===p.id||s.name===p.station)).filter(Boolean);
-    if(stages.length){
-      const line=node('p','entity-radio',word('onRadio'));
-      for(const s of stages){
-        const tune=action(s.name,()=>radio.tune(s.id),'text-button');
-        if(s.id!=='essentials'||!e.favorite){line.append(tune);continue;}
-        const heart=drawing('0 0 36 36',['M18 30.5S5 22.6 5 13.6A6.6 6.6 0 0 1 18 10.4a6.6 6.6 0 0 1 13 3.2c0 9-13 16.9-13 16.9Z'],'essentials-icon'),pair=node('span');
-        heart.removeAttribute('aria-hidden');heart.setAttribute('role','img');heart.setAttribute('aria-label',word('favorite'));pair.append(heart,tune);line.append(pair);
-      }
-      about.append(line);
-    }
     heading.append(picture(e,word(e.type+'Image')),about);panel.replaceChildren(heading);
     if(e.basicDetails)panel.append(node('p','collection-note',word('basicDetails')));
     if(e.reviewRequired)panel.append(node('p','collection-note',word('held')));
-    panel.append(...renderRoots(e,all));
-    const shown=sites(e.links||[]);
+  }
+  // Similar regions keep their heading when empty, and say so in one sentence; so do a label's releases.
+  const empties={similar:'noSimilar',similarLabels:'noSimilarLabels',similarReleases:'noSimilarReleases'};
+  // The body, painted once: the regions as lists, closest first, then About and On the radio, in the same grid so they
+  // sit on the regions' columns.
+  function renderBody(e) {
+    const panel=$('entity-inspector'),found=near.regions(e,records),grid=node('div','regions'),line=panel.querySelector('.entity-line');
+    bodyShown=true;
+    // The line fills in with what the payload brought, such as an artist's stages, unless the listener is in it.
+    if(line&&!line.contains(document.activeElement)){line.before(recordLine(e));line.remove();}
+    // Nothing close at all says so in one sentence, unless the header already said this track has no profiles yet.
+    if(found.every(r=>!r.total)){if(!e.basicDetails)panel.append(node('p','collection-note',word('nothingLinked').replace('{title}',e.title)));}
+    else for(const r of found){
+      const empty=e.type==='label'&&r.key==='releases'?'noLabelReleases':empties[r.key];
+      if(r.items.length||(empty&&!r.total))grid.append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty));
+    }
+    const about=node('section','record-about'),title=node('h4','',word('about').replace('{title}',e.title)),shown=sites(e.links||[]);
+    title.id='r-about';about.setAttribute('aria-labelledby',title.id);about.append(title);
     let text=null,more=null,fit=null;
     if(e.bio){
       // The biography reads open, up to four lines; More appears only when there is more.
@@ -310,9 +379,17 @@
       // The source links once: in the links line when it is there, or here.
       const credit=node('span','',radio.getState().language==='de'?word('bioEnglish'):'');
       if(name)credit.append((credit.textContent?' · ':'')+word('bioFrom')+' ',source&&!shown.some(l=>l.url===source)?link(name,source):name);
-      foot.append(more,credit);bio.append(text,foot);panel.append(bio);
+      foot.append(more,credit);bio.append(text,foot);about.append(bio);
     }
-    if(shown.length){const line=node('p','entity-links');line.append(node('span','',word('elsewhere')),...shown.map(l=>link(site(l.kind,l.url),l.url)));panel.append(line);}
+    // Library bookkeeping tags (seen_live, batch names) and the tag every record here shares say nothing.
+    const tags=(e.tags||[]).filter(t=>!t.includes('_')&&t.toLowerCase()!=='electronic').slice(0,4);
+    if(tags.length)about.append(node('p','entity-tags',tags.join(', ')));
+    if(shown.length){const links=node('p','entity-links');links.append(node('span','',word('elsewhere')),...shown.map(l=>link(site(l.kind,l.url),l.url)));about.append(links);}
+    // Its tracks on the radio: where each plays, or its release where none does, and how long it lasts.
+    const played=(e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track')
+      .map(t=>({...t,line:stagesOf(t).map(s=>s.name).join(', ')||t.album||'',fact:t.durationMs?time(t.durationMs/1000):''}));
+    if(about.children.length>1)grid.append(about);if(played.length)grid.append(regionSection('onRadio',played));
+    if(grid.children.length)panel.append(grid);
     // More follows the width and the font: a turned phone, a narrower window or a late Inter can cut a
     // biography that fitted. Open, it stays, to close it again.
     if(text){
@@ -332,18 +409,22 @@
   // said to screen readers, which do not announce a status that empties.
   const found=n=>n>=40?word('firstResults'):n?node('span','visually-hidden',number(n)+' '+word(n===1?'result':'results')):word('empty');
   async function search() {
-    clearTimeout(typing);selected=null;explorerRequest?.abort();const c=new AbortController(),query=$('discovery-query').value;explorerRequest=c;
+    clearTimeout(typing);selected=null;hop?.abort();const c=new AbortController(),query=$('discovery-query').value;hop=c;
     searchPage(query);
     $('discovery-status').textContent=word('loading');hideRecord();
     const timeout=setTimeout(()=>c.abort(),10000);
     try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent(query),{signal:c.signal});if(!res.ok)throw new Error();
-      const data=await res.json();if(explorerRequest!==c)return;if(!Array.isArray(data.items))throw new Error();
+      const data=await res.json();if(hop!==c)return;if(!Array.isArray(data.items))throw new Error();
       const focused=$('discovery-results').contains(document.activeElement);
-      // The same groups and names as the roots; the second line says who made a release or a track, and on what.
-      $('discovery-results').replaceChildren(...groups(data.items.map(v=>({v,line:v.artist||v.album?node('span','row-line',[v.artist,v.album].filter(Boolean).join(' · ')):null}))));
+      // The same regions and rows as a record: artists, labels, releases, then tracks. The second line says who made
+      // a release, and who made a track and on what.
+      $('discovery-results').replaceChildren(...[['artist','artists'],['label','labels'],['release','releases'],['track','tracks']].map(([type,key])=>{
+        const hits=data.items.filter(v=>v.type===type&&entityID(v.id)).map(v=>({...v,line:[v.artist,type==='track'&&v.album].filter(Boolean).join(' · ')}));
+        return hits.length?regionSection(key,hits,'','q'):'';
+      }).filter(Boolean));
       if(focused)$('discovery-query').focus();
       shownQuery=query;shownCount=data.items.length;$('discovery-results').hidden=false;$('discovery-status').replaceChildren(found(shownCount));
-    }catch{if(explorerRequest===c){hideResults();$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
+    }catch{if(hop===c){hideResults();$('discovery-status').textContent=word('unavailable');}}finally{clearTimeout(timeout);}
   }
   function cancelPreview() {
     const resume=preview?.resume;preview=null;const audio=$('preview-audio');audio.pause();audio.removeAttribute('src');audio.load();previewState();return resume;
@@ -371,7 +452,7 @@
   // restore() then closes the dialog; until then, work stops and moves wait. Any other (a shared link,
   // a reload, a restored session, a typed URL) closes in place, since the entry under it may not be
   // this page. A plain dialog fires no cancel event, so Escape is caught below.
-  const halt=()=>{clearTimeout(typing);explorerRequest?.abort();explorerRequest=null;musicRequest?.abort();musicRequest=null;};
+  const halt=()=>{clearTimeout(typing);hop?.abort();hop=null;musicRequest?.abort();musicRequest=null;};
   const close=()=>{
     if(!dialog.open||closing)return;
     halt();
@@ -404,7 +485,7 @@
     clearTimeout(typing);
     if($('discovery-query').value.trim().length>=2){typing=setTimeout(search,300);return;}
     if(!/^#explore(?:\?|$)/.test(location.hash))return;
-    searchPage('');explorerRequest?.abort();explorerRequest=null;shownQuery='';hideResults();$('discovery-status').textContent='';
+    searchPage('');hop?.abort();hop=null;shownQuery='';hideResults();$('discovery-status').textContent='';
   });
   let view='explore',musicRequest=null,historyPage=null,historyPlace=null,clicked=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
@@ -415,7 +496,7 @@
   const today = () => new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   // Today and yesterday by name, older days by weekday and date.
   function dayName(at) {
-    const lang=radio.getState().language,midnight=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()),days=Math.round((midnight(new Date())-midnight(at))/86400000);
+    const lang=radio.getState().language,midnight=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()),days=Math.round((midnight(new Date(Date.now()))-midnight(at))/86400000);
     if(days>1)return at.toLocaleDateString(lang,{weekday:'long',day:'numeric',month:'long'});
     const name=new Intl.RelativeTimeFormat(lang,{numeric:'auto'}).format(-days,'day');return name[0].toUpperCase()+name.slice(1);
   }
@@ -456,7 +537,7 @@
       if(link.getAttribute('href').split('?')[0]==='#'+next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
     }
     if(next!=='explore'){
-      explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;hideRecord();
+      hop?.abort();selected=null;$('discovery-results').hidden=true;hideRecord();
       $('history-day-label').hidden=next!=='history';$('history-day').max=today();if(next!=='history')$('history-more').hidden=true;fillStages($('music-stage').value);
     }
   }
@@ -515,8 +596,10 @@
     // go at once, as before. Only an empty list says it is loading.
     if(mode!=='history'||content.dataset.key?.split(':')[0]!=='history'){content.replaceChildren();delete content.dataset.key;}
     if($('music-status').contains(document.activeElement))$('music-stage').focus();
-    // Earlier tracks load under the busy button. aria-disabled, unlike disabled, keeps focus on it.
-    if(more){say('loadingMore');button.setAttribute('aria-busy','true');button.setAttribute('aria-disabled','true');}
+    // While any request runs the button does nothing, and says so: aria-disabled, unlike disabled, keeps focus on
+    // it. Earlier tracks load under the busy button; other requests dim the list.
+    button.setAttribute('aria-disabled','true');
+    if(more){say('loadingMore');button.setAttribute('aria-busy','true');}
     else content.setAttribute('aria-busy','true');
     $('music-status').textContent=content.children.length?'':word('musicLoading');
     try {
@@ -579,7 +662,8 @@
   }
   $('music-filters').addEventListener('submit',event=>event.preventDefault());
   // A year typed digit by digit passes through years like 0002, under the field's min: the list waits for a real day.
-  $('music-stage').addEventListener('change',()=>loadMusic());$('history-day').addEventListener('change',()=>{if($('history-day').validity.valid)loadMusic();});
+  // A day the listener changed is theirs, even when it is the one the field showed by itself.
+  $('music-stage').addEventListener('change',()=>loadMusic());$('history-day').addEventListener('change',()=>{delete $('history-day').dataset.shown;if($('history-day').validity.valid)loadMusic();});
   // The field allows days up to today, as of when the listener reaches for it: History can stay open past midnight.
   $('history-day').addEventListener('focus',()=>{$('history-day').max=today();});
   $('history-more').addEventListener('click',()=>{if(!musicRequest)loadMusic(true);});
@@ -587,7 +671,13 @@
   const finePointer=matchMedia('(pointer:fine)');
   // A new track on air, or another stage tuned, redraws History's first page in place while it follows the radio.
   // A lost answer redraws nothing, nor does a half-typed day over a picked one: the list shows what it is for.
-  function followRadio(){if(dialog.open&&!closing&&view==='history'&&!musicRequest&&historyPage&&!historyPage.more&&radio.getState().dataFresh&&$('music-content').dataset.key===musicKey()&&(stale()||onAir()!==historyPage.live))loadMusic(false,true);}
+  // A list with earlier pages follows nothing, but past midnight its days are named anew in place: each heading
+  // takes the day of the row under it, and the rows, the pages and the place stay.
+  function followRadio(){
+    if(!dialog.open||closing||view!=='history'||musicRequest||!historyPage||$('music-content').dataset.key!==musicKey())return;
+    if(historyPage.more){if(stale()){const rows=[...$('music-content').children];rows.forEach((n,i)=>{if(n.localName==='h3')n.textContent=dayName(new Date(rows[i+1].children[0].dateTime));});historyPage.drawn=today();}return;}
+    if(radio.getState().dataFresh&&(stale()||onAir()!==historyPage.live))loadMusic(false,true);
+  }
   function restore(){
     landing=false;
     const [path,params='']=location.hash.split('?');
@@ -612,7 +702,7 @@
     }
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
-    explorerRequest?.abort();explorerRequest=null;selected=null;hideRecord();
+    hop?.abort();hop=null;selected=null;hideRecord();
     const query=new URLSearchParams(params).get('q')||'';$('discovery-query').value=query;
     const again=Boolean(query.trim())&&query===shownQuery&&$('discovery-results').children.length>0;
     $('discovery-results').hidden=!again;$('discovery-status').replaceChildren(again?found(shownCount):'');
@@ -626,6 +716,8 @@
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
+    // A record that has left the air loses its red dot in place; nothing else on the page moves.
+    if(selected&&selected.id!==enriched?.entity.id)$('entity-inspector').querySelector('.on-air')?.remove();
     followRadio();
     if(landing&&!closing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);

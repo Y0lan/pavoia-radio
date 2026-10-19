@@ -26,7 +26,7 @@ jobs:
       - name: Go
         run: go vet ./... && go test -race ./...
       - name: Player
-        run: node --test tests/player.cjs
+        run: node --test tests/player.cjs tests/closeness.cjs
       - name: Operations
         # check_played.py and check_queue.py need Liquidsoap and Podman; they run on Whatbox releases.
         run: |

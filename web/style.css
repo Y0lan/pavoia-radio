@@ -260,6 +260,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer[open] { opacity:1; transform:none; }
 /* The explorer takes focus while a record opened from a result loads; it is a place, not a control. */
 #explorer:focus { outline:none; }
+/* So does the record title it hands focus to after a hop: a place to read from, not a control. */
+#explorer h3[tabindex="-1"]:focus { outline:none; }
 @starting-style { #explorer[open] { opacity:0; transform:translateY(12px); } }
 /* One header row on the page grid: the tabs, the search on the Roots tab, and ✕ at the far end. It stays at the top
    while the explorer scrolls; everything under it starts on the gutter, like the hero and the player bar. */
@@ -308,8 +310,17 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .entity-trail a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 .entity-trail [aria-current] { color:var(--cream); }
 .entity-heading h3 { width:fit-content; max-width:100%; margin:var(--s1) 0 0; font:44px/1.05 var(--serif); overflow-wrap:anywhere; }
-.entity-meta { margin-top:var(--s2); font-size:14px; line-height:1.4; color:var(--soft); }
-.entity-tags { margin-top:var(--s1); font-size:12px; line-height:1.4; color:var(--soft); }
+.eyebrow .on-air span::before { content:""; display:inline-block; width:6px; height:6px; margin-right:var(--s1); border-radius:50%; background:var(--red); vertical-align:1px; }
+/* One line under the title, which keeps its height while it is empty. Stage names are buttons in a sentence: a quiet
+   underline at rest, and the word itself as the target, so a wrapped line never puts one stage's target over
+   another's. Each stage keeps its heart and its count on its own line, and its focus ring inside the spaces. */
+.entity-line { min-height:1.4em; margin-top:var(--s2); font-size:14px; line-height:1.4; color:var(--soft); }
+.entity-line > span { white-space:nowrap; }
+.entity-line small { font:11px/1.4 var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
+#explorer .entity-line .text-button { min-height:0; text-decoration:underline; text-decoration-color:var(--muted); text-underline-offset:3px; }
+#explorer .entity-line .text-button:is(:hover, :focus-visible) { text-decoration-color:currentColor; outline-offset:1px; }
+.entity-line .essentials-icon { fill:currentColor; }
+.entity-tags { margin-top:var(--s3); font-size:12px; line-height:1.4; color:var(--soft); }
 /* The preview plays in place: the player's circle and icons, and what it does next. */
 #explorer .preview-toggle { display:inline-flex; align-items:center; gap:var(--s3); margin-top:var(--s3); font:14px Inter,sans-serif; font-variant-numeric:tabular-nums; }
 .preview-icon { display:grid; place-items:center; width:44px; height:44px; border:1px solid var(--soft); border-radius:50%; }
@@ -323,27 +334,20 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .entity-links a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 /* Named sites need no arrow: the line says they are elsewhere. */
 .entity-links a[href]::after { content:none; }
-/* The stages read as a sentence: their names carry a quiet underline at rest. */
-.entity-radio { display:flex; flex-wrap:wrap; align-items:center; gap:0 var(--s3); font-size:14px; color:var(--muted); }
-#explorer .entity-radio .text-button { text-decoration:underline; text-decoration-color:var(--muted); text-underline-offset:3px; }
-#explorer .entity-radio .text-button:is(:hover, :focus-visible) { text-decoration-color:currentColor; }
-.entity-radio .essentials-icon { fill:currentColor; }
-.entity-bio { max-width:65ch; margin-top:var(--s6); }
-/* Without a biography, the links line keeps the same distance from the roots. */
-.root-groups + .entity-links { margin-top:var(--s6); }
+.entity-bio { max-width:65ch; }
 /* Cut, the paragraphs run on, so no blank line ends on a lone ellipsis; open, they part again. */
 .entity-bio>p:first-child { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; overflow:hidden; font-size:14px; line-height:1.7; color:var(--soft); }
 .entity-bio:has([aria-expanded=true])>p:first-child { -webkit-line-clamp:unset; white-space:pre-line; }
 .bio-foot { display:flex; flex-wrap:wrap; align-items:center; gap:0 var(--s3); min-height:44px; font-size:12px; color:var(--muted); }
 .bio-foot a { color:var(--soft); }
-/* The roots: a column per group, under the profile. */
-.root-groups, .discovery-results { display:grid; grid-auto-flow:column; grid-auto-columns:minmax(0,1fr); gap:var(--s5); }
-.root-groups { margin-top:var(--s5); }
-.discovery-results { margin-top:var(--s5); }
-.root-group h4 { margin:0 0 var(--s2); font:22px/1.2 var(--serif); }
-.root-group h4 small { margin-left:var(--s2); font:11px var(--mono); color:var(--muted); }
-/* A single group, such as a label's artists, flows across the width. */
-.root-group:only-of-type .root-nodes { display:grid; grid-template-columns:repeat(auto-fill,minmax(220px,1fr)); gap:0 var(--s4); }
+/* The regions around a record, and the search results: as many columns as fit, closest first in each. */
+.regions { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--s5); margin-top:var(--s5); }
+.region h4, .record-about h4 { margin:0 0 var(--s2); font:22px/1.2 var(--serif); }
+.region h4 small { margin-left:var(--s1); font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
+.region ol { margin:0; padding:0; list-style:none; }
+/* About and On the radio close the record in the same grid, side by side on a wide screen: On the radio takes the
+   last column, About the ones before it. */
+@media (min-width:761px) { .regions > .record-about { grid-column:1 / -2; } }
 /* One row for every list in the explorer: a 40px picture, a time or nothing, then a name over its second line,
    and a fact on the right. No border, no background; a pointer or the keyboard underlines the name. */
 .row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:var(--s3); min-height:56px; padding-block:var(--s2); }
@@ -426,8 +430,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .entity-heading { grid-template-columns:88px minmax(0,1fr); gap:var(--s3); }
   .entity-heading .picture { width:88px; height:88px; font-size:40px; }
   .entity-heading h3 { font-size:32px; }
-  /* Phones stack the groups. */
-  .root-groups, .discovery-results { grid-auto-flow:row; }
+  .regions { grid-template-columns:minmax(0,1fr); }
   /* The tabs and ✕ share the row; the search takes the full width under them. The bar scrolls away with the page,
      so only the focus ring needs room. */
   .explorer-top { position:static; height:auto; flex-wrap:wrap; row-gap:var(--s2); padding-block:var(--s2); }
@@ -457,7 +460,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #music-content[aria-busy=true] { opacity:.45; pointer-events:none; transition:opacity var(--hover) var(--ease); }
 /* Wide enough for its longest label, Frühere Tracks anzeigen, so Loading… and Try again swap in place. */
 #history-more { margin:var(--s4) 0; min-width:12.5rem; }
-#history-more[aria-busy=true] { opacity:.45; cursor:default; }
+#history-more[aria-disabled=true] { opacity:.45; cursor:default; }
 /* On a phone the explorer's bar scrolls away, so the day names stick to the top edge. */
 @media (max-width:760px) { .history-day { top:0; } }
 .music-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:var(--s4); padding:var(--s4) 0; margin:0; border-bottom:1px solid var(--line); }
