@@ -64,7 +64,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
       if(/^[a-z]+$/.test(selector))return this.descendants().find(c=>c.localName===selector)||null;
       const kind=/data-kind="([^"]+)"/.exec(selector)?.[1];return this.children.find(c=>c.dataset?.kind===kind)||null;
     }
-    focus(){document.activeElement=this;}
+    focus(options){document.activeElement=this;this.focusOptions=options;}
     showModal(){this.open=true;this.modal=true;}
     show(){this.open=true;this.modal=false;}
     close(){this.open=false;}
@@ -113,7 +113,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     back(){this.go(-1);}};
   // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
   const queries=new Map();
-  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],response:status('First'),
+  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],response:status('First'),
     entries:()=>entries.map(entry=>entry.hash),position:()=>at,evict(n){entries.splice(0,n);at-=n;},
     visit(target){location.hash=target;window.emit('popstate');window.emit('hashchange');},
     click:()=>elements.play.emit('click'),
@@ -136,8 +136,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     localStorage:storage,
     // A test calls an observer's fn as the browser would after a resize; disconnect() stops it.
     ResizeObserver:class{constructor(fn){this.fn=fn;this.targets=[];env.observers.push(this);}observe(el){this.targets.push(el);}disconnect(){this.targets=[];}},
-    // env.discovery is one reply for every discovery path, or a function of the path.
-    fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
+    // env.discovery is one reply for every discovery path, or a function of the path; env.historyReply, once set, answers History the same way.
+    fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) :
+      url.includes('/history?')&&env.historyReply ? (env.historyRequests.push({url,signal}),Promise.resolve(env.historyReply(url)).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
     }),
@@ -146,7 +147,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   };
   runInNewContext(source,context);
   env.run=code=>runInContext(code,context);
-  if(journey){elements['discovery-query'].value='';runInContext(web('journey.js'),context);}
+  if(journey){elements['discovery-query'].value='';elements['history-day'].value='';elements['history-day'].validity={valid:true};runInContext(web('journey.js'),context);}
   return env;
 }
 
@@ -1330,4 +1331,245 @@ test('a hop keeps the record in place, dimmed, then starts the next one at its t
  e.discovery=()=>null;follow(e,{getAttribute:()=>'#explore/art_000000000004'});await flush();
  assert.deepEqual([workspace.hidden,workspace.getAttribute('aria-busy'),workspace.inert,status.textContent],[true,null,false,'These details are unavailable. Try another record or search again.'],'a failed hop hides the old record');
  assert.match(cssRules().get('.explore-workspace[aria-busy=true]'),/opacity:\.45; transition:opacity var\(--panel\) var\(--ease\)/);
+});
+
+// Step 7: History finds a time and keeps the place it was left at.
+const routeTo=(e,href)=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
+// A History page: n tracks six minutes apart from `start` back, echoing the asked bounds as the server does.
+// A play keeps its time from one answer to the next, as on the server.
+const playedFrom=Date.now(),played=(n,start=0,next=null)=>({items:Array.from({length:n},(_,i)=>({id:String(1000+start+i),title:'Track '+(start+i),artist:'Artist '+(start+i),startedAt:new Date(playedFrom-(start+i)*360000).toISOString()})),next});
+// With no until the server ends at its own now, as playbackHistory does.
+const answer=page=>url=>{const q=new URL(url,'http://radio').searchParams;return {from:q.get('from'),until:q.get('until')||new Date().toISOString(),...page};};
+const asked=e=>new URL(e.historyRequests.at(-1).url,'http://radio').searchParams;
+const historyRows=e=>byClass(e.elements['music-content'],'history-row');
+// A status line as read: its own words, or the error and its Try again.
+const said=n=>n.children.length?n.children.map(textOf).join(''):n.textContent;
+const localDay=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+const onAirNow=id=>({track:{id,title:'On air '+id,artist:'Artist'},audience:{available:true,listeners:2,measuredAt:new Date(clock.now).toISOString()}});
+// Elements compare by identity, as booleans: a failed deepEqual over the fake DOM takes minutes to print.
+const sameRows=(a,b)=>a.length===b.length&&a.every((n,i)=>n===b[i]);
+
+test('History rows are links that read the time, then the title over its artist, under a heading per local day',async()=>{
+ const e=setup({journey:true});await flush();
+ const day=(back,hour)=>{const d=new Date();d.setDate(d.getDate()-back);d.setHours(hour,30,0,0);return d.toISOString();};
+ const items=[[0,10,'101'],[0,0,'102'],[1,23,'103'],[3,12,'x1']].map(([back,hour,id],i)=>({id,title:'Title '+i,artist:'Artist '+i,startedAt:day(back,hour)}));
+ e.historyReply=answer({items,next:null});routeTo(e,'#history');await flush();
+ const kids=e.elements['music-content'].children,older=new Date(items[3].startedAt).toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long'});
+ assert.deepEqual(kids.map(n=>n.localName+'.'+n.className),['h3.history-day','a.history-row','a.history-row','h3.history-day','a.history-row','h3.history-day','a.history-row'],'a heading opens each local day');
+ assert.deepEqual(kids.filter(n=>n.localName==='h3').map(n=>n.textContent),['Today','Yesterday',older]);
+ const row=kids[1];
+ assert.deepEqual([row.getAttribute('href'),row.events.click,row.children.map(n=>n.localName+'.'+(n.className||''))],['#explore/plex_101',undefined,['time.','span.history-record']],'a link with no handler of its own, and no stage cell');
+ assert.deepEqual([row.children[0].textContent,row.children[0].dateTime,row.children[1].children.map(n=>n.textContent)],[new Date(items[0].startedAt).toLocaleTimeString('en',{timeStyle:'short'}),items[0].startedAt,['Title 0','Artist 0']],'the short time only');
+ assert.equal(kids[6].getAttribute('href'),null,'a track without a valid id is no link');
+ follow(e,row);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/plex_101',2],'the document handler routes it through go(), so it replaces the explorer\'s one entry');
+ e.setLanguage('de');routeTo(e,'#history');await flush();
+ assert.deepEqual(e.elements['music-content'].children.filter(n=>n.localName==='h3').map(n=>n.textContent).slice(0,2),['Heute','Gestern'],'rows drawn in English are drawn again in German');
+});
+
+test('a picked day lists back from its end, earlier tracks carry on across days, and an empty list says why',async()=>{
+ const e=setup({journey:true});await flush();const day=e.elements['history-day'],status=e.elements['music-status'],more=e.elements['history-more'];
+ e.historyReply=answer(played(50,0,'9:1'));routeTo(e,'#history');await flush();
+ assert.equal(day.max,localDay(new Date()),'no day after today');
+ assert.deepEqual([asked(e).get('from'),asked(e).get('until')],[new Date(0).toISOString(),null],'an empty field means the server\'s now, the clock that announces the track on air: the browser\'s may run behind');
+ day.value='2026-03-28';day.emit('change');await flush();
+ assert.deepEqual([asked(e).get('from'),asked(e).get('until'),asked(e).get('before')],[new Date(0).toISOString(),new Date(2026,2,29).toISOString(),null],'until is the end of that local day');
+ // Typing 2026 passes through the years 0002, 0020 and 0202, each a change the field's min marks invalid.
+ const typed=e.historyRequests.length;day.validity.valid=false;day.value='0202-03-28';day.emit('change');await flush();day.validity.valid=true;day.value='2026-03-28';
+ assert.equal(e.historyRequests.length,typed,'a year still being typed asks for nothing');
+ more.emit('click');await flush();
+ assert.deepEqual([asked(e).get('until'),asked(e).get('before')],[new Date(2026,2,29).toISOString(),'9:1'],'Show earlier tracks goes on back from there, across the days before it');
+ e.historyReply=answer({items:[],next:null});day.emit('change');await flush();
+ assert.deepEqual([status.textContent,more.hidden],['Nothing played on this stage that day.',true]);
+ day.value='';day.emit('change');await flush();assert.equal(status.textContent,'Nothing has played on this stage yet.');
+ e.setLanguage('de');await flush();assert.equal(status.textContent,'Auf dieser Bühne lief noch nichts.');
+ day.value='2026-03-28';day.emit('change');await flush();assert.equal(status.textContent,'An diesem Tag lief hier nichts.');
+ e.historyReply=()=>null;day.emit('change');await flush();assert.equal(said(status),'Der Verlauf konnte nicht geladen werden. Erneut versuchen');
+ const html=web('index.html'),journey=web('journey.js');
+ assert.match(html,/<label id="history-day-label"><span data-journey="historyDay">Day<\/span><input type="date" id="history-day" min="1970-01-01"><\/label>/);
+ for(const pair of ["historyDay:'Day'","historyDay:'Tag'","noDay:'Nothing played on this stage that day.'","historyError:'The history could not load.'"])assert.ok(journey.includes(pair),pair);
+ for(const gone of ['history-period','Last 24 hours','Last 7 days','Last 30 days','All recorded history','Letzte 30 Tage','Gesamter Verlauf','historyNote','Older tracks','Ältere Tracks'])assert.ok(!html.includes(gone)&&!journey.includes(gone),gone+' is gone');
+});
+
+test('Show earlier tracks stays in place while it loads, keeps focus, and says Try again in place',async()=>{
+ const e=setup({journey:true});await flush();const more=e.elements['history-more'];
+ e.historyReply=answer(played(50,0,'9:1'));routeTo(e,'#history');await flush();
+ assert.deepEqual([more.hidden,more.textContent],[false,'Show earlier tracks']);
+ let reply;e.historyReply=url=>new Promise(resolve=>{reply=page=>resolve(page&&answer(page)(url));});
+ more.focus();more.emit('click');await flush();
+ assert.deepEqual([more.hidden,more.textContent,more.getAttribute('aria-busy'),more.getAttribute('aria-disabled'),e.document.activeElement===more],[false,'Loading…','true','true',true],'in place, busy, and still focused');
+ const sent=e.historyRequests.length;more.emit('click');assert.equal(e.historyRequests.length,sent,'a second press while it loads asks for nothing');
+ reply(played(50,50,'9:2'));await flush();
+ assert.deepEqual([historyRows(e).length,more.textContent,more.getAttribute('aria-busy'),more.getAttribute('aria-disabled'),e.document.activeElement===more],[100,'Show earlier tracks',null,null,true],'the rows append above it and focus stays on it');
+ more.emit('click');await flush();reply(null);await flush();
+ assert.deepEqual([more.hidden,more.textContent,historyRows(e).length,e.document.activeElement===more],[false,'Try again',100,true],'a failure says so on the button itself');
+ more.emit('click');await flush();assert.equal(asked(e).get('before'),'9:2','which asks again for the same tracks');
+ reply(played(10,100,null));await flush();
+ assert.deepEqual([more.hidden,e.document.activeElement===historyRows(e)[100]],[true,true],'the last page takes the button away, and focus moves to the first track it showed');
+ e.setLanguage('de');await flush();e.historyReply=answer(played(50,0,'9:1'));e.elements['music-stage'].emit('change');await flush();
+ assert.equal(more.textContent,'Frühere Tracks anzeigen');
+ more.emit('click');assert.equal(more.textContent,'Wird geladen…');
+});
+
+test('a filter change refreshes History in place, dimmed, and Statistics still loads as before',async()=>{
+ const e=setup({journey:true});await flush();const content=e.elements['music-content'],status=e.elements['music-status'],stage=e.elements['music-stage'],day=e.elements['history-day'];
+ let reply;e.historyReply=url=>new Promise(resolve=>{reply=page=>resolve(page&&answer(page)(url));});
+ routeTo(e,'#history');await flush();assert.equal(status.textContent,'Loading the music…','only the first load says it is loading');
+ reply(played(50));await flush();const first=[...content.children];
+ stage.value='bermuda-day';stage.emit('change');await flush();
+ assert.deepEqual([sameRows(content.children,first),content.getAttribute('aria-busy'),status.textContent],[true,'true',''],'the rows stay, dimmed, with no Loading line');
+ reply(played(50,50));await flush();
+ assert.deepEqual([content.getAttribute('aria-busy'),historyRows(e)[0].children[1].children[0].textContent],[null,'Track 50'],'then the next ones replace them');
+ day.focus();day.value='2026-03-28';day.emit('change');await flush();reply(played(50));await flush();
+ assert.ok(e.document.activeElement===day,'the date field keeps focus while the list refreshes');
+ historyRows(e)[3].focus();stage.emit('change');await flush();reply(null);await flush();
+ assert.deepEqual([content.children.length,content.dataset.key,said(status),e.document.activeElement===stage],[0,undefined,'The history could not load. Try again',true],'an error clears the rows, and focus on one moves to the Stage select');
+ status.children[1].focus();status.children[1].emit('click');await flush();
+ assert.ok(e.document.activeElement===stage,'Try again goes with the line, so focus moves to the Stage select');
+ reply(played(50));await flush();
+ routeTo(e,'#statistics');
+ assert.deepEqual([content.children.length,status.textContent],[0,'Loading the music…'],'Statistics still empties at once and says it is loading');
+});
+
+test('the History tab brings back the same rows where they were, with focus on the row that was opened',async()=>{
+ const e=setup({journey:true});await flush();const content=e.elements['music-content'],explorer=e.elements.explorer;
+ e.discovery=url=>entity(url.split('/').pop(),'track');
+ // The track of row 6 plays again at row 46.
+ const first=played(50,0,'9:1');first.items[45]={...first.items[45],id:first.items[5].id};
+ e.historyReply=answer(first);routeTo(e,'#history');await flush();
+ e.historyReply=answer(played(50,50,null));e.elements['history-more'].emit('click');await flush();
+ const shown=[...content.children],row=historyRows(e)[69],sent=e.historyRequests.length;
+ explorer.scrollTop=4000;row.focus();follow(e,row);
+ assert.ok(e.document.activeElement===explorer,'while the record loads, focus waits on the explorer, not on the page');
+ await flush();assert.deepEqual([e.location.hash,e.document.activeElement.tabIndex],['#explore/plex_1069',-1],'then on the record\'s title');
+ routeTo(e,'#history');await flush();
+ assert.deepEqual([e.historyRequests.length,sameRows(content.children,shown),explorer.scrollTop,e.document.activeElement===row],[sent,true,4000,true],'no reload: the same rows, scrolled where they were, focus on the row opened');
+ // A typed #history fires popstate, then hashchange: the second restore() must not undo a scroll made in between.
+ follow(e,row);await flush();
+ e.location.hash='#history';e.window.emit('popstate');explorer.scrollTop=10;e.window.emit('hashchange');await flush();
+ assert.deepEqual([e.historyRequests.length,sameRows(content.children,shown),explorer.scrollTop,e.document.activeElement===row],[sent,true,10,true],'restore() twice changes nothing');
+ // A tap focuses no link: focus is still on row 70 when row 13 is tapped.
+ const tapped=historyRows(e)[12];explorer.scrollTop=700;follow(e,tapped);await flush();
+ routeTo(e,'#history');await flush();
+ assert.deepEqual([e.historyRequests.length,explorer.scrollTop,e.document.activeElement===tapped],[sent,700,true],'a row opened by a tap is found by its link, not by the focus left on another row');
+ const twice=historyRows(e)[45];twice.focus();follow(e,twice);await flush();routeTo(e,'#history');await flush();
+ assert.ok(e.document.activeElement===twice,'a track played twice comes back to the row that was opened, not to its first one');
+ const firstCopy=historyRows(e)[5];firstCopy.focus();follow(e,twice);await flush();routeTo(e,'#history');await flush();
+ assert.ok(e.document.activeElement===twice,'and so does a tap on the second copy while focus sits on the first');
+ routeTo(e,'#statistics');await flush();routeTo(e,'#history');await flush();
+ assert.equal(e.historyRequests.length,sent+1,'Statistics in between loads History again');
+ e.elements['explorer-close'].emit('click');await flush();routeTo(e,'#history');await flush();
+ assert.equal(e.historyRequests.length,sent+2,'so does a new visit');
+});
+
+test('the track on air reads Now on the live stage, and the first page follows the radio',async()=>{
+ const e=setup({journey:true});await flush();const more=e.elements['history-more'],stage=e.elements['music-stage'],explorer=e.elements.explorer;
+ const page=(id,next='9:1')=>answer({items:[{id,title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next});
+ const nowRows=()=>historyRows(e).filter(r=>r.getAttribute('aria-current')==='true');
+ e.historyReply=page('123');routeTo(e,'#history');await flush();
+ assert.deepEqual([nowRows().length,historyRows(e)[0].getAttribute('aria-current'),historyRows(e)[0].children[0].textContent],[1,'true','Now'],'the first row is marked, and its time says Now');
+ const focused=historyRows(e)[3];focused.focus();let sent=e.historyRequests.length;
+ e.historyReply=page('456');e.response=onAirNow('456');await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,historyRows(e)[0].children[1].children[0].textContent,nowRows().length],[sent+1,'On air',1],'a new track redraws the first page');
+ assert.deepEqual([e.document.activeElement===focused,e.document.activeElement.getAttribute('href')],[false,focused.getAttribute('href')],'focus moves to the new row of the same track');
+ sent=e.historyRequests.length;await e.poll();await flush();assert.equal(e.historyRequests.length,sent,'the same track asks for nothing');
+ const later=played(50,60).items;e.historyReply=answer({items:later,next:'9:1'});e.response=onAirNow('789');await e.poll();await flush();
+ assert.ok(e.document.activeElement===stage,'a focused track that left the page hands focus to the Stage select');
+ Object.defineProperty(e.Element.prototype,'offsetTop',{configurable:true,get(){return this.parent?this.parent.children.indexOf(this)*60:0;}});
+ // A new track starts a millisecond after the newest one shown, so no day heading comes between them at any hour.
+ const after=(id,last)=>({id,title:'New '+id,artist:'Artist',startedAt:new Date(Date.parse(last.startedAt)+1).toISOString()}),n790=after('790',later[0]);
+ explorer.scrollTop=600;
+ e.historyReply=answer({items:[n790,...later],next:'9:1'});e.response=onAirNow('790');await e.poll();await flush();
+ assert.equal(explorer.scrollTop,660,'the rows in view stay put while a new track lands above them');
+ explorer.scrollTop=0;e.historyReply=answer({items:[after('791',n790),n790,...later],next:'9:1'});e.response=onAirNow('791');await e.poll();await flush();
+ assert.equal(explorer.scrollTop,0,'at the top, the new track shows above the rows it pushes down');
+ e.setLanguage('de');await flush();assert.equal(historyRows(e)[0].children[0].textContent,'Jetzt');e.setLanguage('en');await flush();
+ e.historyReply=answer(played(50,50,null));more.emit('click');await flush();
+ assert.deepEqual([nowRows().length,historyRows(e)[0].children[0].textContent],[0,new Date(historyRows(e)[0].children[0].dateTime).toLocaleTimeString('en',{timeStyle:'short'})],'an earlier page stops the list following the radio: Now goes back to its time');
+ sent=e.historyRequests.length;e.response=onAirNow('800');await e.poll();await flush();assert.equal(e.historyRequests.length,sent,'and a new track redraws nothing');
+ e.historyReply=page('800');stage.value='bermuda-day';stage.emit('change');await flush();assert.equal(nowRows().length,0,'another stage has no Now');
+ stage.value=e.window.Pavoia.getState().stage;e.elements['history-day'].value='2026-03-28';e.elements['history-day'].emit('change');await flush();assert.equal(nowRows().length,0,'nor has another day');
+ e.elements['history-day'].value=localDay(new Date());e.elements['history-day'].emit('change');await flush();assert.equal(nowRows().length,1,'today does');
+});
+
+test('History keeps its rows through a lost radio answer or a failed refresh, and a half-typed day asks for nothing',async()=>{
+ const e=setup({journey:true});await flush();const content=e.elements['music-content'],status=e.elements['music-status'],explorer=e.elements.explorer,day=e.elements['history-day'];
+ const page=id=>answer({items:[{id,title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});
+ const nowRows=()=>historyRows(e).filter(r=>r.getAttribute('aria-current')==='true');
+ e.historyReply=page('123');routeTo(e,'#history');await flush();
+ const shown=[...content.children];explorer.scrollTop=1200;let sent=e.historyRequests.length;
+ e.response=new Error('Offline');await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,sameRows(content.children,shown),nowRows().length,explorer.scrollTop],[sent,true,1,1200],'a lost radio answer redraws nothing');
+ e.historyReply=()=>null;e.response=onAirNow('456');await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,sameRows(content.children,shown),nowRows().length,historyRows(e)[0].children[0].textContent,status.textContent,explorer.scrollTop],[sent+1,true,0,new Date(historyRows(e)[0].children[0].dateTime).toLocaleTimeString('en',{timeStyle:'short'}),'',1200],'a failed refresh keeps the rows and the place; only Now goes back to its time');
+ e.historyReply=page('456');await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,nowRows().length],[sent+2,1],'the next radio answer tries again');
+ // Typing 10172026 in Chromium passes through 0002-10-17, under the field's min.
+ sent=e.historyRequests.length;day.validity.valid=false;day.value='0002-10-17';day.emit('change');e.response=onAirNow('457');await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,asked(e).get('until')],[sent+1,null],'a half-typed day over the live list is no day: the new track redraws the live list');
+ routeTo(e,'#statistics');await flush();routeTo(e,'#history');await flush();
+ assert.deepEqual([e.historyRequests.length,asked(e).get('until')],[sent+2,null],'nor is it sent when History loads again');
+ day.validity.valid=true;day.value='2026-03-28';day.emit('change');await flush();sent=e.historyRequests.length;
+ day.validity.valid=false;day.value='0002-03-28';day.emit('change');e.response=onAirNow('458');await e.poll();await flush();
+ assert.equal(e.historyRequests.length,sent,'over a picked day, the list waits for the new one, and the radio does not swap it for the live list');
+});
+
+test('History marks the track that was on air when it asked, opens no row while it reloads, and allows today after midnight',async()=>{
+ const e=setup({journey:true});await flush();const stage=e.elements['music-stage'];
+ const page=id=>answer({items:[{id,title:'On air',artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});
+ let reply;const later=id=>url=>new Promise(resolve=>{reply=()=>resolve(page(id)(url));});
+ e.response=onAirNow('111');await e.poll();await flush();
+ e.historyReply=later('111');routeTo(e,'#history');await flush();
+ // Track 222 starts while the list for 111 travels.
+ e.response=onAirNow('222');await e.poll();await flush();reply();await flush();
+ let sent=e.historyRequests.length;e.historyReply=page('222');await e.poll();await flush();
+ assert.equal(e.historyRequests.length,sent+1,'the list showed 111 on air, so 222 still has to come');
+ assert.equal(historyRows(e)[0].getAttribute('aria-current'),'true','and then reads Now');
+ e.historyReply=later('222');stage.value='bermuda-day';stage.emit('change');await flush();
+ const stale=historyRows(e)[4];follow(e,stale);await flush();
+ assert.deepEqual([e.location.hash,e.elements['music-content'].getAttribute('aria-busy')],['#history','true'],'a row of the list being replaced opens nothing');
+ reply();await flush();follow(e,historyRows(e)[4]);await flush();
+ assert.equal(e.location.hash,historyRows(e)[4].getAttribute('href'),'once drawn, rows open again');
+ routeTo(e,'#history');await flush();
+ const day=e.elements['history-day'];day.max='2000-01-01';day.emit('focus');
+ assert.equal(day.max,localDay(new Date()),'reaching for the Day field sets today as its last day');
+});
+
+test('a live refresh keeps focus on the same play of a track played twice, and a track gone hands focus to a visible Stage select',async()=>{
+ const e=setup({journey:true});await flush();const stage=e.elements['music-stage'];
+ const at=i=>new Date(Date.UTC(2026,9,19,6)-i*360000).toISOString(),play=(id,i)=>({id,title:'Track '+id,artist:'Artist',startedAt:at(i)});
+ const list=[play('1',0),play('2',1),play('3',2),play('7',3),play('5',4),play('6',5),play('7',6)];
+ e.response=onAirNow('1');await e.poll();await flush();
+ e.historyReply=answer({items:list,next:null});routeTo(e,'#history');await flush();
+ const second=historyRows(e).filter(r=>r.getAttribute('href')==='#explore/plex_7')[1];second.focus();
+ e.historyReply=answer({items:[play('9',-1),...list],next:null});e.response=onAirNow('9');await e.poll();await flush();
+ assert.deepEqual([e.document.activeElement.getAttribute('href'),e.document.activeElement.children[0].dateTime],['#explore/plex_7',at(6)],'focus stays on the second play, not the first');
+ e.historyReply=answer({items:[play('8',-2),play('9',-1),...list.slice(0,5)],next:null});e.response=onAirNow('8');await e.poll();await flush();
+ assert.deepEqual([e.document.activeElement===stage,stage.focusOptions?.preventScroll],[true,undefined],'its play gone, the other play of that track may be far off screen: focus goes to the Stage select, scrolled into view');
+});
+
+test('the same track started again right after itself is a new play, and History asks for it',async()=>{
+ const e=setup({journey:true});await flush();
+ const on=(id,startedAt)=>{const r=onAirNow(id);r.track.startedAt=startedAt;return r;};
+ e.response=on('5','2026-10-19T04:00:00Z');await e.poll();await flush();
+ e.historyReply=answer(played(50,0,'9:1'));routeTo(e,'#history');await flush();
+ const sent=e.historyRequests.length;await e.poll();await flush();
+ assert.equal(e.historyRequests.length,sent,'the same play asks for nothing');
+ e.response=on('5','2026-10-19T04:07:00Z');await e.poll();await flush();
+ assert.equal(e.historyRequests.length,sent+1,'the same track, started again, is a new play to show');
+});
+
+test('History reads time, title and artist on one grid at every width, under sticky day names, with red only for Now',()=>{
+ const rules=cssRules(),phone=cssRules('(max-width:760px)'),small=cssRules('(max-width:600px)');
+ assert.match(rules.get('.history-row'),/display:grid; grid-template-columns:5rem minmax\(0,1fr\); gap:16px; align-items:baseline; padding:12px 0;.* scroll-margin-top:44px;/,'a row reached with Tab scrolls clear of the sticky day name');
+ assert.ok(![...phone.keys(),...small.keys()].some(selector=>/history-row|history-record/.test(selector)),'the same grid on a phone');
+ assert.match(rules.get('.history-row time'),/font:11px var\(--mono\)/,'times are small facts');
+ assert.match(rules.get('.history-record strong'),/font:500 15px\/1\.4 Inter,sans-serif; color:var\(--cream\)/);
+ assert.match(rules.get('.history-record>span'),/font-size:13px; color:var\(--soft\)/);
+ assert.match(rules.get('.history-day'),/position:sticky; top:-28px; z-index:1; margin:0 0 5px; padding:12px 0 7px; background:var\(--surface\); font:11px var\(--mono\);.*text-transform:uppercase; color:var\(--muted\)/,'a sticky day name sits on the explorer\'s edge, over its 28px padding, and leaves the focus ring under it in view');
+ assert.match(rules.get('#explorer'),/padding:28px/);assert.match(phone.get('#explorer'),/padding:18px/);assert.match(phone.get('#explorer .history-day'),/top:-18px/);
+ assert.match(rules.get('#music-content[aria-busy=true]'),/opacity:\.45; pointer-events:none; transition:opacity var\(--hover\) var\(--ease\)/);
+ assert.match(small.get('#history-more'),/width:100%/);
+ assert.match(rules.get('#history-more'),/min-width:12\.5rem/,'the longest label, Frühere Tracks anzeigen, fits: Loading… and Try again swap in a box of the same width');
+ assert.deepEqual([/^ font:inherit; padding:10px 12px; $/.test(rules.get('#explorer #history-day')),/font:inherit/.test(rules.get('#explorer select'))],[true,true],'the Day field reads at the Stage select\'s size and inset');
+ assert.deepEqual([...rules].filter(([selector,body])=>/history/.test(selector)&&/--red/.test(body)).map(([selector])=>selector),['.history-row[aria-current] time::before'],'red marks Now only');
 });

@@ -55,8 +55,8 @@
       artistImage:'Porträt',releaseImage:'Cover',trackImage:'Cover',labelImage:'Label-Logo',playlistImage:'Cover',
     },
   };
-  Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',period:'Period',day:'Last 24 hours',week:'Last 7 days',month:'Last 30 days',allHistory:'All recorded history',older:'Older tracks',radioSelection:'All radio selections',library:'Whole music library',historyNote:'Confirmed broadcast starts. Times use your local timezone.',noHistory:'No broadcasts recorded in this period.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',plays:'plays',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
-  Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',stage:'Bühne',period:'Zeitraum',day:'Letzte 24 Stunden',week:'Letzte 7 Tage',month:'Letzte 30 Tage',allHistory:'Gesamter Verlauf',older:'Ältere Tracks',radioSelection:'Alle Radioauswahlen',library:'Gesamte Musikbibliothek',historyNote:'Bestätigte Sendestarts. Die Zeiten entsprechen deiner lokalen Zeitzone.',noHistory:'In diesem Zeitraum wurden keine Sendestarts erfasst.',musicLoading:'Musik wird geladen…',noOverlap:'Keine gemeinsamen Tracks.',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',selection:'Tracks in der Auswahl',artistCredits:'Künstlerangaben',releases:'Veröffentlichungen',hours:'Stunden Musik',topArtists:'Künstler in der Auswahl',years:'Erscheinungsjahre',labels:'Labels',genres:'Track-Tags',overlap:'Gemeinsam mit anderen Bühnen',stageSizes:'Tracks je Bühne',coverage:'Tracks mit Metadaten',missingMetadata:'Noch keine Metadaten verfügbar.',snapshot:'Auswahl geprüft',definitions:'Jeder Track zählt einmal pro Auswahl. Künstlerangaben bleiben einschließlich Zusammenarbeiten erhalten. Gemeinsame Tracks können auf mehreren Bühnen erscheinen.',broadcasts:'Sendestarts',differentTracks:'Verschiedene gespielte Tracks',unplayed:'Ausgewählte, nicht gespielte Tracks',frequent:'Am häufigsten gespielt · letzte 30 Tage',broadcastNote:'Sendestatistiken zeigen die letzten 30 Tage oder den kürzeren verfügbaren Verlauf. Sie zählen Starts, keine vollständigen Hörvorgänge.',recordingSince:'Frühester erfasster Start',broadcastError:'Sendestatistiken sind nicht verfügbar. Die Auswahlstatistiken stehen unten.',noPlays:'Noch keine Sendestarts erfasst.',plays:'Starts',topNote:'Alle bekannten Erscheinungsjahre, neueste zuerst. Andere Diagramme zeigen bis zu 12 Einträge. Fehlende Metadaten werden nicht mitgezählt.',statisticsNote:'Auswahlstatistiken enthalten Playlist-Tracks. Ein Sender kann nur Tracks mit verfügbaren Audiodateien abspielen.'});
+  Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',historyDay:'Day',older:'Show earlier tracks',loadingMore:'Loading…',now:'Now',radioSelection:'All radio selections',library:'Whole music library',noHistory:'Nothing has played on this stage yet.',noDay:'Nothing played on this stage that day.',historyError:'The history could not load.',musicLoading:'Loading the music…',noOverlap:'No shared tracks.',musicError:'These records could not load.',retry:'Try again',selection:'In the selection',artistCredits:'Artist credits',releases:'Releases',hours:'Hours of music',topArtists:'Artists in the selection',years:'Release years',labels:'Labels',genres:'Track tags',overlap:'Shared with other stages',stageSizes:'Tracks per stage',coverage:'tracks with metadata',missingMetadata:'No metadata available yet.',snapshot:'Selection checked',definitions:'Each track is counted once per selection. Artist credits are kept as credited, including collaborations. Shared tracks can appear on several stages.',broadcasts:'Broadcast starts',differentTracks:'Different tracks played',unplayed:'Selected tracks not played',frequent:'Most played · last 30 days',broadcastNote:'Broadcast statistics cover the last 30 days, or the available history if shorter. They count starts, not completed listens.',recordingSince:'Earliest recorded start',broadcastError:'Broadcast statistics are unavailable. Selection statistics are shown below.',noPlays:'No broadcasts recorded yet.',plays:'plays',topNote:'All known release years, newest first. Other charts show up to 12 entries. Missing metadata is excluded.',statisticsNote:'Selection snapshots include playlist tracks; a station can play only tracks with accessible audio.'});
+  Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',stage:'Bühne',historyDay:'Tag',older:'Frühere Tracks anzeigen',loadingMore:'Wird geladen…',now:'Jetzt',radioSelection:'Alle Radioauswahlen',library:'Gesamte Musikbibliothek',noHistory:'Auf dieser Bühne lief noch nichts.',noDay:'An diesem Tag lief hier nichts.',historyError:'Der Verlauf konnte nicht geladen werden.',musicLoading:'Musik wird geladen…',noOverlap:'Keine gemeinsamen Tracks.',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',selection:'Tracks in der Auswahl',artistCredits:'Künstlerangaben',releases:'Veröffentlichungen',hours:'Stunden Musik',topArtists:'Künstler in der Auswahl',years:'Erscheinungsjahre',labels:'Labels',genres:'Track-Tags',overlap:'Gemeinsam mit anderen Bühnen',stageSizes:'Tracks je Bühne',coverage:'Tracks mit Metadaten',missingMetadata:'Noch keine Metadaten verfügbar.',snapshot:'Auswahl geprüft',definitions:'Jeder Track zählt einmal pro Auswahl. Künstlerangaben bleiben einschließlich Zusammenarbeiten erhalten. Gemeinsame Tracks können auf mehreren Bühnen erscheinen.',broadcasts:'Sendestarts',differentTracks:'Verschiedene gespielte Tracks',unplayed:'Ausgewählte, nicht gespielte Tracks',frequent:'Am häufigsten gespielt · letzte 30 Tage',broadcastNote:'Sendestatistiken zeigen die letzten 30 Tage oder den kürzeren verfügbaren Verlauf. Sie zählen Starts, keine vollständigen Hörvorgänge.',recordingSince:'Frühester erfasster Start',broadcastError:'Sendestatistiken sind nicht verfügbar. Die Auswahlstatistiken stehen unten.',noPlays:'Noch keine Sendestarts erfasst.',plays:'Starts',topNote:'Alle bekannten Erscheinungsjahre, neueste zuerst. Andere Diagramme zeigen bis zu 12 Einträge. Fehlende Metadaten werden nicht mitgezählt.',statisticsNote:'Auswahlstatistiken enthalten Playlist-Tracks. Ein Sender kann nur Tracks mit verfügbaren Audiodateien abspielen.'});
   const word = key => copy[radio.getState().language][key] || key;
   const node = (tag,cls,value) => {const n=document.createElement(tag);if(cls)n.className=cls;if(value)n.textContent=value;return n;};
   const entityID = value => /^(?:(?:art|trk|rel|lab|pl)_[a-f0-9]{12}|plex_[0-9]{1,32})$/.test(value || '');
@@ -133,8 +133,8 @@
   // the page, keep it too; any other explorer entry is marked as found, not owned.
   const life=performance.timeOrigin||Date.now();
   let landing=false,closing=false;
-  // A new visit starts with an empty trail, and never shows the last visit's record while the first loads.
-  function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=true;dialog.show();for(const n of behind)n.inert=true;}
+  // A new visit starts with an empty trail and a fresh History, and never shows the last visit's record while the first loads.
+  function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=true;delete $('music-content').dataset.key;dialog.show();for(const n of behind)n.inert=true;}
   // The record on air, as the roots know it, or as the radio does until they answer.
   const nowID=()=>{const t=radio.getState().track;return enriched?.entity.id||(t?'plex_'+t.id:'');};
   async function request(path,signal) {
@@ -238,10 +238,10 @@
   async function loadEntity(id) {
     setView('explore');if(preview)finishPreview();
     selected=null;explorerRequest?.abort();const controller=new AbortController();explorerRequest=controller;
-    // A record opened from a focused result or a name in the last record keeps focus visible and off the
-    // field: on the explorer while it loads, then on the record's title. Touch screens open no keyboard.
+    // A record opened from a focused result, a History row or a name in the last record keeps focus visible
+    // and off the field: on the explorer while it loads, then on the record's title. Touch screens open no keyboard.
     const workspace=$('explore-workspace');
-    if($('discovery-results').contains(document.activeElement)||workspace.contains(document.activeElement))dialog.focus({preventScroll:true});
+    if([$('discovery-results'),$('music-content'),workspace].some(n=>n.contains(document.activeElement)))dialog.focus({preventScroll:true});
     // A hop keeps the last record in place, dimmed and out of reach, until the next one is drawn, so its
     // preview cannot start; only a first load says so.
     $('discovery-results').hidden=true;
@@ -383,9 +383,13 @@
   // clicks keep opening them in a new tab or window.
   document.addEventListener('click',event=>{
     if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
-    const href=event.target.closest?.('a[href^="#"]')?.getAttribute('href')||'';
+    const link=event.target.closest?.('a[href^="#"]'),href=link?.getAttribute('href')||'';
     if(!/^#(?:explore|history|statistics)(?:[/?]|$)/.test(href))return;
-    event.preventDefault();go(href);
+    event.preventDefault();
+    // Rows kept on screen while the next ones load are out of date: Enter on one opens nothing.
+    const list=$('music-content');
+    if(list.contains(link)){if(list.getAttribute('aria-busy'))return;clicked=link;}
+    go(href);
   });
   // Escape over the modal stations sheet closes that sheet only. Closing keeps the typed query, which
   // Escape would otherwise clear in the search field.
@@ -398,10 +402,27 @@
     if(!/^#explore(?:\?|$)/.test(location.hash))return;
     searchPage('');explorerRequest?.abort();explorerRequest=null;shownQuery='';hideResults();$('discovery-status').textContent='';
   });
-  let view='explore',musicRequest=null,historyPage=null;
+  let view='explore',musicRequest=null,historyPage=null,historyPlace=null,clicked=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
   const date = value => new Date(value).toLocaleString(radio.getState().language, {dateStyle:'medium',timeStyle:'short'});
+  const shortTime = value => new Date(value).toLocaleTimeString(radio.getState().language, {timeStyle:'short'});
   const number = value => Number(value).toLocaleString(radio.getState().language);
+  // The local date as a date field writes it.
+  const today = () => new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
+  // Today and yesterday by name, older days by weekday and date.
+  function dayName(at) {
+    const lang=radio.getState().language,midnight=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()),days=Math.round((midnight(new Date())-midnight(at))/86400000);
+    if(days>1)return at.toLocaleDateString(lang,{weekday:'long',day:'numeric',month:'long'});
+    const name=new Intl.RelativeTimeFormat(lang,{numeric:'auto'}).format(-days,'day');return name[0].toUpperCase()+name.slice(1);
+  }
+  // The day picked. A year typed digit by digit passes through years like 0002, under the field's min, and a
+  // typed day can pass its max: until the field holds a real day, no day is picked.
+  const pickedDay = () => {const field=$('history-day');return field.validity.valid?field.value:'';};
+  // What the shown music is for. The language is part of it: rows drawn in another one are drawn again.
+  const musicKey = () => [view,$('music-stage').value,pickedDay(),radio.getState().language].join(':');
+  // While History shows the newest tracks of the stage on air, its first row follows the radio's play: the
+  // start time tells a track played twice in a row from one play.
+  const onAir = () => {const s=radio.getState(),day=pickedDay();return s.dataFresh&&s.track&&$('music-stage').value===s.stage&&(!day||day===today())?[s.stage,s.track.id,s.track.startedAt].join(':'):'';};
   function fillStages(value) {
     const options=radio.stations.map(s=>[s.id,s.name]);
     if(view==='statistics')options.unshift(['radio',word('radioSelection')],['library',word('library')]);
@@ -409,7 +430,15 @@
     $('music-stage').value=options.some(([id])=>id===value)?value:radio.getState().stage;
   }
   function setView(next) {
-    view=next;clearTimeout(typing);musicRequest?.abort();
+    // Leaving History keeps its place: how far it was scrolled, and the row opened from it. That is the row
+    // clicked, by pointer, touch or Enter, when it links where the explorer went: a track played twice links
+    // twice, and a tap focuses no link.
+    if(view==='history'&&next!=='history'){
+      const content=$('music-content'),opened=r=>content.contains(r)&&r.getAttribute('href')===location.hash;
+      historyPlace={top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
+    }
+    clicked=null;
+    view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;
     $('music-view').hidden=next==='explore';$('discovery-search').hidden=next!=='explore';
     $('discovery-status').hidden=next!=='explore';
     for(const link of document.querySelectorAll('.explorer-nav a')) {
@@ -418,7 +447,7 @@
     }
     if(next!=='explore'){
       explorerRequest?.abort();selected=null;$('discovery-results').hidden=true;hideRecord();
-      $('history-period-label').hidden=next!=='history';fillStages($('music-stage').value);
+      $('history-day-label').hidden=next!=='history';$('history-day').max=today();if(next!=='history')$('history-more').hidden=true;fillStages($('music-stage').value);
     }
   }
   async function readJSON(path,signal) {
@@ -453,32 +482,84 @@
     if(data.genres.length)charts.append(chart('genres',data.genres,data.coverage.genres,data.tracks));
     content.append(charts,node('p','collection-note',word('topNote')),node('p','collection-note',word('statisticsNote')));
   }
-  async function loadMusic(more=false) {
+  // follow: the radio asked for this first page, as a new track came on air or another stage was tuned.
+  async function loadMusic(more=false,follow=false) {
     musicRequest?.abort();const controller=new AbortController();musicRequest=controller;
-    const timeout=setTimeout(()=>controller.abort(),12000),scope=$('music-stage').value,mode=view;
-    $('music-status').textContent=word('musicLoading');$('history-more').hidden=true;
-    if(!more){$('music-content').replaceChildren();historyPage=null;}
+    const timeout=setTimeout(()=>controller.abort(),12000),scope=$('music-stage').value,mode=view,day=pickedDay(),key=musicKey(),content=$('music-content'),button=$('history-more');
+    // The button says what it does next, in place, in either language.
+    const say=label=>{button.dataset.journey=label;button.textContent=word(label);};
+    // The track on air goes back to its time, and the list marks no track as Now.
+    const unmark=()=>{const old=historyPage.now;if(old){old.removeAttribute('aria-current');old.children[0].textContent=shortTime(old.children[0].dateTime);}historyPage.now=null;historyPage.live='';};
+    // History stays in place, dimmed, until the next rows replace it; Statistics and another view's music
+    // go at once, as before. Only an empty list says it is loading.
+    if(mode!=='history'||content.dataset.key?.split(':')[0]!=='history'){content.replaceChildren();delete content.dataset.key;}
+    if($('music-status').contains(document.activeElement))$('music-stage').focus();
+    // Earlier tracks load under the busy button. aria-disabled, unlike disabled, keeps focus on it.
+    if(more){say('loadingMore');button.setAttribute('aria-busy','true');button.setAttribute('aria-disabled','true');}
+    else content.setAttribute('aria-busy','true');
+    $('music-status').textContent=content.children.length?'':word('musicLoading');
     try {
       if(mode==='history'){
-        const until=more?historyPage.until:new Date().toISOString(),period=$('history-period').value;
-        const from=more?historyPage.from:period==='all'?new Date(0).toISOString():new Date(Date.parse(until)-Number(period)*86400000).toISOString();
-        const query=new URLSearchParams({from,until,limit:'50'});if(more)query.set('before',historyPage.next);
+        // A picked day lists back from its end; paging then carries on across the days before it. With no day
+        // the list ends at the server's now, the clock that announces the track on air: the browser's may run behind.
+        const [y,m,d]=day.split('-').map(Number),query=new URLSearchParams({from:new Date(0).toISOString(),limit:'50'});
+        if(more){query.set('until',historyPage.until);query.set('before',historyPage.next);}else if(day)query.set('until',new Date(y,m-1,d+1).toISOString());
+        // The track on air as the request leaves: one that starts while it travels is still to show.
+        const s=radio.getState(),live=more?'':onAir();
         const data=await readJSON('/api/radio/'+scope+'/history?'+query,controller.signal);
         if(musicRequest!==controller)return;
-        historyPage=data;
-        for(const item of data.items){const row=action('',()=>radio.openTrack(item.id),'history-row');const when=node('time','',date(item.startedAt));when.dateTime=item.startedAt;
-          const record=node('span','history-record');record.append(node('strong','',item.title),node('span','',item.artist));row.append(when,record,node('small','',stationName(scope)));$('music-content').append(row);}
-        $('music-status').textContent=$('music-content').children.length?word('historyNote'):word('noHistory');$('history-more').hidden=!data.next;
+        const rows=[];let shown=more?historyPage.day:'',now=null;
+        for(const item of data.items){
+          // A heading opens each local day, and stays in view while its rows scroll under it.
+          const at=new Date(item.startedAt),row=node('a','history-row'),when=node('time','',shortTime(item.startedAt)),record=node('span','history-record');
+          if(at.toDateString()!==shown){shown=at.toDateString();rows.push(node('h3','history-day',dayName(at)));}
+          if(entityID('plex_'+item.id))row.href='#explore/plex_'+item.id;when.dateTime=item.startedAt;
+          if(live&&item===data.items[0]&&item.id===s.track.id){now=row;row.setAttribute('aria-current','true');when.textContent=word('now');}
+          record.append(node('strong','',item.title),node('span','',item.artist));row.append(when,record);rows.push(row);
+        }
+        const focused=document.activeElement;
+        // Earlier tracks stop the list following the radio.
+        if(more){content.append(...rows);unmark();}
+        else{
+          // The rows in view stay where they were: a new track above them does not push them down.
+          const mark=n=>n.querySelector('time')?.dateTime,top=dialog.scrollTop,anchor=top>0&&[...content.children].find(n=>mark(n)&&n.offsetTop>=top),from=anchor&&anchor.offsetTop;
+          // A focused row hands focus to the same play (a track can play twice, at two times), or, once that play
+          // has left the page, to the Stage select, scrolled into view: never to the page.
+          const held=content.contains(focused)?focused:null;content.replaceChildren(...rows);
+          const same=anchor&&rows.find(n=>mark(n)===mark(anchor));if(same)dialog.scrollTop=top+same.offsetTop-from;
+          if(held){
+            const play=rows.find(r=>r.getAttribute('href')===held.getAttribute('href')&&mark(r)===mark(held));
+            if(play)play.focus({preventScroll:true});else $('music-stage').focus();
+          }
+        }
+        historyPage={...data,day:shown,more,live,now};content.dataset.key=key;
+        $('music-status').textContent=content.children.length?'':word(day?'noDay':'noHistory');
+        button.hidden=!data.next;say('older');
+        // A button that goes while it has focus hands it on: to the first track it showed, or to the Stage select.
+        if(focused===button&&button.hidden)((more&&rows.find(r=>r.getAttribute('href')))||$('music-stage')).focus();
       }else{
         const [data,broadcast]=await Promise.all([readJSON('/api/library/statistics?scope='+scope,controller.signal),radio.stations.some(s=>s.id===scope)?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null]);
-        if(musicRequest!==controller)return;renderStatistics(data,broadcast);$('music-status').textContent='';
+        if(musicRequest!==controller)return;renderStatistics(data,broadcast);content.dataset.key=key;$('music-status').textContent='';
       }
-    }catch {if(musicRequest===controller){$('music-status').replaceChildren(node('span','',word('musicError')+' '),action(word('retry'),()=>loadMusic(more)));}}
-    finally{clearTimeout(timeout);}
+    }catch {if(musicRequest===controller){
+      if(more)say('retry');
+      // A refresh the radio asked for keeps the rows and the place; its next answer tries again.
+      else if(follow)unmark();
+      else{
+        if(content.contains(document.activeElement)||document.activeElement===button)$('music-stage').focus();
+        content.replaceChildren();delete content.dataset.key;historyPage=null;button.hidden=true;
+        $('music-status').replaceChildren(node('span','',word(mode==='history'?'historyError':'musicError')+' '),action(word('retry'),()=>loadMusic()));
+      }
+    }}
+    // A newer load keeps its own busy state; this one clears it, also when leaving the view dropped it.
+    finally{clearTimeout(timeout);if(!musicRequest||musicRequest===controller){musicRequest=null;content.removeAttribute('aria-busy');button.removeAttribute('aria-busy');button.removeAttribute('aria-disabled');if(button.dataset.journey==='loadingMore')say('older');}}
   }
   $('music-filters').addEventListener('submit',event=>event.preventDefault());
-  $('music-stage').addEventListener('change',()=>loadMusic());$('history-period').addEventListener('change',()=>loadMusic());
-  $('history-more').addEventListener('click',()=>loadMusic(true));
+  // A year typed digit by digit passes through years like 0002, under the field's min: the list waits for a real day.
+  $('music-stage').addEventListener('change',()=>loadMusic());$('history-day').addEventListener('change',()=>{if($('history-day').validity.valid)loadMusic();});
+  // The field allows days up to today, as of when the listener reaches for it: History can stay open past midnight.
+  $('history-day').addEventListener('focus',()=>{$('history-day').max=today();});
+  $('history-more').addEventListener('click',()=>{if(!musicRequest)loadMusic(true);});
   // Touch screens keep their keyboard down until the listener asks for it.
   const finePointer=matchMedia('(pointer:fine)');
   function restore(){
@@ -495,6 +576,13 @@
     open();
     if(id)return loadEntity(id);
     setView(section);
+    // The History tab, from a record or another tab, brings back the same rows without a reload, scrolled
+    // where they were, with focus on the row that was opened. The place is used once: the second restore()
+    // of a browser move changes nothing.
+    if(section==='history'&&$('music-content').dataset.key===musicKey()){
+      if(historyPlace){dialog.scrollTop=historyPlace.top;if($('music-content').contains(historyPlace.row))historyPlace.row.focus({preventScroll:true});historyPlace=null;}
+      return;
+    }
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
     explorerRequest?.abort();explorerRequest=null;selected=null;hideRecord();
@@ -511,6 +599,9 @@
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
+    // A new track on air, or another stage tuned, redraws History's first page in place while it follows the radio.
+    // A lost answer redraws nothing, nor does a half-typed day over a picked one: the list shows what it is for.
+    if(dialog.open&&!closing&&view==='history'&&!musicRequest&&historyPage&&!historyPage.more&&radio.getState().dataFresh&&$('music-content').dataset.key===musicKey()&&onAir()!==historyPage.live)loadMusic(false,true);
     if(landing&&!closing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
 })();

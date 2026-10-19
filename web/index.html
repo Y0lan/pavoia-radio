@@ -109,9 +109,9 @@
       <button id="explorer-close" type="button" aria-label="Back to listening" title="Back to listening"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"/></svg></button>
     </header>
     <section id="music-view" hidden aria-label="Music collection">
-      <form id="music-filters" class="music-filters"><label><span data-journey="stage">Stage</span><select id="music-stage"></select></label><label id="history-period-label"><span data-journey="period">Period</span><select id="history-period"><option value="1" data-journey="day">Last 24 hours</option><option value="7" selected data-journey="week">Last 7 days</option><option value="30" data-journey="month">Last 30 days</option><option value="all" data-journey="allHistory">All recorded history</option></select></label></form>
+      <form id="music-filters" class="music-filters"><label><span data-journey="stage">Stage</span><select id="music-stage"></select></label><label id="history-day-label"><span data-journey="historyDay">Day</span><input type="date" id="history-day" min="1970-01-01"></label></form>
       <p id="music-status" class="collection-note" role="status"></p>
-      <div id="music-content"></div><button id="history-more" type="button" data-journey="older" hidden>Older tracks</button>
+      <div id="music-content"></div><button id="history-more" type="button" data-journey="older" hidden>Show earlier tracks</button>
     </section>
     <p id="discovery-status" class="collection-note" role="status"></p>
     <div id="discovery-results" class="discovery-results" hidden></div>

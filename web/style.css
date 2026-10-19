@@ -262,7 +262,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer button, #explorer input { font:inherit; color:var(--cream); border:1px solid #4b4640; background:transparent; min-height:44px; padding:10px 14px; }
 #explorer button { cursor:pointer; }
 #explorer button:hover { background:var(--raised); }
-/* The actions: Try again and Older tracks. */
+/* The actions: Try again and Show earlier tracks. */
 #explorer :is(#music-status button, #history-more) { padding:10px 16px; border-color:var(--soft); font:14px Inter,sans-serif; }
 #explorer :is(#music-status button, #history-more):hover { border-color:var(--cream); }
 /* Quiet text actions: a stage to tune, More, and the rest of a group. */
@@ -403,6 +403,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .root-groups { margin-top:32px; }
   .root-group { padding-left:16px; border-left:1px solid var(--line); }
   #explorer { inset:0 0 var(--bar); padding:18px; border:0; }
+  #explorer .history-day { top:-18px; }
   /* The tabs and ✕ share the row; the search takes the full width under them. */
   .explorer-top { flex-wrap:wrap; gap:12px; }
   .discovery-search { order:1; flex-basis:100%; }
@@ -419,13 +420,28 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .music-filters { display:flex; gap:20px; flex-wrap:wrap; margin:24px 0; }
 .music-filters label { display:grid; gap:8px; color:var(--soft); font-size:13px; }
 #explorer select { min-height:44px; padding:10px 32px 10px 12px; border:1px solid var(--muted); background:var(--surface); color:var(--cream); font:inherit; max-width:100%; }
+/* The Day field reads at the size and inset of the Stage select beside it. */
+#explorer #history-day { font:inherit; padding:10px 12px; }
 #music-status { margin:16px 0; }
-#explorer .history-row { display:grid; grid-template-columns:minmax(150px, .7fr) minmax(0,2fr) minmax(90px,.6fr); width:100%; text-align:left; gap:20px; border:0; border-top:1px solid var(--line); padding:16px 8px; }
-.history-row time, .history-row small { color:var(--soft); font:12px/1.6 var(--mono); }
-.history-record { display:grid; gap:6px; overflow-wrap:anywhere; }
-.history-record strong { font-weight:500; }
-.history-record>span { color:var(--soft); font-size:13px; }
-#history-more { margin:24px 0; }
+/* History: the time, then the title over its artist, on every width. Each row is a link to its track. */
+.history-row { display:grid; grid-template-columns:5rem minmax(0,1fr); gap:16px; align-items:baseline; padding:12px 0; border-top:1px solid var(--line); scroll-margin-top:44px; }
+.history-row time { font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--soft); white-space:nowrap; }
+/* Red is what you hear: a 6px dot before Now, on the track on air. */
+.history-row[aria-current] time::before { content:""; display:inline-block; width:6px; height:6px; margin-right:6px; border-radius:50%; background:var(--red); vertical-align:1px; }
+.history-record { display:grid; gap:2px; overflow-wrap:anywhere; }
+.history-record strong { font:500 15px/1.4 Inter,sans-serif; color:var(--cream); }
+.history-record>span { font-size:13px; color:var(--soft); }
+.history-row[href]:hover strong { text-decoration:underline; text-underline-offset:3px; }
+/* Each local day opens on its name, which stays in view while its rows scroll under it. A sticky top
+   counts from inside the explorer's padding, so minus that padding puts it on the edge, with no row above it.
+   The last 5px under the name are margin, not padding, so the focus ring of the row below stays in view;
+   a row reached with Tab scrolls clear of the name (scroll-margin-top above). */
+.history-day { position:sticky; top:-28px; z-index:1; margin:0 0 5px; padding:12px 0 7px; background:var(--surface); font:11px var(--mono); letter-spacing:.08em; text-transform:uppercase; color:var(--muted); }
+/* A refresh keeps the rows in place, dimmed and out of reach, until the next ones replace them. */
+#music-content[aria-busy=true] { opacity:.45; pointer-events:none; transition:opacity var(--hover) var(--ease); }
+/* Wide enough for its longest label, Frühere Tracks anzeigen, so Loading… and Try again swap in place. */
+#history-more { margin:24px 0; min-width:12.5rem; }
+#history-more[aria-busy=true] { opacity:.45; cursor:default; }
 .music-summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:24px; padding:28px 0; margin:0; border-bottom:1px solid var(--line); }
 .music-summary dt { color:var(--soft); font-size:13px; }
 .music-summary dd { font:clamp(28px,4vw,52px)/1.2 var(--serif); font-variant-numeric:tabular-nums; margin:10px 0 0; }
@@ -443,12 +459,10 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer .played-ranking .connection-row { justify-content:space-between; }
 .played-ranking .connection-row>span:first-child { overflow-wrap:anywhere; }
 .played-ranking .connection-row>span:nth-child(2) { flex:none; }
-@media(max-width:600px) {
+@media (max-width:600px) {
   .music-summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .music-charts { grid-template-columns:1fr; gap:32px; }
-  #explorer .history-row { grid-template-columns:minmax(0,1fr) auto; gap:8px 12px; }
-  .history-row time { grid-column:1/-1; }
-  .history-row small { max-width:95px; }
+  #history-more { width:100%; }
   .music-filters label { width:100%; }
   .explorer-nav { gap:6px 20px; font-size:13px; }
 }
