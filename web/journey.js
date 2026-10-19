@@ -420,6 +420,9 @@
   const pickedDay = () => {const field=$('history-day');return field.validity.valid?field.value:'';};
   // What the shown music is for. The language is part of it: rows drawn in another one are drawn again.
   const musicKey = () => [view,$('music-stage').value,pickedDay(),radio.getState().language].join(':');
+  // Both starts come from one playback row: the radio writes it to the second, History to the millisecond.
+  // The same second is the same play. Without a start, the track alone decides.
+  const samePlay = (item,track) => item.id===track.id&&(!track.startedAt||Math.floor(Date.parse(item.startedAt)/1000)===Date.parse(track.startedAt)/1000);
   // While History shows the newest tracks of the stage on air, its first row follows the radio's play: the
   // start time tells a track played twice in a row from one play.
   const onAir = () => {const s=radio.getState(),day=pickedDay();return s.dataFresh&&s.track&&$('music-stage').value===s.stage&&(!day||day===today())?[s.stage,s.track.id,s.track.startedAt].join(':'):'';};
@@ -514,7 +517,7 @@
           const at=new Date(item.startedAt),row=node('a','history-row'),when=node('time','',shortTime(item.startedAt)),record=node('span','history-record');
           if(at.toDateString()!==shown){shown=at.toDateString();rows.push(node('h3','history-day',dayName(at)));}
           if(entityID('plex_'+item.id))row.href='#explore/plex_'+item.id;when.dateTime=item.startedAt;
-          if(live&&item===data.items[0]&&item.id===s.track.id){now=row;row.setAttribute('aria-current','true');when.textContent=word('now');}
+          if(live&&item===data.items[0]&&samePlay(item,s.track)){now=row;row.setAttribute('aria-current','true');when.textContent=word('now');}
           record.append(node('strong','',item.title),node('span','',item.artist));row.append(when,record);rows.push(row);
         }
         const focused=document.activeElement;
@@ -532,7 +535,9 @@
             if(play)play.focus({preventScroll:true});else $('music-stage').focus();
           }
         }
-        historyPage={...data,day:shown,more,live,now};content.dataset.key=key;
+        // The list follows the play on air only once it shows it: until then each radio answer asks again.
+        // ponytail: a stage whose history never records its play would ask at every answer; cap the retries then.
+        historyPage={...data,day:shown,more,live:now?live:'',now};content.dataset.key=key;
         $('music-status').textContent=content.children.length?'':word(day?'noDay':'noHistory');
         button.hidden=!data.next;say('older');
         // A button that goes while it has focus hands it on: to the first track it showed, or to the Stage select.
@@ -562,6 +567,9 @@
   $('history-more').addEventListener('click',()=>{if(!musicRequest)loadMusic(true);});
   // Touch screens keep their keyboard down until the listener asks for it.
   const finePointer=matchMedia('(pointer:fine)');
+  // A new track on air, or another stage tuned, redraws History's first page in place while it follows the radio.
+  // A lost answer redraws nothing, nor does a half-typed day over a picked one: the list shows what it is for.
+  function followRadio(){if(dialog.open&&!closing&&view==='history'&&!musicRequest&&historyPage&&!historyPage.more&&radio.getState().dataFresh&&$('music-content').dataset.key===musicKey()&&onAir()!==historyPage.live)loadMusic(false,true);}
   function restore(){
     landing=false;
     const [path,params='']=location.hash.split('?');
@@ -581,7 +589,8 @@
     // of a browser move changes nothing.
     if(section==='history'&&$('music-content').dataset.key===musicKey()){
       if(historyPlace){dialog.scrollTop=historyPlace.top;if($('music-content').contains(historyPlace.row))historyPlace.row.focus({preventScroll:true});historyPlace=null;}
-      return;
+      // A track that came on air while a record was open shows now, not at the next radio answer.
+      return followRadio();
     }
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
@@ -599,9 +608,7 @@
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
-    // A new track on air, or another stage tuned, redraws History's first page in place while it follows the radio.
-    // A lost answer redraws nothing, nor does a half-typed day over a picked one: the list shows what it is for.
-    if(dialog.open&&!closing&&view==='history'&&!musicRequest&&historyPage&&!historyPage.more&&radio.getState().dataFresh&&$('music-content').dataset.key===musicKey()&&onAir()!==historyPage.live)loadMusic(false,true);
+    followRadio();
     if(landing&&!closing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
 })();

@@ -1550,12 +1550,43 @@ test('a live refresh keeps focus on the same play of a track played twice, and a
 test('the same track started again right after itself is a new play, and History asks for it',async()=>{
  const e=setup({journey:true});await flush();
  const on=(id,startedAt)=>{const r=onAirNow(id);r.track.startedAt=startedAt;return r;};
+ // History writes a play's start to the millisecond, the radio to the second.
+ const list=(...plays)=>answer({items:[...plays.map(([id,at])=>({id,title:'Track '+id,artist:'Artist',startedAt:at})),...played(48,1).items],next:'9:1'});
+ const nowRow=()=>historyRows(e).find(r=>r.getAttribute('aria-current')==='true');
  e.response=on('5','2026-10-19T04:00:00Z');await e.poll();await flush();
- e.historyReply=answer(played(50,0,'9:1'));routeTo(e,'#history');await flush();
+ e.historyReply=list(['5','2026-10-19T04:00:00.412Z']);routeTo(e,'#history');await flush();
+ assert.equal(nowRow()?.children[0].dateTime,'2026-10-19T04:00:00.412Z','the play on air reads Now');
  const sent=e.historyRequests.length;await e.poll();await flush();
  assert.equal(e.historyRequests.length,sent,'the same play asks for nothing');
- e.response=on('5','2026-10-19T04:07:00Z');await e.poll();await flush();
- assert.equal(e.historyRequests.length,sent+1,'the same track, started again, is a new play to show');
+ e.historyReply=list(['5','2026-10-19T04:07:00.250Z'],['5','2026-10-19T04:00:00.412Z']);e.response=on('5','2026-10-19T04:07:00Z');await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,nowRow()?.children[0].dateTime],[sent+1,'2026-10-19T04:07:00.250Z'],'the same track, started again, is a new play: History asks and marks it');
+});
+
+test('an earlier play of the track on air is not Now, and History asks again until the play shows',async()=>{
+ const e=setup({journey:true});await flush();
+ const on=(id,startedAt)=>{const r=onAirNow(id);r.track.startedAt=startedAt;return r;};
+ const list=(...plays)=>answer({items:[...plays.map(([id,at])=>({id,title:'Track '+id,artist:'Artist',startedAt:at})),...played(48,1).items],next:'9:1'});
+ const nowRow=()=>historyRows(e).find(r=>r.getAttribute('aria-current')==='true');
+ e.response=on('5','2026-10-19T04:30:00Z');await e.poll();await flush();
+ e.historyReply=list(['5','2026-10-19T04:29:30.412Z']);routeTo(e,'#history');await flush();
+ assert.equal(nowRow(),undefined,'a play of the same track thirty seconds earlier is not the one on air');
+ const sent=e.historyRequests.length;
+ e.historyReply=list(['5','2026-10-19T04:30:00.120Z'],['5','2026-10-19T04:29:30.412Z']);await e.poll();await flush();
+ assert.deepEqual([e.historyRequests.length,nowRow()?.children[0].dateTime],[sent+1,'2026-10-19T04:30:00.120Z'],'the next radio answer asks again, and the play shows as Now');
+});
+
+test('back on History from a record, a track that came on air meanwhile shows at once',async()=>{
+ const e=setup({journey:true});await flush();
+ e.discovery=url=>entity(url.split('/').pop(),'track');
+ const page=id=>answer({items:[{id,title:'On air '+id,artist:'Artist',startedAt:new Date().toISOString()},...played(49,1).items],next:'9:1'});
+ e.response=onAirNow('123');await e.poll();await flush();
+ e.historyReply=page('123');routeTo(e,'#history');await flush();
+ follow(e,historyRows(e)[3]);await flush();
+ // The radio answer comes while the record is open: History is not in view, so it waits.
+ e.historyReply=page('456');e.response=onAirNow('456');await e.poll();await flush();
+ const sent=e.historyRequests.length;
+ routeTo(e,'#history');await flush();
+ assert.deepEqual([e.historyRequests.length,historyRows(e)[0].children[1].children[0].textContent,historyRows(e)[0].getAttribute('aria-current')],[sent+1,'On air 456','true'],'the History tab asks at once and marks the new play');
 });
 
 test('History reads time, title and artist on one grid at every width, under sticky day names, with red only for Now',()=>{
