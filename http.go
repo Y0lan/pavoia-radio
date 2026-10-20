@@ -31,7 +31,7 @@ func acceptsGzip(header string) bool {
 	for _, part := range strings.Split(header, ",") {
 		name, params, _ := strings.Cut(part, ";")
 		if strings.EqualFold(strings.TrimSpace(name), "gzip") {
-			q, found := strings.CutPrefix(strings.ReplaceAll(params, " ", ""), "q=")
+			q, found := strings.CutPrefix(strings.ToLower(strings.Join(strings.Fields(params), "")), "q=")
 			return !found || strings.Trim(q, "0.") != ""
 		}
 	}

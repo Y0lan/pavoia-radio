@@ -372,7 +372,7 @@ func TestLibraryNamesBoundary(t *testing.T) {
 	if plain, err := io.ReadAll(zr); err != nil || !bytes.Equal(plain, r.Body.Bytes()) {
 		t.Fatal(err, string(plain))
 	}
-	for header, want := range map[string]bool{"gzip": true, "GZIP;q=0.5": true, "br, gzip;q=1.0": true, "gzip;q=0": false, "gzip; q=0.000": false, "xgzip": false, "deflate": false, "": false} {
+	for header, want := range map[string]bool{"gzip": true, "GZIP;q=0.5": true, "br, gzip;q=1.0": true, "gzip;q=0": false, "gzip; q=0.000": false, "gzip;\tq=0": false, "gzip;Q=0": false, "xgzip": false, "deflate": false, "": false} {
 		if acceptsGzip(header) != want {
 			t.Fatal(header, want)
 		}
