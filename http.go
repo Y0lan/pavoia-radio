@@ -26,10 +26,22 @@ func jsonResponse(w http.ResponseWriter, status int, value any) {
 	_ = json.NewEncoder(w).Encode(value)
 }
 
+// acceptsGzip reads an Accept-Encoding list: gzip named as its own token, without q=0.
+func acceptsGzip(header string) bool {
+	for _, part := range strings.Split(header, ",") {
+		name, params, _ := strings.Cut(part, ";")
+		if strings.EqualFold(strings.TrimSpace(name), "gzip") {
+			q, found := strings.CutPrefix(strings.ReplaceAll(params, " ", ""), "q=")
+			return !found || strings.Trim(q, "0.") != ""
+		}
+	}
+	return false
+}
+
 // gzipJSON answers 200 like jsonResponse, compressed when the client accepts gzip: for documents of several hundred KB.
 func gzipJSON(w http.ResponseWriter, r *http.Request, value any) {
 	w.Header().Set("Vary", "Accept-Encoding")
-	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+	if !acceptsGzip(r.Header.Get("Accept-Encoding")) {
 		jsonResponse(w, 200, value)
 		return
 	}
