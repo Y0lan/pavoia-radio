@@ -198,9 +198,11 @@ def music_statistics(result, discovery):
     membership = {t['plex_rating_key']: {PLAYLISTS[p] for p in t['playlist_ids'] if p in PLAYLISTS} for t in tracks}
     groups = {'library': [t for t in tracks if t.get('library_section_ids')], 'radio': [t for t in tracks if membership[t['plex_rating_key']]]}
     groups.update({stage: [t for t in tracks if stage in membership[t['plex_rating_key']]] for stage in dict.fromkeys(PLAYLISTS.values())})
-    def ranked(counts):
-        return [{'name': name, 'count': count} for name, count in sorted(counts.items(), key=lambda p: (-p[1], p[0]))[:12]]
+    def ranked(counts, limit=12):
+        return [{'name': name, 'count': count} for name, count in sorted(counts.items(), key=lambda p: (-p[1], p[0]))[:limit]]
     for scope, selected in groups.items():
+        # Every artist and label of the playlists can be explored; the unused whole-library scope keeps its top 12.
+        every = 12 if scope == 'library' else None
         artists, years, labels, genres, overlap = (Counter() for _ in range(5))
         albums = set()
         coverage = dict(artists=0, releases=0, years=0, labels=0, genres=0)
@@ -227,7 +229,7 @@ def music_statistics(result, discovery):
         yield scope, {'scope': scope, 'updatedAt': result['completed_at'], 'metadataAt': metadata_at,
                       'tracks': len(selected), 'artists': len(artists), 'releases': len(albums),
                       'durationMs': sum(t['duration_ms'] for t in selected), 'coverage': coverage,
-                      'topArtists': ranked(artists), 'years': [{'name': year, 'count': years[year]} for year in sorted(years, reverse=True)], 'labels': ranked(labels),
+                      'topArtists': ranked(artists, every), 'years': [{'name': year, 'count': years[year]} for year in sorted(years, reverse=True)], 'labels': ranked(labels, every),
                       'genres': ranked(genres), 'stages': ranked(overlap)}
 
 

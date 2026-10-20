@@ -130,11 +130,16 @@ with tempfile.TemporaryDirectory() as directory:
         db.execute('DELETE FROM entities')
         for index, year in enumerate(years):
             track = copy.deepcopy(full['tracks'][0])
-            track.update(plex_rating_key=str(index), playlist_ids=['145469'])
+            track.update(plex_rating_key=str(index), playlist_ids=['145469'], artist_credit=f'Artist {index:02d}')
             fixture['tracks'].append(track)
             doc = dict(id=f'trk_{index:012x}', type='track', plexId=str(index), releaseDate=str(year))
             db.execute('INSERT INTO entities VALUES(?,?)', (doc['id'], json.dumps(doc)))
-    years_chart = dict(ci.music_statistics(fixture, discovery))['fontanna']['years']
+    many = dict(ci.music_statistics(fixture, discovery))
+    years_chart = many['fontanna']['years']
+    # Every artist of a stage and of all stages is listed; the whole library stops at 12.
+    assert len(many['fontanna']['topArtists']) == len(many['radio']['topArtists']) == 17
+    assert many['fontanna']['topArtists'][-1] == {'name': 'Artist 16', 'count': 1}
+    assert len(many['library']['topArtists']) == 12
     assert [entry['name'] for entry in years_chart] == [str(year) for year in range(2014, 1999, -1)]
     assert years_chart[0]['count'] == 1 and years_chart[-1]['count'] == 3
 
