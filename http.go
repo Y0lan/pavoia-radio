@@ -35,6 +35,7 @@ func (c *controller) routes() http.Handler {
 	mux.HandleFunc("GET /api/discovery/preview/{id}", c.discoveryPreview)
 	mux.HandleFunc("GET /api/library/catalogue", c.libraryCatalogue)
 	mux.HandleFunc("GET /api/library/statistics", c.libraryStatistics)
+	mux.HandleFunc("GET /api/library/names", c.libraryNames)
 	mux.HandleFunc("GET /api/library/artwork/{id}/{kind}", c.libraryArtwork)
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) {
 		if c.db.PingContext(r.Context()) != nil {

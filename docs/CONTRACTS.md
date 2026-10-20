@@ -187,10 +187,34 @@ broadcast time. Historical plays can include tracks removed from the selection.
 
 `GET /api/library/statistics?scope=radio` reads the hourly immutable library cache.
 Scope accepts `radio`, `library` or a configured stage ID. Counts include tracks,
-artist credit strings, Plex albums and total duration. Distributions cover
-artist credits, labels, release years, available track tags and stage memberships.
+credited artists, Plex albums and total duration. Distributions cover
+artists, labels, release years, available track tags and stage memberships.
 Release years include every known year, newest first, regardless of track count.
 Other distributions show up to 12 entries ranked by track count.
+A track's artists are its discovery credits (primary, featured and remixer),
+plus the other discovery artists that its Plex credit names. A name that
+overlaps a credited artist, such as `Dole & Kom` next to `Dole` and `Kom`, is not
+added. A track without discovery credits uses its Plex credit. A credit always
+splits at `;` and featuring marks. It splits at `, `, ` & `, ` x `, ` and ` or ` vs ` only when
+every piece is a known artist and the whole name is not a discovery artist
+with links. A known artist is a discovery artist or a credit that appears alone
+on a track. A discovery artist whose title is such a credit (`A;B`, `A feat. B`,
+or `A & B` without links) splits in the same way. A remixer titled after a remix
+label, such as `X extended`, counts as `X` when `X` is a discovery artist. A bare
+mix word such as `Garage` counts as no artist. `Various Artists`, `Unknown Artist`,
+`[unknown]` and `[no label]` are never an artist or a label. Label records whose
+titles differ only by punctuation or by a `Records`, `Recordings`, `Music`,
+`Limited` or `Ltd` suffix are one label, with the record used on most tracks.
+A track counts once for each of its artists. Artist and label entries carry `id`
+and `image` when a discovery record matches. The server drops an `id` that is not
+an `art_` or `lab_` record and an `image` outside `/api/discovery/media/`.
+
+`GET /api/library/names?kind=artists` (or `kind=labels`) lists every artist or
+label of the radio playlists as `{kind, updatedAt, total, items}`. Each item has
+`name`, `count` (distinct radio tracks) and `stages`, the track count per stage ID
+for stages with at least one track. It has `id` and `image` when known. Items are
+sorted by count, then by name. An invalid kind returns 400. A snapshot without
+names, such as one published before this endpoint existed, returns 503.
 Coverage counts state how many selected tracks have each metadata field.
 Shared tracks count once per scope. The full library scope uses music-library
 membership; the radio scope uses the union of the configured playlists.

@@ -41,6 +41,19 @@ type libraryInfo struct {
 type musicCount struct {
 	Name  string `json:"name"`
 	Count int    `json:"count"`
+	ID    string `json:"id,omitempty"`
+	Image string `json:"image,omitempty"`
+}
+
+// A name links only to a discovery artist or label and to a discovery picture.
+func (c *controller) cleanCount(m *musicCount) {
+	m.Name = c.cleanMetadata(m.Name)
+	if !discoveryID.MatchString(m.ID) || !(strings.HasPrefix(m.ID, "art_") || strings.HasPrefix(m.ID, "lab_")) {
+		m.ID = ""
+	}
+	if sha, ok := strings.CutPrefix(m.Image, "/api/discovery/media/"); !ok || !discoverySHA.MatchString(sha) {
+		m.Image = ""
+	}
 }
 
 type libraryMusicStats struct {
@@ -84,7 +97,49 @@ func (c *controller) libraryStatistics(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, counts := range [][]musicCount{result.TopArtists, result.Years, result.Labels, result.Genres, result.Stages} {
 		for i := range counts {
-			counts[i].Name = c.cleanMetadata(counts[i].Name)
+			c.cleanCount(&counts[i])
+		}
+	}
+	jsonResponse(w, 200, result)
+}
+
+type nameEntry struct {
+	musicCount
+	Stages map[string]int `json:"stages"`
+}
+
+type musicNames struct {
+	Kind      string      `json:"kind"`
+	UpdatedAt string      `json:"updatedAt"`
+	Total     int         `json:"total"`
+	Items     []nameEntry `json:"items"`
+}
+
+// Every artist or label of the radio playlists, with its track count per stage.
+func (c *controller) libraryNames(w http.ResponseWriter, r *http.Request) {
+	kind := r.URL.Query().Get("kind")
+	if kind != "artists" && kind != "labels" {
+		http.Error(w, "invalid names kind", 400)
+		return
+	}
+	db, err := c.openLibrary()
+	if err != nil {
+		http.Error(w, "names unavailable", 503)
+		return
+	}
+	defer db.Close()
+	var doc string
+	var result musicNames
+	if err = db.QueryRowContext(r.Context(), "SELECT doc FROM music_names WHERE kind=?", kind).Scan(&doc); err != nil || json.Unmarshal([]byte(doc), &result) != nil {
+		http.Error(w, "names unavailable", 503)
+		return
+	}
+	for i := range result.Items {
+		c.cleanCount(&result.Items[i].musicCount)
+		for stage := range result.Items[i].Stages {
+			if s, err := sceneFor(stage); err != nil || s.ID != stage {
+				delete(result.Items[i].Stages, stage)
+			}
 		}
 	}
 	jsonResponse(w, 200, result)

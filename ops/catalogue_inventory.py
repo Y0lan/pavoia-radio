@@ -10,6 +10,7 @@ import os
 import sqlite3
 import tempfile
 import re
+import unicodedata
 from datetime import datetime, timezone
 from pathlib import Path
 import urllib.request
@@ -26,6 +27,17 @@ PLAYLISTS = {
 ID = re.compile(r'[0-9]{1,32}')
 IMAGE = re.compile(r'/library/metadata/[0-9]{1,32}/(?:thumb|art)/[0-9]+')
 PAGE_SIZE = 200
+ROLES = {'primary', 'featured', 'remixer'}
+MEDIA = re.compile(r'/api/discovery/media/[0-9a-f]{40}')
+# ';' and featuring marks always separate artists; the joiners only when every piece is a known artist.
+FEAT_END = re.compile(r'\s*\((?:feat\.?|ft\.?|featuring)\s+([^()]*)\)\s*$', re.I)
+ALWAYS = re.compile(r';|\s(?:feat\.?|ft\.?|featuring)\s', re.I)
+JOINED = re.compile(r', | & | x | and | vs\.? ', re.I)
+# Credits and labels that name nobody.
+PLACEHOLDER = re.compile(r'various(?: artists)?|unknown artist.*|\[(?:unknown|no label)\]', re.I)
+# A remix label read as a remixer name: 'Kevin de Vries extended', 'Haze 2011 Dub', 'Garage'.
+MIX = re.compile(r'(?:\s*\b(?:extended|dub|mix|edit|version|remix|vocal|radio|club|old school|garage|\d{4}))+$', re.I)
+LABEL_SUFFIX = re.compile(r'\s+(?:records|recordings|music|limited|ltd)\.?$')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -185,8 +197,94 @@ def inventory(read):
     return result
 
 
+def fold(s):
+    return unicodedata.normalize('NFKC', s).casefold().strip()
+
+
+def credit_parts(credit):
+    """Split a credit where it always names several artists: ';' and featuring marks."""
+    return [part.strip() for part in ALWAYS.split(FEAT_END.sub(r';\1', credit)) if part.strip()]
+
+
+def known_artists(entities, tracks):
+    """Folded name -> its only discovery artist, or None: an ambiguous title, or a credit seen alone on a track."""
+    titles = {}
+    for d in entities.values():
+        if d.get('type') == 'artist' and d.get('title'):
+            titles.setdefault(fold(d['title']), []).append(d)
+    known = {title: records[0] if len(records) == 1 else None for title, records in titles.items()}
+    for t in tracks:
+        credit = t['artist_credit']
+        if credit_parts(credit) == [credit.strip()] and not JOINED.search(credit):
+            known.setdefault(fold(credit), None)
+    return known
+
+
+def entry(key, name, record=None):
+    image = (record or {}).get('image')
+    return {'key': key, 'name': name, 'id': record['id'] if record else None,
+            'image': image if isinstance(image, str) and MEDIA.fullmatch(image) else None}
+
+
+def unique(entries):
+    seen = set()
+    return [e for e in entries if not (e['key'] in seen or seen.add(e['key']))]
+
+
+def split(credit, known):
+    """A credit's artists: always split at ';' and featuring marks, at joiners only into known artists."""
+    found = []
+    for part in credit_parts(credit):
+        pieces = [piece.strip() for piece in JOINED.split(part) if piece.strip()]
+        whole = known.get(fold(part))
+        # A linked discovery name ("Frankey & Sandrino") stays whole; an unlinked one is a raw credit string.
+        for name in [part] if whole and whole.get('links') or not all(fold(piece) in known for piece in pieces) else pieces:
+            record = known.get(fold(name))
+            if not PLACEHOLDER.fullmatch(name):
+                found.append(entry(record['id'], record['title'], record) if record else entry('name:' + fold(name), name))
+    return found
+
+
+def credited(track, metadata, entities, known):
+    """The track's artists: its discovery credits, then the discovery artists its credit string adds.
+    Without discovery credits, its credit string split into known names."""
+    found = []
+    for c in metadata.get(track['plex_rating_key'], {}).get('connections', []):
+        roles = ROLES & set(str(c.get('relation') or '').split('/'))
+        record = entities.get(c.get('id'), {})
+        if not (roles and record.get('type') == 'artist' and record.get('title')):
+            continue
+        mix = MIX.search(record['title']) if roles == {'remixer'} else None
+        if mix:
+            base = record['title'][:mix.start()].strip()
+            if not base:
+                continue
+            record = known.get(fold(base)) or record
+        # A title naming several artists ('A;B', 'A feat. B', unlinked 'A & B') splits like a credit string.
+        pieces = split(record['title'], known)
+        whole = len(pieces) == 1 and fold(pieces[0]['name']) == fold(record['title'])
+        found += [entry(record['id'], record['title'], record)] if whole else pieces
+    if not found:
+        return unique(split(track['artist_credit'], known))
+    # Discovery can miss an artist the credit names ('Stimming & H.O.S.H.', 'Prok & Fitch, Green Velvet'). Add the discovery
+    # artists among its names, or among the pieces of a name that is none, but never one that overlaps a credited name
+    # ('Dole & Kom' next to Dole and Kom), and never a bare name.
+    taken = {fold(piece) for e in found for piece in JOINED.split(e['name'])}
+    for named in split(track['artist_credit'], known):
+        for e in [named] if named['id'] else [x for piece in JOINED.split(named['name']) for x in split(piece, known)]:
+            if e['id'] and taken.isdisjoint(fold(piece) for piece in JOINED.split(e['name'])):
+                found.append(e)
+    return unique(found)
+
+
+def label_fold(title):
+    """'Stil Vor Talent Records' and 'Stil Vor Talent', or 'Blu Fin' and 'BluFin', are one label."""
+    return ''.join(c for c in LABEL_SUFFIX.sub('', fold(title)) if c.isalnum())
+
+
 def music_statistics(result, discovery):
-    """Count Plex tracks once per scope; enrich only from public catalogue fields."""
+    """Count Plex tracks once per scope; enrich only from public catalogue fields.
+    Returns the statistics by scope and the radio artists and labels documents by kind."""
     metadata, entities, metadata_at = {}, {}, None
     if discovery.exists():
         with closing(sqlite3.connect(discovery.as_uri() + '?mode=ro&immutable=1', uri=True)) as db:
@@ -195,21 +293,43 @@ def music_statistics(result, discovery):
             row = db.execute("SELECT value FROM info WHERE key='publishedAt'").fetchone()
             metadata_at = row[0] if row else None
     tracks = result['tracks']
+    known = known_artists(entities, tracks)
+    # Spellings of one label share the record used on the most discovery tracks.
+    uses = Counter(c.get('id') for d in metadata.values() for c in d.get('connections', []) if c.get('relation') == 'label')
+    spelled = {}
+    for d in entities.values():
+        if d.get('type') == 'label' and d.get('title') and not PLACEHOLDER.fullmatch(d['title'].strip()):
+            spelled.setdefault(label_fold(d['title']) or d['id'], []).append(d)
+    label = {d['id']: min(group, key=lambda r: (-uses[r['id']], r['id'])) for group in spelled.values() for d in group}
+    people, imprints, info, spellings = {}, {}, {}, {}
+    for t in tracks:
+        key = t['plex_rating_key']
+        people[key] = credited(t, metadata, entities, known)
+        imprints[key] = unique([entry(r['id'], r['title'], r) for r in (
+            label.get(c.get('id')) for c in metadata.get(key, {}).get('connections', []) if c.get('relation') == 'label') if r])
+        for e in people[key] + imprints[key]:
+            info.setdefault(e['key'], e)
+            spellings.setdefault(e['key'], Counter())[e['name']] += 1
+    for key, e in info.items():
+        e['name'] = spellings[key].most_common(1)[0][0]
     membership = {t['plex_rating_key']: {PLAYLISTS[p] for p in t['playlist_ids'] if p in PLAYLISTS} for t in tracks}
+    stages = list(dict.fromkeys(PLAYLISTS.values()))
     groups = {'library': [t for t in tracks if t.get('library_section_ids')], 'radio': [t for t in tracks if membership[t['plex_rating_key']]]}
-    groups.update({stage: [t for t in tracks if stage in membership[t['plex_rating_key']]] for stage in dict.fromkeys(PLAYLISTS.values())})
+    groups.update({stage: [t for t in tracks if stage in membership[t['plex_rating_key']]] for stage in stages})
     def ranked(counts, limit=12):
         return [{'name': name, 'count': count} for name, count in sorted(counts.items(), key=lambda p: (-p[1], p[0]))[:limit]]
+    def listed(counts, limit=None, more=lambda key: {}):
+        items = [dict(name=info[key]['name'], count=count, **{f: info[key][f] for f in ('id', 'image') if info[key][f]}, **more(key))
+                 for key, count in counts.items()]
+        return sorted(items, key=lambda item: (-item['count'], fold(item['name']), item['name']))[:limit]
+    statistics, totals = {}, {}
     for scope, selected in groups.items():
-        # Every artist and label of the playlists can be explored; the unused whole-library scope keeps its top 12.
-        every = 12 if scope == 'library' else None
         artists, years, labels, genres, overlap = (Counter() for _ in range(5))
         albums = set()
         coverage = dict(artists=0, releases=0, years=0, labels=0, genres=0)
         for t in selected:
-            if t['artist_credit']:
-                artists[t['artist_credit']] += 1
-                coverage['artists'] += 1
+            artists.update(e['key'] for e in people[t['plex_rating_key']])
+            coverage['artists'] += bool(people[t['plex_rating_key']])
             if t['plex_album_id']:
                 albums.add(t['plex_album_id'])
                 coverage['releases'] += 1
@@ -218,19 +338,24 @@ def music_statistics(result, discovery):
             if re.fullmatch(r'[12][0-9]{3}(?:-[0-9]{2}(?:-[0-9]{2})?)?', date):
                 years[date[:4]] += 1
                 coverage['years'] += 1
-            track_labels = {entities[r['id']]['title'] for r in doc.get('connections', [])
-                            if r.get('relation') == 'label' and r['id'] in entities and entities[r['id']].get('title')}
-            labels.update(track_labels)
-            coverage['labels'] += bool(track_labels)
+            labels.update(e['key'] for e in imprints[t['plex_rating_key']])
+            coverage['labels'] += bool(imprints[t['plex_rating_key']])
             tags = set(doc.get('tags') or [])
             genres.update(tags)
             coverage['genres'] += bool(tags)
             overlap.update(membership[t['plex_rating_key']] - {scope})
-        yield scope, {'scope': scope, 'updatedAt': result['completed_at'], 'metadataAt': metadata_at,
-                      'tracks': len(selected), 'artists': len(artists), 'releases': len(albums),
-                      'durationMs': sum(t['duration_ms'] for t in selected), 'coverage': coverage,
-                      'topArtists': ranked(artists, every), 'years': [{'name': year, 'count': years[year]} for year in sorted(years, reverse=True)], 'labels': ranked(labels, every),
-                      'genres': ranked(genres), 'stages': ranked(overlap)}
+        totals[scope] = {'artists': artists, 'labels': labels}
+        # Full lists of artists and labels live in the names documents.
+        statistics[scope] = {'scope': scope, 'updatedAt': result['completed_at'], 'metadataAt': metadata_at,
+                             'tracks': len(selected), 'artists': len(artists), 'releases': len(albums),
+                             'durationMs': sum(t['duration_ms'] for t in selected), 'coverage': coverage,
+                             'topArtists': listed(artists, 12), 'years': [{'name': year, 'count': years[year]} for year in sorted(years, reverse=True)],
+                             'labels': listed(labels, 12), 'genres': ranked(genres), 'stages': ranked(overlap)}
+    names = {}
+    for kind in ('artists', 'labels'):
+        items = listed(totals['radio'][kind], more=lambda key: {'stages': {s: totals[s][kind][key] for s in stages if totals[s][kind][key]}})
+        names[kind] = {'kind': kind, 'updatedAt': result['completed_at'], 'total': len(items), 'items': items}
+    return statistics, names
 
 
 def publish_library(result, destination):
@@ -247,6 +372,7 @@ def publish_library(result, destination):
                 CREATE TABLE track_details(id TEXT PRIMARY KEY,album_id TEXT,album TEXT,artist_id TEXT,cover_path TEXT,portrait_path TEXT);
                 CREATE TABLE library_info(total INTEGER NOT NULL,updated_at TEXT NOT NULL);
                 CREATE TABLE music_statistics(scope TEXT PRIMARY KEY,doc TEXT NOT NULL);
+                CREATE TABLE music_names(kind TEXT PRIMARY KEY,doc TEXT NOT NULL);
             """)
             db.executemany('INSERT INTO tracks VALUES(?,?,?,?)', (
                 (t['plex_rating_key'], t['title'], t['artist_credit'], t['duration_ms']) for t in result['tracks']))
@@ -254,9 +380,11 @@ def publish_library(result, destination):
                 (t['plex_rating_key'], t['plex_album_id'] or '', t['album'] or '', t['plex_artist_id'] or '',
                  t['cover_path'] or '', t['artist_image_path'] or '') for t in result['tracks']))
             db.execute('INSERT INTO library_info VALUES(?,?)', (len(result['tracks']), result['completed_at']))
+            statistics, names = music_statistics(result, destination.parent / 'discovery/catalogue.sqlite')
             db.executemany('INSERT INTO music_statistics VALUES(?,?)', (
-                (scope, json.dumps(doc, allow_nan=False))
-                for scope, doc in music_statistics(result, destination.parent / 'discovery/catalogue.sqlite')))
+                (scope, json.dumps(doc, allow_nan=False)) for scope, doc in statistics.items()))
+            db.executemany('INSERT INTO music_names VALUES(?,?)', (
+                (kind, json.dumps(doc, allow_nan=False)) for kind, doc in names.items()))
             if db.execute('PRAGMA integrity_check').fetchone()[0] != 'ok':
                 raise ValueError('Library snapshot integrity check failed')
         with open(temporary, 'rb') as snapshot:

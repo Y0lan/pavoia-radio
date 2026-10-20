@@ -284,7 +284,9 @@ func TestLibraryStatisticsBoundary(t *testing.T) {
 	if _, err = db.Exec("CREATE TABLE music_statistics(scope TEXT PRIMARY KEY,doc TEXT)"); err != nil {
 		t.Fatal(err)
 	}
-	doc := `{"scope":"radio","tracks":2,"coverage":{"labels":0},"topArtists":[{"name":"Artist /private/audio/file.mp3 internal-secret-token","count":2}],"private":"hidden"}`
+	picture := "/api/discovery/media/" + strings.Repeat("a", 40)
+	doc := `{"scope":"radio","tracks":2,"coverage":{"labels":0},"topArtists":[{"name":"Artist /private/audio/file.mp3 internal-secret-token","count":2,"id":"art_0123456789ab","image":"` + picture + `"}],
+	 "labels":[{"name":"Label","count":1,"id":"trk_0123456789ab","image":"/library/metadata/9/thumb/1"},{"name":"Other","count":1,"id":"lab_0123456789ab","image":"/api/discovery/media/../x"}],"private":"hidden"}`
 	if _, err = db.Exec("INSERT INTO music_statistics VALUES(?,?)", "radio", doc); err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +295,72 @@ func TestLibraryStatisticsBoundary(t *testing.T) {
 	if r.Code != 200 || strings.Contains(r.Body.String(), "private") || strings.Contains(r.Body.String(), c.cfg.InternalToken) {
 		t.Fatal(r.Code, r.Body.String())
 	}
+	var stats libraryMusicStats
+	if err = json.Unmarshal(r.Body.Bytes(), &stats); err != nil {
+		t.Fatal(err)
+	}
+	want := []musicCount{{Name: "Label", Count: 1}, {Name: "Other", Count: 1, ID: "lab_0123456789ab"}}
+	if len(stats.TopArtists) != 1 || stats.TopArtists[0].ID != "art_0123456789ab" || stats.TopArtists[0].Image != picture || len(stats.Labels) != 2 || stats.Labels[0] != want[0] || stats.Labels[1] != want[1] {
+		t.Fatal(r.Body.String())
+	}
 	if r := request(c.routes(), "GET", "/api/library/statistics?scope=bus", "", ""); r.Code != 400 {
 		t.Fatal(r.Code)
+	}
+}
+
+func TestLibraryNamesBoundary(t *testing.T) {
+	c := testController(t)
+	h := c.routes()
+	if r := request(h, "GET", "/api/library/names?kind=artists", "", ""); r.Code != 503 {
+		t.Fatal("missing snapshot presented as empty names", r.Code)
+	}
+	db, err := sql.Open("sqlite", filepath.Join(c.cfg.StateDir, "library.sqlite"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if _, err = db.Exec("CREATE TABLE music_statistics(scope TEXT PRIMARY KEY,doc TEXT)"); err != nil {
+		t.Fatal(err)
+	}
+	// A snapshot published before the names documents has no table.
+	if r := request(h, "GET", "/api/library/names?kind=artists", "", ""); r.Code != 503 || !strings.Contains(r.Body.String(), "names unavailable") {
+		t.Fatal(r.Code, r.Body.String())
+	}
+	picture := "/api/discovery/media/" + strings.Repeat("0", 40)
+	doc := `{"kind":"artists","updatedAt":"2026-10-20T00:00:00Z","total":2,"private":"hidden","items":[
+	 {"name":"Artist /private/audio/file.mp3 internal-secret-token","id":"art_0123456789ab","image":"` + picture + `","count":2,"stages":{"palac-feel":1,"bermuda-day":1,"moon":3,"":1}},
+	 {"name":"Other","id":"art_0123456789AB","image":"/library/metadata/9/thumb/1","count":1,"stages":{"closing":1}}]}`
+	if _, err = db.Exec("CREATE TABLE music_names(kind TEXT PRIMARY KEY,doc TEXT); INSERT INTO music_names VALUES('artists',?),('broken','{')", doc); err != nil {
+		t.Fatal(err)
+	}
+	for _, url := range []string{"/api/library/names", "/api/library/names?kind=tracks", "/api/library/names?kind=broken"} {
+		if r := request(h, "GET", url, "", ""); r.Code != 400 {
+			t.Fatal(url, r.Code)
+		}
+	}
+	if r := request(h, "GET", "/api/library/names?kind=labels", "", ""); r.Code != 503 {
+		t.Fatal("missing labels row", r.Code)
+	}
+	r := request(h, "GET", "/api/library/names?kind=artists", "", "")
+	for _, private := range []string{"private", c.cfg.InternalToken, "/library/metadata/", "moon"} {
+		if r.Code != 200 || strings.Contains(r.Body.String(), private) {
+			t.Fatal(r.Code, r.Body.String())
+		}
+	}
+	var names musicNames
+	if err = json.Unmarshal(r.Body.Bytes(), &names); err != nil {
+		t.Fatal(err)
+	}
+	first, second := names.Items[0], names.Items[1]
+	if names.Kind != "artists" || names.Total != 2 || len(names.Items) != 2 || first.Name != "Artist" || first.ID != "art_0123456789ab" || first.Image != picture ||
+		len(first.Stages) != 2 || first.Stages["palac-feel"] != 1 || first.Stages["bermuda-day"] != 1 ||
+		second.ID != "" || second.Image != "" || second.Stages["closing"] != 1 {
+		t.Fatal(r.Body.String())
+	}
+	if _, err = db.Exec("UPDATE music_names SET doc='{\"items\":' WHERE kind='artists'"); err != nil {
+		t.Fatal(err)
+	}
+	if r := request(h, "GET", "/api/library/names?kind=artists", "", ""); r.Code != 503 {
+		t.Fatal("corrupt names document", r.Code)
 	}
 }
