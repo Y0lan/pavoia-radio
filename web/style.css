@@ -279,20 +279,22 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 /* The ✕ glyph, not its 44px target, ends on the gutter. */
 #explorer #explorer-close { margin-right:-12px; }
 #explorer button { min-height:44px; padding:0; border:0; background:none; color:var(--cream); font:inherit; cursor:pointer; }
-/* The bordered actions: Try again, Show earlier tracks and Switch to this stage. Box borders are the line, and darken to
-   muted under a pointer. */
-#explorer :is(#music-status button, #history-more, .stage-switch) { min-height:44px; padding:0 var(--s3); font:14px Inter,sans-serif; border:1px solid var(--line); }
-#explorer :is(#music-status button, #history-more, .stage-switch):hover { border-color:var(--muted); }
+/* The bordered actions: Try again, Show earlier tracks, Show more and Switch to this stage. Box borders are the line,
+   and darken to muted under a pointer. */
+#explorer :is(#music-status button, #history-more, .list-more, .stage-switch) { min-height:44px; padding:0 var(--s3); font:14px Inter,sans-serif; border:1px solid var(--line); }
+#explorer :is(#music-status button, #history-more, .list-more, .stage-switch):hover { border-color:var(--muted); }
 #explorer .stage-switch { margin-top:var(--s3); }
 /* Quiet text actions, More and Show all: soft at rest, cream and underlined under a pointer or the keyboard. */
 #explorer .text-button { color:var(--soft); font:14px Inter,sans-serif; }
 #explorer .text-button:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+/* A text link in its place, such as All 860 artists, keeps a button's 44px target. */
+#explorer a.text-button { display:inline-flex; align-items:center; min-height:44px; }
 /* Fields: 16px keeps iOS from zooming. */
 #explorer input { height:44px; padding:0 var(--s3); font:16px Inter,sans-serif; color:var(--cream); background:transparent; border:1px solid var(--line); border-radius:0; }
 #explorer input:is(:hover, :focus) { border-color:var(--muted); }
 #explorer input::placeholder { color:var(--muted); opacity:1; }
 /* ✕ in the header leaves the explorer; the browser's own clear mark would be a second one. */
-#discovery-query::-webkit-search-cancel-button { appearance:none; }
+#explorer input[type=search]::-webkit-search-cancel-button { appearance:none; }
 #explorer input:focus-visible { outline-offset:-1px; }
 .discovery-search { flex:0 1 360px; min-width:0; }
 .discovery-search input { width:100%; min-width:0; text-overflow:ellipsis; }
@@ -355,6 +357,9 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .regions { display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:var(--s5); margin-top:var(--s5); }
 .region h4, .record-about h4 { margin:0 0 var(--s2); font:22px/1.2 var(--serif); }
 .region h4 small { margin-left:var(--s1); font:11px var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
+/* On the map, the count of a region that lists every name links to that list. */
+.region h4 small a { text-decoration:underline; text-underline-offset:3px; }
+.region h4 small a:is(:hover, :focus-visible) { color:var(--cream); }
 .region ol { margin:0; padding:0; list-style:none; }
 /* About and On the radio close the record in the same grid, side by side on a wide screen: On the radio takes the
    last column, About the ones before it. */
@@ -536,6 +541,19 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 /* Wide enough for its longest label, Frühere Tracks anzeigen, so Loading… and Try again swap in place. */
 #history-more { margin:var(--s4) 0; min-width:12.5rem; }
 #history-more[aria-disabled=true] { opacity:.45; cursor:default; }
+/* A list of names: the place it belongs to as a link over its title, then one row of a filter and the two orders, in the
+   stage row's style; on a phone the orders go under the full-width filter. The rows are the explorer's one row, a
+   hundred at a time under Show more, in a column narrow enough to read a name with its count. The link's padding widens
+   its target without moving the title, and lies over it; its ring keeps clear of the title. */
+.eyebrow a { position:relative; padding-block:var(--s1); color:var(--soft); }
+.eyebrow a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+.eyebrow a:focus-visible { outline-offset:0; }
+.list-controls { display:flex; flex-wrap:wrap; align-items:center; gap:var(--s3) var(--s4); margin-top:var(--s4); }
+.list-controls input { flex:0 1 360px; min-width:0; }
+@media (max-width:760px) { .list-controls input { flex-basis:100%; } }
+#explorer .list-status:empty { margin:0; }
+.list-rows { max-width:640px; margin:var(--s3) 0 0; padding:0; list-style:none; }
+#explorer .list-more { margin:var(--s4) 0; }
 /* On a phone the explorer's bar scrolls away, so the day names stick to the top edge. */
 @media (max-width:760px) { .history-day { top:0; } }
 /* Release years: one cream bar a year from the first to the last, an empty year a line, and the first year, the peak and
@@ -553,6 +571,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .stage-notes summary:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 @media (max-width:600px) {
   #history-more { width:100%; }
+  #explorer .list-more { width:100%; }
   .music-filters label { width:100%; }
   .explorer-nav { gap:var(--s3); }
 }

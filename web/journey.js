@@ -70,14 +70,20 @@
       showList:'Als Liste zeigen',showMap:'Als Karte zeigen',mapHint:'Je näher ein Name, desto enger die Verbindung. Wähle einen, um dorthin zu gehen.',
     },
   };
-  Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',historyDay:'Day',older:'Show earlier tracks',loadingMore:'Loading…',now:'Now',allStages:'All stages',wholeLibrary:'Whole library',noHistory:'Nothing has played on this stage yet.',noDay:'Nothing played on this stage that day.',historyError:'The history could not load.',musicLoading:'Loading the music…',musicError:'These records could not load.',retry:'Try again',releases:'Releases',years:'Release years',labels:'Labels',
+  Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',stage:'Stage',historyDay:'Day',older:'Show earlier tracks',loadingMore:'Loading…',now:'Now',allStages:'All stages',noHistory:'Nothing has played on this stage yet.',noDay:'Nothing played on this stage that day.',historyError:'The history could not load.',musicLoading:'Loading the music…',musicError:'These records could not load.',retry:'Try again',releases:'Releases',years:'Release years',labels:'Labels',
     statLine:'{tracks} tracks by {artists} artists, {hours} hours of music',playsSince:'{plays} plays since {date}',plays30:'{plays} plays in the last 30 days',allPlayed:'every track has played',notPlayed:'{n} not played yet',seeWhatPlayed:'See what played',playsError:'Plays could not load.',switchStage:'Switch to this stage',
     mostTracksBy:'Most tracks by',mostTracksOn:'Most tracks on',sharesWith:'Shares tracks with',stages:'Stages',tracksOn:'{tracks} on {stage}',tracksInCommon:'{tracks} in common',mostPlayedSince:'Most played since {date}',mostPlayed30:'Most played in the last 30 days',howCounted:'How these numbers are counted',
-    definitions:'Each track counts once per playlist. Artists are counted as credited, collaborations included. A track can be on several stages.',playIsStart:'A play is a start on the stream, not a full listen.',checkedAt:'Playlist checked at {time}',knownArtist:'Artist known for {n} of {total} tracks',knownLabel:'Label known for {n} of {total} tracks',knownYear:'Year known for {n} of {total} tracks'});
-  Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',stage:'Bühne',historyDay:'Tag',older:'Frühere Tracks anzeigen',loadingMore:'Wird geladen…',now:'Jetzt',allStages:'Alle Bühnen',wholeLibrary:'Gesamte Bibliothek',noHistory:'Auf dieser Bühne lief noch nichts.',noDay:'An diesem Tag lief hier nichts.',historyError:'Der Verlauf konnte nicht geladen werden.',musicLoading:'Musik wird geladen…',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',releases:'Veröffentlichungen',years:'Erscheinungsjahre',labels:'Labels',
+    definitions:'Each track counts once per playlist. Artists are counted as credited, collaborations included. A track can be on several stages.',playIsStart:'A play is a start on the stream, not a full listen.',checkedAt:'Playlist checked at {time}',knownArtist:'Artist known for {n} of {total} tracks',knownLabel:'Label known for {n} of {total} tracks',knownYear:'Year known for {n} of {total} tracks',
+    statLineAll:'{tracks} tracks by {artists} on {labels}, {hours} hours of music',artistsLink:'{n} artists',labelsLink:'{n} labels',allArtists:'All {n} artists',allLabels:'All {n} labels',
+    listArtists:'{n} artists',listLabels:'{n} labels',byCount:'most tracks first',byName:'A to Z',sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',
+    showMore:'Show more',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.'});
+  Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',stage:'Bühne',historyDay:'Tag',older:'Frühere Tracks anzeigen',loadingMore:'Wird geladen…',now:'Jetzt',allStages:'Alle Bühnen',noHistory:'Auf dieser Bühne lief noch nichts.',noDay:'An diesem Tag lief hier nichts.',historyError:'Der Verlauf konnte nicht geladen werden.',musicLoading:'Musik wird geladen…',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',releases:'Veröffentlichungen',years:'Erscheinungsjahre',labels:'Labels',
     statLine:'{tracks} Tracks von {artists} Künstlern, {hours} Stunden Musik',playsSince:'{plays} Wiedergaben seit {date}',plays30:'{plays} Wiedergaben in den letzten 30 Tagen',allPlayed:'jeder Track lief schon',notPlayed:'{n} noch nicht gespielt',seeWhatPlayed:'Sieh, was lief',playsError:'Die Wiedergaben konnten nicht geladen werden.',switchStage:'Zu dieser Bühne wechseln',
     mostTracksBy:'Die meisten Tracks von',mostTracksOn:'Die meisten Tracks bei',sharesWith:'Teilt Tracks mit',stages:'Bühnen',tracksOn:'{tracks} auf {stage}',tracksInCommon:'{tracks} gemeinsam',mostPlayedSince:'Am häufigsten gespielt seit {date}',mostPlayed30:'Am häufigsten gespielt in den letzten 30 Tagen',howCounted:'So wird gezählt',
-    definitions:'Jeder Track zählt einmal pro Playlist. Künstler zählen wie angegeben, Zusammenarbeiten eingeschlossen. Ein Track kann auf mehreren Bühnen laufen.',playIsStart:'Eine Wiedergabe ist ein Start im Stream, kein ganzes Anhören.',checkedAt:'Playlist geprüft um {time}',knownArtist:'Künstler bekannt für {n} von {total} Tracks',knownLabel:'Label bekannt für {n} von {total} Tracks',knownYear:'Jahr bekannt für {n} von {total} Tracks'});
+    definitions:'Jeder Track zählt einmal pro Playlist. Künstler zählen wie angegeben, Zusammenarbeiten eingeschlossen. Ein Track kann auf mehreren Bühnen laufen.',playIsStart:'Eine Wiedergabe ist ein Start im Stream, kein ganzes Anhören.',checkedAt:'Playlist geprüft um {time}',knownArtist:'Künstler bekannt für {n} von {total} Tracks',knownLabel:'Label bekannt für {n} von {total} Tracks',knownYear:'Jahr bekannt für {n} von {total} Tracks',
+    statLineAll:'{tracks} Tracks von {artists} auf {labels}, {hours} Stunden Musik',artistsLink:'{n} Künstlern',labelsLink:'{n} Labels',allArtists:'Alle {n} Künstler',allLabels:'Alle {n} Labels',
+    listArtists:'{n} Künstler',listLabels:'{n} Labels',byCount:'die meisten Tracks zuerst',byName:'von A bis Z',sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',
+    showMore:'Mehr zeigen',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.'});
   const word = key => copy[radio.getState().language][key] || key;
   const node = (tag,cls,value) => {const n=document.createElement(tag);if(cls)n.className=cls;if(value)n.textContent=value;return n;};
   const entityID = value => /^(?:(?:art|trk|rel|lab|pl)_[a-f0-9]{12}|plex_[0-9]{1,32})$/.test(value || '');
@@ -118,15 +124,18 @@
   function door(v,line,fact) {const a=node('a','row'),text=node('span','row-text'),href=v.href===undefined?'#explore/'+v.id:v.href;if(href)a.href=href;text.append(node('span','row-name',v.title));if(line)text.append(node('span','row-line',line));a.append(picture(v,''),text);if(fact)a.append(node('span','row-fact',fact));return a;}
   // A region: a heading with the count of its names, then a list, six rows until the listener asks for the rest, whose
   // pictures load only then: Show all {n} shows that count. One with nothing in it says so in one sentence. On the map
-  // it holds the 14 closest at once, the most a side shows, each knowing the name it hangs from.
-  function regionSection(key,items,empty,prefix='r',map=false,count=items.length) {
+  // it holds the 14 closest at once, the most a side shows, each knowing the name it hangs from. A region whose every
+  // name has a place of its own links there instead of Show all, and on the map from its count.
+  function regionSection(key,items,empty,prefix='r',map=false,count=items.length,all=null) {
     const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.dataset.id=i.id;if(i.via)li.dataset.via=i.via;li.append(door(i,i.line,i.fact));return li;});
-    heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);section.dataset.key=key;if(count!==null)heading.append(' ',node('small','',number(count)));section.append(heading);
+    heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);section.dataset.key=key;
+    if(count!==null){const n=node('small','',map&&all?'':number(count));if(map&&all){const a=node('a','',number(count));a.href=all.getAttribute('href');a.setAttribute('aria-label',all.textContent);n.append(a);}heading.append(' ',n);}
+    section.append(heading);
     if(!items.length){section.append(node('p','collection-note',word(empty)));return section;}
     list.append(...rows(items.slice(0,map?14:6)));section.append(list);
     if(map)return section;
     // The button goes once used, so focus moves on to the first row it showed, never to the page.
-    if(items.length>6){const more=action(word('showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].children[0].focus();},'text-button');section.append(more);}
+    if(items.length>6){const more=all||action(word('showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].children[0].focus();},'text-button');section.append(more);}
     return section;
   }
   // {names}: "A", "A and B", or "A, B and 3 more", in the listener's language.
@@ -661,10 +670,10 @@
     if(!/^#explore(?:\?|$)/.test(location.hash))return;
     searchPage('');hop?.abort();hop=null;shownQuery='';hideResults();$('discovery-status').textContent='';
   });
-  let view='explore',musicRequest=null,historyPage=null,historyPlace=null,clicked=null,musicScope='',musicDay='',shownStage=null,naming=null;
+  let view='explore',musicRequest=null,historyPage=null,musicPlace=null,clicked=null,musicScope='',musicKind='',musicDay='',shownStage=null,naming=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
-  // A place in Statistics by name: a stage, all stages together, or the whole library.
-  const scopeName = id => id==='radio'?word('allStages'):id==='library'?word('wholeLibrary'):stationName(id);
+  // A place in Statistics by name: a stage, or all stages together, which hold the whole collection.
+  const scopeName = id => id==='radio'?word('allStages'):stationName(id);
   const shortTime = value => new Date(value).toLocaleTimeString(radio.getState().language, {timeStyle:'short'});
   // A day by its month and number: Oct 7.
   const shortDay = value => new Date(value).toLocaleDateString(radio.getState().language, {day:'numeric',month:'short'});
@@ -686,9 +695,9 @@
     if(days>1)return at.toLocaleDateString(lang,{weekday:'long',day:'numeric',month:'long'});
     const name=new Intl.RelativeTimeFormat(lang,{numeric:'auto'}).format(-days,'day');return name[0].toUpperCase()+name.slice(1);
   }
-  // What the shown music is for: the stage and the day of its address, and the language, since rows drawn in another
-  // one are drawn again.
-  const musicKey = () => [view,musicScope,musicDay,radio.getState().language].join(':');
+  // What the shown music is for: the stage, the list and the day of its address, and the language, since rows drawn in
+  // another one are drawn again.
+  const musicKey = () => [view,musicScope,musicKind,musicDay,radio.getState().language].join(':');
   // History drawn under a Today that has become Yesterday is drawn again.
   const stale = () => historyPage?.drawn!==today();
   // Both starts come from one playback row: the radio writes it to the second, History to the millisecond.
@@ -697,24 +706,25 @@
   // While History shows the newest tracks of the stage on air, its first row follows the radio's play: the
   // start time tells a track played twice in a row from one play.
   const onAir = () => {const s=radio.getState();return s.dataFresh&&s.track&&musicScope===s.stage&&!musicDay?[s.stage,s.track.id,s.track.startedAt].join(':'):'';};
-  // The stage row, in the radio rail's style: the stages, and in Statistics all of them together before and the whole
-  // library after. The current one is marked, and History's links keep the day picked. On a phone the row scrolls
+  // The stage row, in the radio rail's style: the stages, and in Statistics all of them together before. The current one
+  // is marked; History's links keep the day picked, and a list of names keeps its kind for the other stages, while its
+  // own stage leads back to its place. On a phone the row scrolls
   // sideways from the current stage, faded where stages wait. Focus in it moves to the current stage, never to the page.
   function fillRow() {
     const held=stageRow.contains(document.activeElement),ids=radio.stations.map(s=>s.id);
-    if(view==='statistics'){ids.unshift('radio');ids.push('library');}
-    stageRow.replaceChildren(...ids.map(id=>{const a=node('a','',scopeName(id));a.href=view==='history'?historyAt(id,musicDay):'#statistics/'+id;if(id===musicScope)a.setAttribute('aria-current','page');return a;}));
+    if(view==='statistics')ids.unshift('radio');
+    stageRow.replaceChildren(...ids.map(id=>{const a=node('a','',scopeName(id));a.href=view==='history'?historyAt(id,musicDay):'#statistics/'+id+(musicKind&&id!==musicScope?'/'+musicKind:'');if(id===musicScope)a.setAttribute('aria-current','page');return a;}));
     const current=stageRow.querySelector('[aria-current]');
     stageRow.scrollLeft=current.offsetLeft-(stageRow.clientWidth-current.offsetWidth)/2;fade(stageRow);
     if(held)current.focus({preventScroll:true});
   }
   function setView(next) {
-    // Leaving History keeps its place: how far it was scrolled, and the row opened from it. That is the row
-    // clicked, by pointer, touch or Enter, when it links where the explorer went: a track played twice links
+    // Leaving History or a list of names keeps its place: how far it was scrolled, and the row opened from it. That is
+    // the row clicked, by pointer, touch or Enter, when it links where the explorer went: a track played twice links
     // twice, and a tap focuses no link.
-    if(view==='history'&&next!=='history'){
+    if((view==='history'||view==='statistics'&&musicKind)&&next!==view){
       const content=$('music-content'),opened=r=>content.contains(r)&&r.getAttribute('href')===location.hash;
-      historyPlace={top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
+      musicPlace={top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
     }
     clicked=null;
     view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();
@@ -754,16 +764,30 @@
   const someone = name => Boolean(name.trim())&&name!=='Various Artists';
   // The red On air of what plays now.
   const onAirMark = () => {const on=node('span','on-air',' · ');on.append(node('span','',word('onAir')));return on;};
+  const tracks = n => word(n===1?'tracks1':'tracksN').replace('{n}',number(n));
+  // An artist or a label opens its record, found by its name, or at once when this visit already found it.
+  const credit = (type,name) => {const known=named.get(type+':'+name);
+    return {id:type+':'+name,type,title:name,image:known?.image,href:!someone(name)?null:known?'#explore/'+known.id:'#explore/'+type+'/'+encodeURIComponent(name)};};
+  // The listener's words with some {parts} as nodes, such as links in a sentence.
+  const sentence = (text,parts) => text.split(/(\{\w+\})/).map((p,i)=>i%2?parts[p.slice(1,-1)]:p).filter(p=>p!=='');
+  // The numbers of each place fetched in this visit, which a list of its names reuses. Until the server keeps every
+  // name, they hold the first 12 only, and the place offers no list.
+  const placeStats=new Map(),complete=data=>data.topArtists.length===data.artists;
   // A stage in Statistics is a place on the map of a record: its photo, its name and its numbers in the middle, the
   // artists and labels with the most tracks on it and the stages it shares tracks with around them, each opening its own
   // place. Under it: its release years, what it played most, and how all of it is counted.
   function renderStage(data,music) {
     const content=$('music-content'),scope=data.scope,station=radio.stations.find(s=>s.id===scope),title=scopeName(scope),map=mapOn()?node('div','neighbourhood'):null,grid=node('div','regions');
-    const heading=node('div','entity-heading'),about=node('div'),tracks=n=>word(n===1?'tracks1':'tracksN').replace('{n}',number(n)),since=Date.parse(music?.earliest)>Date.parse(music?.from);
+    const heading=node('div','entity-heading'),about=node('div'),since=Date.parse(music?.earliest)>Date.parse(music?.from),every=complete(data);
     shownStage=[data,music];mapWatch?.disconnect();content.replaceChildren();
     recordTitle=node('h3','',title);recordTitle.tabIndex=-1;
     if(station)about.append(node('p','eyebrow',word('stage')));
-    about.append(recordTitle,node('p','entity-line',word('statLine').replace('{tracks}',number(data.tracks)).replace('{artists}',number(data.artists)).replace('{hours}',number(Math.round(data.durationMs/3600000)))));
+    // With every name kept, its artists and its labels are links in the sentence to their lists. The map keeps the shorter
+    // sentence, which fits its middle on one line, and links them from the counts over its regions.
+    const list=(kind,key,n,cls)=>{const a=node('a',cls,word(key).replace('{n}',number(n)));a.href='#statistics/'+scope+'/'+kind;return a;},line=node('p','entity-line'),linked=every&&!map;
+    // One text node between links, as the plain line had: the words shape as they did.
+    line.append(...sentence(word(linked?'statLineAll':'statLine'),{tracks:number(data.tracks),hours:number(Math.round(data.durationMs/3600000)),artists:linked?list('artists','artistsLink',data.artists):number(data.artists),labels:linked&&list('labels','labelsLink',data.labels.length)}));line.normalize();
+    about.append(recordTitle,line);
     // A station's plays in a sentence that ends on a link to what played there; plays that failed to load say so in
     // their place, and the rest still shows.
     if(station){
@@ -773,13 +797,12 @@
       about.append(plays,action(word('switchStage'),()=>radio.tune(scope),'stage-switch'));
     }
     heading.append(...station?[picture({type:'stage',title,image:station.thumb},'')]:[],about);
-    // An artist or a label opens its record, found by its name; a stage opens its own place. The count is the fact.
-    const names=(type,list)=>list.map(({name,count})=>{const known=named.get(type+':'+name);
-      return {id:type+':'+name,type,title:name,image:known?.image,href:!someone(name)?null:known?'#explore/'+known.id:'#explore/'+type+'/'+encodeURIComponent(name),line:station?word('tracksOn').replace('{tracks}',tracks(count)).replace('{stage}',title):tracks(count),fact:number(count)};});
+    // The first 12 artists and labels, and the stages; each opens its own place, and the count is the fact.
+    const names=(type,list)=>list.slice(0,12).map(({name,count})=>({...credit(type,name),line:station?word('tracksOn').replace('{tracks}',tracks(count)).replace('{stage}',title):tracks(count),fact:number(count)}));
     const stages=data.stages.map(({name,count})=>[radio.stations.find(s=>s.id===name),count]).filter(([s])=>s)
       .map(([s,count])=>({id:s.id,type:'stage',title:s.name,image:s.thumb,href:'#statistics/'+s.id,line:station?word('tracksInCommon').replace('{tracks}',tracks(count)):tracks(count),fact:number(count)}));
-    const regions=[['mostTracksBy',names('artist',data.topArtists),data.artists],['mostTracksOn',names('label',data.labels),null],[station?'sharesWith':'stages',stages,stages.length]]
-      .filter(([,items])=>items.length).map(([key,items,count])=>regionSection(key,items,'','r',Boolean(map),count));
+    const regions=[['mostTracksBy',names('artist',data.topArtists),data.artists,every&&list('artists','allArtists',data.artists,'text-button')],['mostTracksOn',names('label',data.labels),every?data.labels.length:null,every&&list('labels','allLabels',data.labels.length,'text-button')],[station?'sharesWith':'stages',stages,stages.length]]
+      .filter(([,items])=>items.length).map(([key,items,count,all])=>regionSection(key,items,'','r',Boolean(map),count,all||null));
     if(map){map.append(heading,...regions);content.append(map);}else{content.append(heading);grid.append(...regions);}
     if(wide.matches)drawMap(content,map,{type:'stage'});
     // Release years in one strip, a bar a year from the first to the last, the empty ones kept as a line.
@@ -829,10 +852,44 @@
     if(!on)kind.querySelector('.on-air')?.remove();else if(!kind.querySelector('.on-air'))kind.append(onAirMark());
     if(on&&document.activeElement===button)recordTitle.focus({preventScroll:true});button.hidden=on;
   }
+  // Every artist or label of a place, a hundred rows at a time, most tracks first or A to Z, and a filter that ignores
+  // case and accents. The filter, the order and the rows shown live in the page, so a record opened from a row comes
+  // back to them; none of them changes the address.
+  function renderList(data,kind) {
+    const content=$('music-content'),scope=data.scope,lang=radio.getState().language,type=kind.slice(0,-1),all=kind==='artists'?data.topArtists:data.labels;
+    const loose=s=>s.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase(lang),collator=new Intl.Collator(lang,{sensitivity:'base',numeric:true});
+    const heading=node('div','entity-heading'),about=node('div'),eyebrow=node('p','eyebrow'),back=node('a','',scopeName(scope)),line=node('p','entity-line');
+    const controls=node('div','list-controls'),field=node('input'),orders=node('div','stage-row'),status=node('p','collection-note list-status'),spoken=node('span','visually-hidden'),list=node('ol','list-rows');
+    let order='count',shown=100,az=null,said=null;
+    back.href='#statistics/'+scope;eyebrow.append(back);
+    recordTitle=node('h3','',word(kind));recordTitle.tabIndex=-1;about.append(eyebrow,recordTitle,line);heading.append(about);
+    // The names that match, in the order asked for.
+    const matches=()=>{const q=loose(field.value.trim()),from=order==='name'?(az||=[...all].sort((a,b)=>collator.compare(a.name,b.name))):all;return q?from.filter(i=>loose(i.name).includes(q)):from;};
+    const row=({name,count})=>{const li=node('li');li.append(door(credit(type,name),'',tracks(count)));return li;};
+    // The button adds a hundred and keeps focus; when it goes, focus moves on to the first name it showed.
+    const more=action(word('showMore'),()=>{const hits=matches(),next=hits.slice(shown,shown+100).map(row);shown+=100;list.append(...next);more.hidden=hits.length<=shown;if(more.hidden)next[0].children[0].focus();},'list-more');
+    // How many match shows with the rows they leave, so the rows move once, and is said once typing pauses.
+    const draw=()=>{
+      const hits=matches(),q=field.value.trim();list.replaceChildren(...hits.slice(0,shown).map(row));more.hidden=hits.length<=shown;
+      status.textContent=!q?'':hits.length?word('nOfTotal').replace('{n}',number(hits.length)).replace('{total}',number(all.length)):word(kind==='artists'?'noArtistMatch':'noLabelMatch').replace('{q}',q);
+      line.textContent=word(kind==='artists'?'listArtists':'listLabels').replace('{n}',number(all.length))+', '+word(order==='count'?'byCount':'byName');
+      for(const a of orders.children)if(a.dataset.order===order)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current');
+    };
+    field.type='search';field.autocomplete='off';field.placeholder=word(kind==='artists'?'filterArtists':'filterLabels');field.setAttribute('aria-label',field.placeholder);
+    field.addEventListener('input',()=>{shown=100;draw();clearTimeout(said);said=setTimeout(()=>{spoken.textContent=status.textContent;},300);});
+    // The two orders are links to this list itself, in the stage row's style: Space plays over them, as over any link, and
+    // the explorer's click router keeps them from moving. Ctrl, Cmd, Shift and middle clicks open the list elsewhere.
+    for(const [key,label] of [['count','sortCount'],['name','sortName']]){
+      const a=node('a','',word(label));a.href='#statistics/'+scope+'/'+kind;a.dataset.order=key;orders.append(a);
+      a.addEventListener('click',event=>{if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;order=key;shown=100;draw();});
+    }
+    spoken.setAttribute('role','status');controls.append(field,orders);draw();
+    content.replaceChildren(heading,controls,status,spoken,list,more);
+  }
   // follow: the radio asked for this first page, as a new track came on air or another stage was tuned.
   async function loadMusic(more=false,follow=false) {
     musicRequest?.abort();const controller=new AbortController();musicRequest=controller;
-    const timeout=setTimeout(()=>controller.abort(),12000),scope=musicScope,mode=view,day=musicDay,key=musicKey(),content=$('music-content'),button=$('history-more'),field=$('history-day');
+    const timeout=setTimeout(()=>controller.abort(),12000),scope=musicScope,kind=musicKind,mode=view,day=musicDay,key=musicKey(),content=$('music-content'),button=$('history-more'),field=$('history-day');
     // The current stage in the row takes focus that has nowhere left to be.
     const stage=()=>stageRow.querySelector('[aria-current]');
     // The field shows the picked day, or today by itself rather than mm/dd/yyyy: past midnight it moves on with the
@@ -902,9 +959,16 @@
         // A button that goes while it has focus hands it on: to the first track it showed, or to the current stage.
         if(focused===button&&button.hidden)((more&&rows.find(r=>r.getAttribute('href')))||stage()).focus();
       }else{
-        // A station's plays come with its numbers; plays that fail leave the numbers to show.
-        const [data,music]=await Promise.all([readJSON('/api/library/statistics?scope='+scope,controller.signal),radio.stations.some(s=>s.id===scope)?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null]);
-        if(musicRequest!==controller)return;renderStage(data,music);content.dataset.key=key;$('music-status').textContent='';
+        // A station's plays come with its numbers; plays that fail leave the numbers to show. A list of names reuses the
+        // numbers of its place when this visit has them.
+        const [data,music]=await Promise.all([kind&&placeStats.get(scope)||readJSON('/api/library/statistics?scope='+scope,controller.signal),!kind&&radio.stations.some(s=>s.id===scope)?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null]);
+        if(musicRequest!==controller)return;placeStats.set(scope,data);
+        // A list the numbers cannot fill yet is its place.
+        if(kind&&!complete(data))return go('#statistics/'+scope);
+        // A place starts at its top, as a record does: a list drawn from the numbers already here leaves no empty page
+        // in between for the browser to scroll back up.
+        dialog.scrollTop=0;
+        if(kind)renderList(data,kind);else renderStage(data,music);content.dataset.key=key;$('music-status').textContent='';
         // A stage place starts at its name, as a record starts at its title, unless the listener moved focus while it loaded.
         if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
       }
@@ -954,22 +1018,24 @@
     open();
     if(id)return loadEntity(id);
     if(name)return byName(first,name);
-    // History and Statistics read their stage, and History its day, from the address. A bare or unknown stage is the one
-    // on air, and a day that is not a real one before today is none; the address is rewritten to say so, and the tab
-    // keeps it.
+    // History and Statistics read their stage, History its day and Statistics its list of artists or labels, from the
+    // address. A bare or unknown stage is the one on air, the whole library is All stages, which holds every playlist,
+    // and a day that is not a real one before today is none; the address is rewritten to say so, and the tab keeps it.
     if(section!=='explore'){
-      musicScope=[...radio.stations.map(s=>s.id),...section==='statistics'?['radio','library']:[]].includes(first)?first:radio.getState().stage;
+      const statistics=section==='statistics',known=[...radio.stations.map(s=>s.id),...statistics?['radio']:[]].includes(first);
+      musicScope=known?first:statistics&&first==='library'?'radio':radio.getState().stage;
+      musicKind=statistics&&known&&['artists','labels'].includes(second)?second:'';
       musicDay=section==='history'&&pastDay(second||'')?second:'';
-      const place=section==='history'?historyAt(musicScope,musicDay):'#statistics/'+musicScope;
+      const place=section==='history'?historyAt(musicScope,musicDay):'#statistics/'+musicScope+(musicKind?'/'+musicKind:'');
       if(location.hash!==place)history.replaceState(history.state,'',place);
       for(const link of document.querySelectorAll('.explorer-nav a'))if(tab(link)===section)link.setAttribute('href',place);
     }
     setView(section);
-    // The History tab, from a record or another tab, brings back the same rows without a reload, scrolled
-    // where they were, with focus on the row that was opened. The place is used once: the second restore()
-    // of a browser move changes nothing.
-    if(section==='history'&&$('music-content').dataset.key===musicKey()){
-      if(historyPlace){dialog.scrollTop=historyPlace.top;if($('music-content').contains(historyPlace.row))historyPlace.row.focus({preventScroll:true});historyPlace=null;}
+    // The History tab, or the Statistics tab on a list of names, from a record or another tab, brings back the same
+    // rows without a reload, scrolled where they were, with focus on the row that was opened; a list keeps its filter, its
+    // order and the rows it showed. The place is used once: the second restore() of a browser move changes nothing.
+    if((section==='history'||musicKind)&&$('music-content').dataset.key===musicKey()){
+      if(musicPlace){dialog.scrollTop=musicPlace.top;if($('music-content').contains(musicPlace.row))musicPlace.row.focus({preventScroll:true});musicPlace=null;}
       // A track that came on air while a record was open, or a new day, shows now, not at the next radio answer.
       return followRadio();
     }
