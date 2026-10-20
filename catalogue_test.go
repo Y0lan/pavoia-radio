@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -9,7 +10,9 @@ import (
 	"image"
 	"image/color"
 	"image/jpeg"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -356,6 +359,18 @@ func TestLibraryNamesBoundary(t *testing.T) {
 		len(first.Stages) != 2 || first.Stages["palac-feel"] != 1 || first.Stages["bermuda-day"] != 1 ||
 		second.ID != "" || second.Image != "" || second.Stages["closing"] != 1 {
 		t.Fatal(r.Body.String())
+	}
+	// A browser that accepts gzip gets the same document compressed.
+	zipped := httptest.NewRequest("GET", "/api/library/names?kind=artists", nil)
+	zipped.Header.Set("Accept-Encoding", "gzip, deflate, br")
+	zw := httptest.NewRecorder()
+	h.ServeHTTP(zw, zipped)
+	zr, err := gzip.NewReader(zw.Body)
+	if err != nil || zw.Header().Get("Content-Encoding") != "gzip" || zw.Header().Get("Vary") != "Accept-Encoding" || r.Header().Get("Content-Encoding") != "" {
+		t.Fatal(err, zw.Header(), r.Header())
+	}
+	if plain, err := io.ReadAll(zr); err != nil || !bytes.Equal(plain, r.Body.Bytes()) {
+		t.Fatal(err, string(plain))
 	}
 	if _, err = db.Exec("UPDATE music_names SET doc='{\"items\":' WHERE kind='artists'"); err != nil {
 		t.Fatal(err)

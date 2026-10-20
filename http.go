@@ -1,6 +1,7 @@
 package main
 
 import (
+	"compress/gzip"
 	"context"
 	"crypto/subtle"
 	"database/sql"
@@ -23,6 +24,22 @@ func jsonResponse(w http.ResponseWriter, status int, value any) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(value)
+}
+
+// gzipJSON answers 200 like jsonResponse, compressed when the client accepts gzip: for documents of several hundred KB.
+func gzipJSON(w http.ResponseWriter, r *http.Request, value any) {
+	w.Header().Set("Vary", "Accept-Encoding")
+	if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		jsonResponse(w, 200, value)
+		return
+	}
+	w.Header().Set("Content-Encoding", "gzip")
+	z := gzip.NewWriter(w)
+	defer z.Close()
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.WriteHeader(200)
+	_ = json.NewEncoder(z).Encode(value)
 }
 
 func (c *controller) routes() http.Handler {

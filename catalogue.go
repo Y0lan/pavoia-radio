@@ -142,7 +142,8 @@ func (c *controller) libraryNames(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	jsonResponse(w, 200, result)
+	// Every artist of the playlists is about 680 KB of JSON and 175 KB gzipped.
+	gzipJSON(w, r, result)
 }
 
 // Open each immutable snapshot on demand so atomic replacements appear without a restart.
