@@ -2195,6 +2195,24 @@ test('a record opened from a list comes back, through the Statistics tab, to the
  assert.deepEqual([e.location.hash,textOf(content.descendants().find(n=>n.localName==='h3')),e.document.activeElement===content.descendants().find(n=>n.localName==='h3')],['#statistics/bermuda-day','Under the Sun',true],'its place, at its name');
 });
 
+test('the last Show more hands focus to its first new name, even when that name is plain text',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};
+ const topArtists=[...Array.from({length:100},(_,i)=>({name:'Act '+(i+1),count:300-i})),{name:'Various Artists',count:100},...Array.from({length:5},(_,i)=>({name:'Late '+(i+1),count:50-i}))];
+ e.response={...status('First'),...stageStats({topArtists,artists:topArtists.length,labels:[]})};routeTo(e,'#statistics/bermuda-day/artists');await flush();
+ const more=e.elements['music-content'].children.at(-1);more.focus();more.emit('click');
+ const first=listRows(e)[100],active=e.document.activeElement;
+ assert.deepEqual([more.hidden,textOf(first),active===first,active.getAttribute('href')!=null||active.tabIndex===-1],[true,'Various Artists100 tracks',true,true],'focus on Various Artists, which can hold it');
+});
+
+test('a place kept from History never scrolls a list drawn after it',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};const explorer=e.elements.explorer;
+ e.response={...status('First'),...everyName()};routeTo(e,'#history');await flush();
+ explorer.scrollTop=700;routeTo(e,'#statistics/bermuda-day/artists');await flush();
+ assert.equal(explorer.scrollTop,0,'the list starts at its top');
+ e.location.hash='#statistics/bermuda-day/artists';e.window.emit('popstate');e.window.emit('hashchange');await flush();
+ assert.equal(explorer.scrollTop,0,'and the second restore() of the move does not bring History\'s place');
+});
+
 test('All stages lists its labels, a stage row keeps the list, and an address the numbers cannot fill is the place itself',async()=>{
  const e=setup({journey:true});await flush();e.discovery={items:[]};const content=e.elements['music-content'];
  e.response={...status('First'),...everyName({scope:'radio'})};routeTo(e,'#statistics/radio/labels');await flush();const kept=e.entries().length;

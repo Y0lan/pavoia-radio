@@ -724,7 +724,7 @@
     // twice, and a tap focuses no link.
     if((view==='history'||view==='statistics'&&musicKind)&&next!==view){
       const content=$('music-content'),opened=r=>content.contains(r)&&r.getAttribute('href')===location.hash;
-      musicPlace={top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
+      musicPlace={key:content.dataset.key,top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
     }
     clicked=null;
     view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();
@@ -866,8 +866,9 @@
     // The names that match, in the order asked for.
     const matches=()=>{const q=loose(field.value.trim()),from=order==='name'?(az||=[...all].sort((a,b)=>collator.compare(a.name,b.name))):all;return q?from.filter(i=>loose(i.name).includes(q)):from;};
     const row=({name,count})=>{const li=node('li');li.append(door(credit(type,name),'',tracks(count)));return li;};
-    // The button adds a hundred and keeps focus; when it goes, focus moves on to the first name it showed.
-    const more=action(word('showMore'),()=>{const hits=matches(),next=hits.slice(shown,shown+100).map(row);shown+=100;list.append(...next);more.hidden=hits.length<=shown;if(more.hidden)next[0].children[0].focus();},'list-more');
+    // The button adds a hundred and keeps focus; when it goes, focus moves on to the first name it showed, which takes it
+    // even as plain text (Various Artists).
+    const more=action(word('showMore'),()=>{const hits=matches(),next=hits.slice(shown,shown+100).map(row);shown+=100;list.append(...next);more.hidden=hits.length<=shown;if(more.hidden){const first=next[0].children[0];if(first.getAttribute('href')==null)first.tabIndex=-1;first.focus();}},'list-more');
     // How many match shows with the rows they leave, so the rows move once, and is said once typing pauses.
     const draw=()=>{
       const hits=matches(),q=field.value.trim();list.replaceChildren(...hits.slice(0,shown).map(row));more.hidden=hits.length<=shown;
@@ -1035,7 +1036,9 @@
     // rows without a reload, scrolled where they were, with focus on the row that was opened; a list keeps its filter, its
     // order and the rows it showed. The place is used once: the second restore() of a browser move changes nothing.
     if((section==='history'||musicKind)&&$('music-content').dataset.key===musicKey()){
-      if(musicPlace){dialog.scrollTop=musicPlace.top;if($('music-content').contains(musicPlace.row))musicPlace.row.focus({preventScroll:true});musicPlace=null;}
+      // Only the rows the place was taken from: History's place never scrolls a list drawn since.
+      if(musicPlace?.key===musicKey()){dialog.scrollTop=musicPlace.top;if($('music-content').contains(musicPlace.row))musicPlace.row.focus({preventScroll:true});}
+      musicPlace=null;
       // A track that came on air while a record was open, or a new day, shows now, not at the next radio answer.
       return followRadio();
     }
