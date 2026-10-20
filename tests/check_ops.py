@@ -193,7 +193,7 @@ class OpsChecks(unittest.TestCase):
         self.assertIn("location ^~ /internal/ { return 404; }", config)
         self.assertIn("location = /healthz { return 404; }", config)
         routes = dict(re.findall(r"location = (\S+) \{\n(.*?)\n    \}", config, re.S))
-        expected = {"/api/library/catalogue", "/api/library/statistics", "/api/audience"}
+        expected = {"/api/library/catalogue", "/api/library/statistics", "/api/library/names", "/api/audience"}
         self.assertIn("location ^~ /api/discovery/ {", config)
         for scene in manage.SCENES:
             for suffix in ("", "/stats", "/catalogue", "/changes", "/history", "/music"):

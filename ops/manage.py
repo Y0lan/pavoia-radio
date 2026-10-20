@@ -142,7 +142,7 @@ def configure():
       add_header Cache-Control "no-store" always;
     }}
 ''' for scene in SCENES)
-    routes = [(path, 14502) for path in ("/api/library/catalogue", "/api/library/statistics", "/api/audience")]
+    routes = [(path, 14502) for path in ("/api/library/catalogue", "/api/library/statistics", "/api/library/names", "/api/audience")]
     routes += [(f"/api/radio/{scene['id']}{suffix}", scene["port"])
                for scene in SCENES for suffix in ("", "/stats", "/catalogue", "/changes", "/history", "/music")]
     def controller_locations(routes):
