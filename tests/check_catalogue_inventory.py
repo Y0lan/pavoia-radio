@@ -269,4 +269,12 @@ with tempfile.TemporaryDirectory() as directory:
     assert items['Twin Peaks']['id'] == 'art_000000000012' and items['Stimming']['id'] == artist['Stimming']
     assert stats['radio']['coverage']['artists'] == 14 and stats['radio']['coverage']['labels'] == 5
     assert docs['labels']['items'] == [dict(name='Stil Vor Talent', id='lab_00000000000a', image='/api/discovery/media/' + 'c' * 40, count=5, stages={'palac-feel': 5})]
+    # Punctuation and stacked suffixes do not keep spellings of one label apart.
+    assert {ci.label_fold(t) for t in ('Foo', 'Foo Records', 'Foo-Records', 'Foo Records Ltd', 'Foo Recordings Limited.')} == {'foo'}
+    # An artist the credit string adds counts as credited for the names after it: B then 'B & C' adds B only.
+    entities = {'art_a': dict(id='art_a', type='artist', title='A'), 'art_b': dict(id='art_b', type='artist', title='B'),
+                'art_bc': dict(id='art_bc', type='artist', title='B & C', links=linked)}
+    metadata = {'1': dict(connections=[dict(id='art_a', relation='primary')])}
+    added = ci.credited(dict(plex_rating_key='1', artist_credit='A; B; B & C'), metadata, entities, ci.known_artists(entities, []))
+    assert [e['name'] for e in added] == ['A', 'B'], added
 print('Composite credits, placeholders, remix labels and label spellings checks passed')

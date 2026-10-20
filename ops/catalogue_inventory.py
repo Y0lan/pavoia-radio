@@ -37,7 +37,7 @@ JOINED = re.compile(r', | & | x | and | vs\.? ', re.I)
 PLACEHOLDER = re.compile(r'various(?: artists)?|unknown artist.*|\[(?:unknown|no label)\]', re.I)
 # A remix label read as a remixer name: 'Kevin de Vries extended', 'Haze 2011 Dub', 'Garage'.
 MIX = re.compile(r'(?:\s*\b(?:extended|dub|mix|edit|version|remix|vocal|radio|club|old school|garage|\d{4}))+$', re.I)
-LABEL_SUFFIX = re.compile(r'\s+(?:records|recordings|music|limited|ltd)\.?$')
+LABEL_SUFFIX = re.compile(r'(?:\s+(?:records|recordings|music|limited|ltd))+$')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -272,14 +272,16 @@ def credited(track, metadata, entities, known):
     taken = {fold(piece) for e in found for piece in JOINED.split(e['name'])}
     for named in split(track['artist_credit'], known):
         for e in [named] if named['id'] else [x for piece in JOINED.split(named['name']) for x in split(piece, known)]:
-            if e['id'] and taken.isdisjoint(fold(piece) for piece in JOINED.split(e['name'])):
+            pieces = {fold(piece) for piece in JOINED.split(e['name'])}
+            if e['id'] and taken.isdisjoint(pieces):
                 found.append(e)
+                taken |= pieces
     return unique(found)
 
 
 def label_fold(title):
-    """'Stil Vor Talent Records' and 'Stil Vor Talent', or 'Blu Fin' and 'BluFin', are one label."""
-    return ''.join(c for c in LABEL_SUFFIX.sub('', fold(title)) if c.isalnum())
+    """'Stil Vor Talent Records', 'Stil Vor Talent' and 'Stil-Vor-Talent Records Ltd', or 'Blu Fin' and 'BluFin', are one label."""
+    return ''.join(c for c in LABEL_SUFFIX.sub('', ' '.join(re.split(r'[\W_]+', fold(title))).strip()) if c.isalnum())
 
 
 def music_statistics(result, discovery):
