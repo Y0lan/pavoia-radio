@@ -34,13 +34,13 @@ async page => {
   await page.locator('.explorer-nav a[href^="#history"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===50&&!document.getElementById('music-view').hidden);
   assert((await page.locator('#stage-row [aria-current]').innerText())==='Ambiance','Back lost the selected history stage');
-  // Statistics: the stage on air's place, then all stages, then Fontanna's, each from the stage row.
+  // Statistics: the place of the station on air, then all stations, then Fontanna's, each from the station row.
   const place=title=>page.waitForFunction(title=>document.querySelector('#music-content .entity-heading h3')?.textContent===title&&!document.getElementById('music-content').hasAttribute('aria-busy'),title);
   await page.locator('.explorer-nav a[href^="#statistics"]').click();
   await page.waitForFunction(()=>document.querySelector('#music-content .entity-heading .entity-line'));
   assert(Number((await page.locator('#music-content .entity-heading .entity-line').first().innerText()).split(' ')[0].replaceAll(',',''))>0,'Missing stage statistics');
   await page.locator('#stage-row a[href="#statistics/radio"]').click();
-  await place('All stages');
+  await place('All stations');
   await page.locator('#stage-row a[href="#statistics/fontanna"]').click();
   await place('Fontanna');
   assert((await page.locator('#music-content').innerText()).includes('Shares tracks with'),'Shared stages missing');

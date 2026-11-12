@@ -359,7 +359,9 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .entity-trail a:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 .entity-trail [aria-current] { color:var(--cream); }
 .entity-heading h3 { width:fit-content; max-width:100%; margin:var(--s1) 0 0; font:44px/1.05 var(--serif); overflow-wrap:anywhere; }
-.eyebrow .on-air span::before { content:""; display:inline-block; width:6px; height:6px; margin-right:var(--s1); border-radius:50%; background:var(--red); vertical-align:1px; }
+/* On air: its middle dot, a 6px red dot and its words hold together, so a narrow eyebrow breaks before the middle dot. */
+.eyebrow .on-air > span { white-space:nowrap; }
+.eyebrow .on-air span span::before { content:""; display:inline-block; width:6px; height:6px; margin-right:var(--s1); border-radius:50%; background:var(--red); vertical-align:1px; }
 /* One line under the title, which keeps its height while it is empty. Stage names, and See what played, are links in a
    sentence: a quiet underline at rest, and the word itself as the target, so a wrapped line never puts one stage's
    target over another's. Each stage keeps its heart and its count on its own line, and its focus ring inside the
@@ -563,17 +565,27 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .explorer-nav a::after { content:""; position:absolute; inset:auto 0 8px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
 .explorer-nav a[aria-current]::after { transform:scaleX(1); }
 .music-filters { display:flex; align-items:end; gap:var(--s3) var(--s4); flex-wrap:wrap; margin:var(--s4) 0; }
-/* The stage row reads like the radio's stage rail: serif 19px, soft, the current stage cream with a 1px line under its
-   name only, 8px above the link's bottom as before. The Index's orders read the same. */
-.stage-row { position:relative; flex:1 1 0; display:flex; flex-wrap:wrap; gap:0 var(--s3); min-width:0; }
+/* The station row reads like the radio's rail: serif 19px, soft, the current station cream with a 1px line under its
+   name only, 8px above the link's bottom as before. The Index's orders read the same. The row is one line at every
+   width, so no line break cuts a group of the radio's way: where the stations do not fit, it scrolls sideways, faded
+   where stations wait. A scroller clips what passes its edges: 6px above and below and 8px at each end hold a focus
+   ring, as in the player's credits, and the names still start on the gutter. */
+.stage-row { position:relative; flex:1 1 0; display:flex; gap:0 var(--s3); min-width:0; overflow-x:auto; scrollbar-width:none; padding:6px var(--s2); margin:-6px calc(-1 * var(--s2)); }
 .stage-row a, .index-order a { position:relative; display:flex; align-items:center; min-height:44px; font:19px/1.2 var(--serif); color:var(--soft); white-space:nowrap; }
 .stage-row a:is(:hover, [aria-current]), .index-order a:is(:hover, [aria-current]) { color:var(--cream); }
 :is(.stage-row, .index-order) a > span { position:relative; }
 :is(.stage-row, .index-order) a[aria-current] > span::after { content:""; position:absolute; inset:auto 0 -3px; height:1px; background:currentColor; }
-/* On a phone the stage row stays one line that scrolls sideways, from edge to edge with the gutter inside; the Day field
-   goes under it. A scroller clips what passes its edges: 6px above and below hold a focus ring, as in the player's credits. */
+/* The stations follow the radio's way. A thin line in a wider gap parts its groups, and All stations from the rest: the
+   first station of a group keeps 16px more before it and draws the line in the middle of the 32px, outside its own
+   focus ring. The Index's bar, which also counts each station's names, keeps the row's 16px and draws the line in its
+   middle, 7.5px from each name and still outside the rings, so the bar keeps to one line on a 1366px laptop. */
+.stage-row a[data-group-start] { margin-left:var(--s3); }
+.stage-row a[data-group-start]::before { content:""; position:absolute; top:13px; left:calc(-1 * var(--s3) - .5px); width:1px; height:18px; background:var(--line); }
+#music-view[data-view=index] .stage-row a[data-group-start] { margin-left:0; }
+#music-view[data-view=index] .stage-row a[data-group-start]::before { left:calc(-1 * var(--s2) - .5px); }
+/* On a phone the row runs from edge to edge, with the gutter inside; the Day field goes under it. */
 @media (max-width:760px) {
-  .stage-row { flex:1 0 calc(100% + 2 * var(--gutter)); flex-wrap:nowrap; margin-inline:calc(-1 * var(--gutter)); padding-inline:var(--gutter); overflow-x:auto; scrollbar-width:none; padding-block:6px; margin-block:-6px; }
+  .stage-row { flex:1 0 calc(100% + 2 * var(--gutter)); margin-inline:calc(-1 * var(--gutter)); padding-inline:var(--gutter); }
 }
 .music-filters label { display:grid; gap:var(--s2); color:var(--soft); font-size:12px; }
 #music-status { margin:var(--s3) 0; }

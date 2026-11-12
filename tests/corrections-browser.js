@@ -55,10 +55,11 @@ async page => {
   // The explorer keeps one history entry, so Back would close it: the History tab is the way back to the list.
   await page.locator('.explorer-nav a[href^="#history"]').click();
   await page.waitForFunction(()=>!document.getElementById('music-view').hidden&&document.querySelector('#music-content > .row'));
-  // Statistics: All stages from the stage row. Release years are one bar a year, oldest first, each named in its label.
+  // Statistics: All stations from the station row. Release years are one bar a year, oldest first, each named in its
+  // label.
   await page.locator('.explorer-nav a[href^="#statistics"]').click();
   await page.locator('#stage-row a[href="#statistics/radio"]').click();
-  await page.waitForFunction(()=>location.hash==='#statistics/radio'&&document.querySelector('#music-content .entity-heading h3')?.textContent==='All stages'&&document.querySelector('#music-content .release-years')&&!document.getElementById('music-content').hasAttribute('aria-busy'));
+  await page.waitForFunction(()=>location.hash==='#statistics/radio'&&document.querySelector('#music-content .entity-heading h3')?.textContent==='All stations'&&document.querySelector('#music-content .release-years')&&!document.getElementById('music-content').hasAttribute('aria-busy'));
   const years=(await page.locator('#music-content .release-years .years > span').evaluateAll(bars=>bars.map(bar=>bar.getAttribute('aria-label')))).map(label=>Number(label.slice(0,4)));
   assert(years.length>12,'Year chart still truncated');
   assert(years.every((y,i)=>i===0||y===years[i-1]+1),'Years are not one bar a year, oldest first');

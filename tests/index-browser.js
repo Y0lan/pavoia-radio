@@ -36,7 +36,7 @@ async page => {
   const shown=()=>page.evaluate(()=>[...document.querySelectorAll('#music-content .row')].map(a=>({name:a.querySelector('.row-name').textContent,stages:a.dataset.stages.split(' ')})));
   const report=[];
 
-  // 6. No second line is cut, at four widths, in both languages, on All stages and on a stage.
+  // 6. No second line is cut, at four widths, in both languages, on All stations and on a station.
   const cut=()=>page.evaluate(()=>{
     const sections=[...document.querySelectorAll('#music-content .index-section')];for(const s of sections)s.style.contentVisibility='visible';
     const lines=[...document.querySelectorAll('#music-content .row-line')].filter(n=>n.scrollWidth>n.clientWidth).map(n=>n.textContent);
@@ -49,14 +49,14 @@ async page => {
   const narrow=await cut();assert(narrow.every(t=>t.startsWith('Auch auf')),'at 360 px only Auch auf lines may be cut: '+narrow.filter(t=>!t.startsWith('Auch auf')).slice(0,3));
   report.push('6: 0 cut lines at 16 views, '+narrow.length+' Auch auf lines cut at 360 px');
 
-  // The stage bar says which stage the list shows. After a tap on a stage, after a filter typed and cleared, and on a
-  // fresh load, the current stage lies inside the bar, clear of its faded edges, and each edge fades exactly where
-  // stages wait: on a phone, where the bar scrolls sideways, and on a narrow window in German, where it is cut by a little.
+  // The stage bar says which station the list shows. After a tap on a station, after a filter typed and cleared, and on
+  // a fresh load, the current station lies inside the bar, clear of its faded edges, and each edge fades exactly where
+  // stations wait: on a phone, where the bar scrolls sideways, and on a narrow window in German, where it is cut by a little.
   const bar=()=>page.evaluate(()=>{
     const row=document.getElementById('stage-row'),box=row.getBoundingClientRect(),c=row.querySelector('[aria-current]').getBoundingClientRect(),before=row.scrollLeft>1,more=row.scrollWidth-row.scrollLeft-row.clientWidth>1;
     return {left:Math.round(c.left-box.left),right:Math.round(box.right-c.right),shown:c.left>=box.left+(before?40:0)-.5&&c.right<=box.right-(more?40:0)+.5,faded:row.hasAttribute('data-before')===before&&row.hasAttribute('data-more')===more};
   });
-  const inBar=async what=>{const b=await bar();assert(b.shown&&b.faded,'the current stage in the bar, '+what+': '+JSON.stringify(b));return what+' '+b.left+'/'+b.right;};
+  const inBar=async what=>{const b=await bar();assert(b.shown&&b.faded,'the current station in the bar, '+what+': '+JSON.stringify(b));return what+' '+b.left+'/'+b.right;};
   const bars=[];
   await open('#index/artists',390,844);await page.locator('#stage-row a[data-stage=closing]').click();await drawn();await frames();bars.push(await inBar('Closing tapped'));
   // A filter no name matches empties every count, and clearing it brings them back: the row narrows and widens again.
@@ -67,9 +67,9 @@ async page => {
   await open('#index/artists/essentials?by=tracks',390,844);bars.push(await inBar('Essentials loaded'));
   await open('#index/labels/fontanna?by=tracks',1100,800,'de');bars.push(await inBar('Fontanna at 1100 px in German'));
   report.push('bar: '+bars.join(', ')+' px from its edges');
-  // A keyboard user in the bar while a side loads slowly keeps the stage they reached in view when the names come.
-  // Shift+Tab reaches All stages, far from the current stage, on a laptop and on a phone. Tab reaches the last stage that
-  // shows whole, which the counts that come push out.
+  // A keyboard user in the bar while a side loads slowly keeps the station they reached in view when the names come.
+  // Shift+Tab reaches All stations, far from the current station, on a laptop and on a phone. Tab reaches the last
+  // station that shows whole, which the counts that come push out.
   const reached=async(hash,width,height,back)=>{
     await open(hash,width,height,'de');
     let release;const held=new Promise(r=>release=r),labels=/\/api\/library\/names\?kind=labels$/;
@@ -83,13 +83,13 @@ async page => {
     const stage=await page.evaluate(()=>document.activeElement.dataset.stage);release();await drawn();await frames();await page.unroute(labels);
     const kept=await page.evaluate(()=>{const box=document.getElementById('stage-row').getBoundingClientRect(),a=document.activeElement,f=a.getBoundingClientRect();
       return {stage:a.dataset.stage,left:Math.round(f.left-box.left),right:Math.round(box.right-f.right)};});
-    assert(kept.stage===stage&&kept.left>=0&&kept.right>=0,'the stage reached with the keyboard stays in the bar as the names come, '+hash+' at '+width+' px: '+JSON.stringify(kept));
+    assert(kept.stage===stage&&kept.left>=0&&kept.right>=0,'the station reached with the keyboard stays in the bar as the names come, '+hash+' at '+width+' px: '+JSON.stringify(kept));
     return stage+' '+kept.left+'/'+kept.right;
   };
   const keys=[await reached('#index/artists/fontanna',800,800,true),await reached('#index/artists/fontanna',390,844,true),await reached('#index/artists',800,800,false)];
   report.push('bar with keys: '+keys.join(', ')+' px from its edges');
 
-  // 8. The name under the bar stays there, or the first one that does not sort before it, across a stage, an order and a
+  // 8. The name under the bar stays there, or the first one that does not sort before it, across a station, an order and a
   // side: that row's line sits 16 px under the bar, and stays there. Rows read left to right, so names before it in the
   // new list may share its line. A pointer scrolls up to the head to reach a side or an order, which brings the list's top
   // into view, so those are pressed here where they are, as a script or an address change would.
@@ -133,8 +133,8 @@ async page => {
   assert(turned.top>=turned.bar&&turned.bottom<=turned.end,'a turned phone finds the row inside the list: '+JSON.stringify(turned));
   report.push(`10: ${pick} back at ${back.top.toFixed(1)} (was ${before.toFixed(1)}), focused; in view after 1440->1100 and 390x844->844x390`);
 
-  // 11. Speed in the page, from the answer or the input to the end of the next frame: the first draw, a stage switch from
-  // All stages to Night in Motion, and one keystroke after the debounce (the third of "ame", and a first "a", the
+  // 11. Speed in the page, from the answer or the input to the end of the next frame: the first draw, a station switch from
+  // All stations to Night in Motion, and one keystroke after the debounce (the third of "ame", and a first "a", the
   // largest redraw), at 1x and with a 6x slower CPU; then the list's weight and how smoothly it scrolls, on a laptop
   // window and on a phone. Each is the better of two tries, since other work on the machine adds to one. The spec asks
   // 150, 60 (300 at 6x) and 40 (200 at 6x) ms; this guards against twice that.
@@ -206,8 +206,8 @@ async page => {
   assert(Math.abs(header.height-61)<1&&header.lines===1&&header.close<=header.width,'the phone header: '+JSON.stringify(header));
   report.push(`13: header ${header.height} px, one line, ✕ ends at ${header.close} of ${header.width}`);
 
-  // 15. Space plays everywhere, the arrows change the radio's stage, Enter keeps focus on a stage and hands it from Look on
-  // all stages to the field, and a mouse starts in the field: from the page, and by a click on the Index tab, which
+  // 15. Space plays everywhere, the arrows change the radio's station, Enter keeps focus on a station and hands it from
+  // Look on all stations to the field, and a mouse starts in the field: from the page, and by a click on the Index tab, which
   // focuses the tab first.
   await page.setViewportSize({width:1440,height:900});await page.goto(origin+'/');await page.waitForFunction(()=>window.Pavoia?.getState);
   await page.evaluate(()=>{history.pushState({},'','#index/artists');dispatchEvent(new PopStateEvent('popstate'));});await drawn();
@@ -221,19 +221,19 @@ async page => {
   }
   const radioStage=()=>page.evaluate(()=>window.Pavoia.getState().stage),stageBefore=await radioStage();
   await page.locator('#music-content .row').first().focus();await page.keyboard.press('ArrowRight');
-  assert(await radioStage()!==stageBefore,'the right arrow changes the radio\'s stage');
+  assert(await radioStage()!==stageBefore,'the right arrow changes the radio\'s station');
   await page.keyboard.press('ArrowLeft');assert(await radioStage()===stageBefore,'and the left arrow brings it back');
   await page.locator('#stage-row a[data-stage=bermuda-day]').focus();await page.keyboard.press('Enter');await drawn();await frames();
   assert(await page.evaluate(()=>document.activeElement.dataset.stage==='bermuda-day'&&location.hash==='#index/artists/bermuda-day'),'Enter on Under the Sun keeps focus on it');
-  // A name that plays on other stages but not on Ambiance, and that no name of Ambiance holds: filtered on Ambiance, the
-  // note offers every stage. Enter there redraws the note, and focus goes to the field.
+  // A name that plays on other stations but not on Ambiance, and that no name of Ambiance holds: filtered on Ambiance,
+  // the note offers every station. Enter there redraws the note, and focus goes to the field.
   await page.locator('#stage-row a[data-stage=radio]').click();await drawn();
   const every=await shown(),lone=every.find(n=>/^[a-z]{5,}$/i.test(n.name)&&!n.stages.includes('ambiance')&&!every.some(m=>m.stages.includes('ambiance')&&fold(m.name).includes(fold(n.name)))).name;
   await page.evaluate(h=>{history.replaceState(history.state,'',h);dispatchEvent(new PopStateEvent('popstate'));},'#index/artists/ambiance?q='+encodeURIComponent(lone));
   await page.waitForFunction(()=>document.querySelector('#index-note a'));await page.locator('#index-note a').focus();await page.keyboard.press('Enter');await drawn();await frames();
   const looked=await page.evaluate(()=>({hash:location.hash,focus:document.activeElement.id||document.activeElement.localName}));
-  assert(looked.hash==='#index/artists?q='+encodeURIComponent(lone)&&looked.focus==='index-query','Enter on Look on all stages hands focus to the field: '+JSON.stringify(looked));
-  report.push('15: Space on a row, a stage and an order; arrows; Enter on a stage and on Look on all stages ('+lone+'); the field on a first entry and on a click on the Index tab');
+  assert(looked.hash==='#index/artists?q='+encodeURIComponent(lone)&&looked.focus==='index-query','Enter on Look on all stations hands focus to the field: '+JSON.stringify(looked));
+  report.push('15: Space on a row, a station and an order; arrows; Enter on a station and on Look on all stations ('+lone+'); the field on a first entry and on a click on the Index tab');
   assert(!errors.length,'page errors: '+errors.join(' | '));
   return 'index ok: '+report.join(' · ');
 }

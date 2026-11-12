@@ -2,7 +2,9 @@
 // stands still on a laptop, whole groups at 1100 px, no sideways scroll, the order with real keys, radios and swipes,
 // the phone sheet, blocked storage, nothing playing, the text styles, the player bar, Chrome's accessibility tree and the
 // focus rings (checks 2 to 11, 13, 14 and 15 of the radio page step), then a slow first load (16) and short windows
-// (17). Run it against the preview:
+// (17). Then the explorer's station rows (checks 2 to 7 of the explorer step): the radio's way and its lines, rows that
+// never wrap, the Index's bar on a laptop, a phone, links only, no station called a stage, and the stage over a
+// station's place, on air on a narrow phone too. Run it against the preview:
 //   python3 design/stage-direction/serve.py 14541
 //   playwright-cli cli -s=stages open http://127.0.0.1:14541/
 //   playwright-cli cli -s=stages run-code --filename=tests/stages-browser.js
@@ -265,6 +267,162 @@ async page => {
   }
   report.push('17: photo tools above the bar by '+shorts.join(', '));
   await set(page,'en','stage');await page.evaluate(()=>localStorage.clear());
+
+  // The explorer's station rows. History, Statistics and the Index list the stations in the radio's way, and a thin line
+  // parts its groups, and All stations from the rest. The way and the language change with the explorer closed, since
+  // the page behind it is inert. History opens on Lost in Feelings, Statistics on All stations, the Index on Artists.
+  const views={history:['#history/palac-feel',()=>document.querySelector('#music-content > .row')&&!document.getElementById('music-content').hasAttribute('aria-busy')],
+    statistics:['#statistics/radio',()=>document.querySelector('#music-content .entity-heading h3')&&!document.getElementById('music-content').hasAttribute('aria-busy')],
+    place:['#statistics/bermuda-day',()=>document.querySelector('#music-content .entity-heading .eyebrow')&&!document.getElementById('music-content').hasAttribute('aria-busy')],
+    index:['#index/artists',()=>document.querySelector('#stage-row a[data-stage]')&&(document.querySelector('#music-content .index-section')||document.querySelector('#music-status button'))]};
+  const explore=async(p,view)=>{const [hash,shown]=views[view];await p.evaluate(h=>{history.pushState({},'',h);dispatchEvent(new PopStateEvent('popstate'));},hash);
+    await until(p,shown,null,'the explorer did not show '+hash);await p.evaluate(()=>document.fonts.ready);};
+  const shut=async p=>{await p.keyboard.press('Escape');await until(p,()=>!document.getElementById('explorer').open,null,'the explorer did not close');};
+  // The row as laid out: each link's box and the box of its line (::before) if it draws one, and where its first link
+  // starts.
+  const stationRow=p=>p.evaluate(()=>{const row=document.getElementById('stage-row'),box=row.getBoundingClientRect(),s=getComputedStyle(row);
+    return {left:box.left,right:box.right,start:box.left+parseFloat(s.paddingLeft)-row.scrollLeft,scroll:row.scrollLeft,max:row.scrollWidth-row.clientWidth,kinds:[...row.children].map(a=>a.localName),
+      links:[...row.children].map(a=>{const r=a.getBoundingClientRect(),b=getComputedStyle(a,'::before');
+        return {name:a.firstElementChild.textContent,start:a.hasAttribute('data-group-start'),current:a.hasAttribute('aria-current'),left:r.left,right:r.right,top:r.top,height:r.height,
+          line:b.content==='none'?null:{left:r.left+parseFloat(b.left),top:r.top+parseFloat(b.top),width:parseFloat(b.width),height:parseFloat(b.height),colour:b.backgroundColor}};})};});
+  const read=r=>r.links.map(l=>(l.start?'| ':'')+l.name).join(', ');
+  const rowLines=links=>{const out=[];for(const l of links){const line=out.at(-1);if(line&&Math.abs(l.top-line[0].top)<=1)line.push(l);else out.push([l]);}return out;};
+  // The row is one line of links that starts on the gutter, and shows the focus ring of its first link while it is
+  // scrolled to the start. Each group's line is 1 by 18 px and centred on its link, in the middle of its gap (32 px in
+  // History and Statistics, the row's 16 px in the Index) and outside the rings of the links on each side.
+  const parted=(r,ring,gap,what)=>{
+    const lines=rowLines(r.links),links=lines[0];
+    assert(lines.length===1&&r.kinds.every(k=>k==='a'),`${what}: the row takes ${lines.length} lines and holds ${r.kinds}`);
+    assert(Math.abs(links[0].left-r.start)<=1,`${what}: the row starts ${(links[0].left-r.start).toFixed(1)} px off the gutter`);
+    if(!r.scroll)assert(links[0].left-ring>=r.left-.5,`${what}: the row clips the ring of ${links[0].name}`);
+    for(const [i,l] of links.entries()){
+      if(!l.start){assert(!l.line,`${what}: ${l.name} draws a line`);continue;}
+      assert(i&&l.line&&l.line.width===1&&l.line.height===18&&Math.abs(l.line.top+9-(l.top+l.height/2))<=.5,`${what}: the line of ${l.name}: ${JSON.stringify(l.line)}`);
+      const before=links[i-1],space=l.left-before.right,off=l.line.left+l.line.width/2-(before.right+l.left)/2;
+      assert(Math.abs(space-gap)<=1&&Math.abs(off)<=1&&l.line.left>=before.right+ring&&l.line.left+l.line.width<=l.left-ring,`${what}: the line before ${l.name}: a ${space.toFixed(1)} px gap, ${off.toFixed(1)} px off its middle`);
+    }
+  };
+  const gapOf=view=>view==='index'?16:32;
+  const feelingRow='Under the Sun, Fontanna, | As Night Begins, Night in Motion, Etage 0, Lost in Feelings, Closing, | Ambiance, Essentials';
+  const stageRow='Under the Sun, As Night Begins, | Night in Motion, Lost in Feelings, | Etage 0, | Fontanna, | Ambiance, | Closing, Essentials';
+  const rows={history:{feeling:feelingRow,stage:stageRow},statistics:{feeling:'All stations, | '+feelingRow,stage:'All stations, | '+stageRow}};rows.index=rows.statistics;
+  await visit(1440,900);await explore(page,'history');
+  // The ring of a station in the row, as the keyboard shows it.
+  await page.keyboard.press('Shift');await page.locator('#stage-row a[data-group-start]').first().focus();
+  const ring=await page.evaluate(()=>{const a=document.activeElement,s=getComputedStyle(a);return a.matches(':focus-visible')?parseFloat(s.outlineOffset)+parseFloat(s.outlineWidth):NaN;});
+  await page.evaluate(()=>document.activeElement.blur());
+  assert(ring===5,'the focus ring of a station in the row reaches '+ring+' px out');
+  // Checks 2, 3 and 5 at 1440×900: the order, the lines and links only, in each way.
+  const ways2=[];
+  for(const way of ['feeling','stage']){
+    await shut(page);await set(page,null,way);
+    for(const view of ['history','statistics','index']){
+      await explore(page,view);const r=await stationRow(page);
+      assert(read(r)===rows[view][way],`2, 3: the ${view} row by ${way}: ${read(r)}`);
+      parted(r,ring,gapOf(view),`2, 3, 5: ${view} by ${way} at 1440`);
+      const lines=r.links.filter(l=>l.start),gaps=lines.map(l=>{const b=r.links[r.links.indexOf(l)-1];return (l.left-b.right).toFixed(1);});
+      ways2.push(`${view} by ${way}: ${lines.length} lines (${[...new Set(gaps)].join('/')} px gaps)`);
+    }
+  }
+  report.push(`step 2, 2, 3 and 5: at 1440, ${ways2.join(', ')}; each line 1x18 px in the middle of its gap, ${ring} px rings clear of it, every child a link`);
+  // Narrower, the row never wraps, so no line break cuts a group, nor leaves Essentials alone: from 1180 px down to
+  // 761 px it stays one line that scrolls sideways where the stations do not fit, and History's first track stays where
+  // it is at 1440 px. Opened again at 761 px, the row shows the current station whole, in its middle where it can scroll
+  // that far.
+  const narrow=[];
+  for(const way of ['stage','feeling']){
+    await shut(page);await page.setViewportSize({width:1440,height:900});await set(page,null,way);
+    for(const view of ['history','statistics']){
+      await explore(page,view);
+      const first=()=>page.evaluate(()=>document.querySelector('#music-content > .row')?.getBoundingClientRect().top),top=await first(),scrolled=[];
+      for(const width of [1180,1160,1100,1040,1000,940,900,860,820,800,768,761]){
+        await page.setViewportSize({width,height:800});await page.evaluate(()=>new Promise(done=>requestAnimationFrame(()=>requestAnimationFrame(done))));
+        const r=await stationRow(page);parted(r,ring,32,`the ${view} row by ${way} at ${width}`);if(r.max>0)scrolled.push(width);
+        if(view==='history'){const now=await first();assert(Math.abs(now-top)<=.5,`History's first track moves ${(now-top).toFixed(1)} px at ${width} by ${way}`);}
+      }
+      await shut(page);await explore(page,view);
+      const r=await stationRow(page),current=r.links.find(l=>l.current),off=(current.left+current.right)/2-(r.left+r.right)/2;
+      assert(current.left>=r.left&&current.right<=r.right&&(Math.abs(off)<=1||r.scroll<=0||r.scroll>=r.max),`${current.name} opens ${off.toFixed(1)} px off the middle of the ${view} row by ${way} at 761, scrolled ${r.scroll} of ${r.max}`);
+      narrow.push(`${view} by ${way} scrolls from ${scrolled[0]} px, ${current.name} ${Math.abs(off)<=1?'in the middle':r.scroll<=0?'at the start':'at the end'} at 761`);
+      await page.setViewportSize({width:1440,height:900});
+    }
+  }
+  report.push(`step 2, narrow: one line from 1180 to 761 px, ${narrow.join(', ')}; History's first track does not move`);
+  // The Index's bar keeps to one line on a 1366 px laptop, in both languages and both ways, and at 1280 px it cuts no
+  // station: the last one ends inside the bar, faded at most.
+  const bars2=[];
+  for(const [width,height] of [[1366,768],[1280,800]]){
+    await shut(page);await page.setViewportSize({width,height});
+    for(const lang of ['en','de'])for(const way of ['stage','feeling']){
+      await shut(page);await set(page,lang,way);await explore(page,'index');
+      await until(page,()=>document.querySelector('#stage-row a[data-stage=essentials] small')?.textContent,null,'the Index bar did not count at '+width);
+      const b=await page.evaluate(()=>{const row=document.getElementById('stage-row'),last=row.lastElementChild,end=row.clientWidth-(last.offsetLeft+last.offsetWidth);
+        return {end,spare:end-parseFloat(getComputedStyle(row).paddingRight),over:row.scrollWidth-row.clientWidth};});
+      if(width===1366)assert(b.over<=0&&b.spare>=0,`the Index bar does not fit at 1366 ${lang} by ${way}: ${JSON.stringify(b)}`);
+      else assert(b.end>=0,`the Index bar cuts Essentials at 1280 ${lang} by ${way}: ${JSON.stringify(b)}`);
+      bars2.push(`${width} ${lang} ${way} `+(width===1366?`${Math.round(b.spare)} px to spare`:`Essentials ${Math.round(b.end)} px inside`));
+    }
+  }
+  report.push('step 2, Index bar: '+bars2.join(', '));
+  await shut(page);await page.setViewportSize({width:1440,height:900});await set(page,'en','stage');
+  // 4. On a phone the row stays one line that scrolls sideways, and opens with the current station in its middle.
+  const m2=await phone(390,844),phones=[];
+  for(const way of ['stage','feeling']){
+    if(way==='feeling'){await shut(m2);await set(m2,null,way);}
+    await explore(m2,'history');const r=await stationRow(m2),current=r.links.find(l=>l.current),off=(current.left+current.right)/2-(r.left+r.right)/2;
+    assert(rowLines(r.links).length===1&&r.max>0,`4: the row by ${way} on a phone: ${rowLines(r.links).length} lines, ${r.max} px to scroll`);
+    assert(Math.abs(off)<=1||r.scroll<=0||r.scroll>=r.max,`4: ${current.name} is ${off.toFixed(1)} px off the middle by ${way}, scrolled ${r.scroll} of ${r.max}`);
+    parted(r,ring,32,`4: the phone row by ${way}`);phones.push(`${way}: ${current.name} ${off.toFixed(1)} px off the middle, ${Math.round(r.max)} px to scroll`);
+  }
+  report.push('step 2, 4: one line at 390, '+phones.join('; '));
+  await silent(m2,'the explorer on a phone');
+  // 6. No word shown in the explorer calls a station a stage: the texts in view, the details opened, and the names a
+  // screen reader hears, in History, a station's place, All stations and the Index, in both languages. Artists, labels
+  // and tracks are the collection's own names, and a station's stage, such as Bermuda stage, is a stage.
+  const words=p=>p.evaluate(()=>{const explorer=document.getElementById('explorer'),out=[];
+    for(const d of explorer.querySelectorAll('details'))d.open=true;
+    const walk=document.createTreeWalker(explorer,NodeFilter.SHOW_TEXT);
+    for(let n=walk.nextNode();n;n=walk.nextNode()){const el=n.parentElement,text=n.textContent.trim();
+      if(text&&!el.closest('[hidden], .row-name, #music-content > .row .row-line, [aria-labelledby=r-played] .row-line')&&el.getClientRects().length)out.push(text);}
+    for(const el of explorer.querySelectorAll('[aria-label], [title], [placeholder]'))if(!el.closest('[hidden]'))for(const name of ['aria-label','title','placeholder'])if(el.getAttribute(name))out.push(el.getAttribute(name));
+    return out;});
+  const fact=/^(?:(?:Bermuda|Pałac|Etage 0|Fontanna|Ambiance) stage|Bühne (?:Bermuda|Pałac|Etage 0|Fontanna|Ambiance))$/;
+  let read6=0;
+  for(const lang of ['en','de']){
+    await shut(page);await set(page,lang,'stage');
+    for(const view of ['history','place','statistics','index']){
+      await explore(page,view);const seen=await words(page),staged=seen.filter(t=>!fact.test(t)&&/\bstages?\b|bühne/i.test(t));read6+=seen.length;
+      assert(!staged.length,`6: ${view} in ${lang} calls a station a stage: ${staged.join(' | ')}`);
+    }
+  }
+  report.push(`step 2, 6: ${read6} words and names read in 4 views x 2 languages, none calls a station a stage`);
+  // 7. The place of Under the Sun names its stage over its name, on a laptop and on a phone.
+  const placeFact=p=>p.evaluate(()=>{const e=document.querySelector('#music-content .entity-heading .eyebrow'),h=document.querySelector('#music-content .entity-heading h3');
+    return {text:e.innerText,over:e.getBoundingClientRect().bottom<=h.getBoundingClientRect().top+.5,title:h.textContent};});
+  const places=[];
+  for(const [p,lang,expected] of [[page,'de','BÜHNE BERMUDA'],[page,'en','BERMUDA STAGE'],[m2,'en','BERMUDA STAGE']]){
+    await shut(p);await set(p,lang);await explore(p,'place');const f=await placeFact(p);
+    assert(f.text===expected&&f.over&&f.title==='Under the Sun',`7: the place of Under the Sun in ${lang} at ${p===page?1440:390}: ${JSON.stringify(f)}`);
+    places.push(`${p===page?1440:390} "${f.text}" over ${f.title}`);
+  }
+  // On air, a narrow phone breaks the eyebrow only before the middle dot: the stage stays whole on its line, and
+  // "· ● On air" stays whole, after it or at the start of the next line.
+  for(const [width,height,lang] of [[360,740,'en'],[360,740,'de'],[320,700,'en']]){
+    const p=await phone(width,height,lang);
+    for(const id of ['closing','fontanna']){
+      await p.evaluate(([id,hash])=>{window.Pavoia.tune(id);history.pushState({},'',hash);dispatchEvent(new PopStateEvent('popstate'));},[id,'#statistics/'+id]);
+      await until(p,()=>document.querySelector('#music-content .entity-heading .eyebrow .on-air')&&!document.getElementById('music-content').hasAttribute('aria-busy'),null,`7: ${id} is not on air at ${width} ${lang}`);
+      await p.evaluate(()=>document.fonts.ready);
+      const e=await p.evaluate(()=>{const p=document.querySelector('#music-content .entity-heading .eyebrow'),fact=document.createRange(),mark=p.querySelector('.on-air > span');fact.selectNodeContents(p.firstChild);
+        const tops=rects=>[...new Set([...rects].filter(r=>r.width).map(r=>Math.round(r.top)))];
+        return {fact:tops(fact.getClientRects()),mark:tops(mark.getClientRects()),start:mark.getBoundingClientRect().left-p.getBoundingClientRect().left,text:p.textContent};});
+      const lines=e.mark[0]>e.fact[0]?2:1;
+      assert(e.fact.length===1&&e.mark.length===1&&(lines===1||Math.abs(e.start)<=1),`7: the eyebrow of ${id} on air at ${width} ${lang} breaks inside: ${JSON.stringify(e)}`);
+      places.push(`${width} ${lang} ${id} on air on ${lines} line${lines>1?'s, "· ● On air" starting the second':''}`);
+    }
+  }
+  report.push('step 2, 7: '+places.join(', '));
+  await shut(page);await set(page,'en','stage');await page.evaluate(()=>localStorage.clear());
 
   // 10. Nothing played: no page asked for a stream, and no audio element got a source.
   await silent(page,'the run');
