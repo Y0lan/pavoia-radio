@@ -12,7 +12,7 @@ async page => {
   };
   for(const width of [1440,390,320]){
     await page.setViewportSize({width,height:width===1440?1000:844});
-    assert(await page.locator('#bus-link').evaluate(n=>n===n.parentElement.lastElementChild&&n.previousElementSibling.classList.contains('mood-essentials')),'Bus is not last');
+    assert(await page.locator('#bus-link').evaluate(n=>n.parentElement.children.length===1&&n.closest('.mood-group').nextElementSibling.querySelector('.group-moods').lastElementChild.classList.contains('mood-essentials')),'The Bus does not close the stages');
     for(const language of ['en','de']){
       await page.locator(`#language [value=${language}]`).dispatchEvent('click');
       for(const name of ['Ambiance','Closing']){

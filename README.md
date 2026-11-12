@@ -5,8 +5,8 @@ The horizontal player stays available while you explore artist, release and labe
 profiles through **See the roots it's built on**, beneath the Gaende signature. On mobile, the station photograph appears behind
 the full description. Desktop keeps the artwork composition. The player contains
 the record details, artist and label links, and Spotify where a mapping exists.
-Use **Change stage** or swipe the photo on mobile. Essentials and The Bus appear as full Special rows in the mobile menu.
-The Bus stays last and keeps the current station playing. See the [stage controls release](docs/STAGE_CONTROLS_2026-10-15.md).
+Use **Change station** or swipe the photo on mobile. **By stage**, the first view, lists the nine stations under the festival's stages, and **By feeling** lists them by the time of day. Essentials and The Bus appear as full Special rows in the mobile menu.
+The Bus keeps the current station playing. See the [stage controls release](docs/STAGE_CONTROLS_2026-10-15.md).
 
 See [the feature roadmap](docs/ROADMAP.md) for remaining work grouped by category
 and approval status. [The continuation prompt](docs/SESSION_HANDOFF_2026-10-09.md)

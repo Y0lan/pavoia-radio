@@ -49,7 +49,10 @@ body[data-on-air] .dot { background:var(--red); }
 /* One column: the sleeve and the portrait are absolute layers of the same photo, not a second column. */
 .listen-layout { position:relative; isolation:isolate; display:grid; grid-template-columns:minmax(0,1fr); align-items:end; min-height:calc(100svh - var(--bar)); padding:clamp(120px,24svh,320px) var(--gutter) 32px; overflow:hidden; }
 .scene-artwork { display:contents; }
-.listen-layout::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse 60% 55% at 0% 70%,rgb(11 10 9 / .6),transparent),linear-gradient(180deg,rgb(11 10 9 / .75),rgb(11 10 9 / .6) 90px,rgb(11 10 9 / .25) 160px,transparent 30%,rgb(11 10 9 / .2) 45%,rgb(11 10 9 / .92) 100%); }
+.listen-layout::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:radial-gradient(ellipse 60% 55% at 0% 70%,rgb(11 10 9 / .6),transparent),linear-gradient(180deg,rgb(11 10 9 / .75),rgb(11 10 9 / .6) 90px,rgb(11 10 9 / .25) 160px,rgb(11 10 9 / var(--dip, 0)) 30%,rgb(11 10 9 / var(--mid, .2)) 45%,rgb(11 10 9 / .92) 100%); }
+/* Where the rail wraps, its first row and the fact over the title stand higher, in the lighter part of the photo, so the
+   dark band rises with them: no gap above it, and a darker middle. */
+.listen-layout:has(#moods[data-wraps]) { --dip:.25; --mid:.5; }
 .poster { min-width:0; }
 .station-switcher, .station-position, .mood-preview, .sheet-line, .change-photo svg { display:none; }
 .spotify-caption, .special-name { display:none; }
@@ -58,14 +61,20 @@ body[data-on-air] .dot { background:var(--red); }
 #stations-sheet::backdrop { background:rgb(11 10 9 / .72); opacity:0; transition:opacity var(--panel) ease, display var(--panel) allow-discrete, overlay var(--panel) allow-discrete; }
 #stations-sheet[open]::backdrop { opacity:1; }
 @starting-style { #stations-sheet[open] { opacity:0; transform:translateY(12px); } #stations-sheet[open]::backdrop { opacity:0; } }
-.stations-heading { position:sticky; top:0; z-index:1; display:flex; justify-content:space-between; align-items:center; min-height:64px; background:var(--surface); border-bottom:1px solid var(--line); }
+.stations-heading { position:sticky; top:0; z-index:1; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-rows:64px; align-items:center; background:var(--surface); border-bottom:1px solid var(--line); }
 .stations-heading h2 { font:28px var(--serif); }
+/* In the sheet the switch is the heading's second row, so both ways stay in reach; the 8px under it hold the ring. */
+.stations-heading .ways { grid-column:1 / -1; gap:var(--s4); padding-bottom:var(--s2); }
+.stations-heading .ways button { font-size:14px; }
 #close-stations, #explorer #explorer-close { display:grid; place-items:center; width:44px; height:44px; padding:0; border:0; color:var(--cream); background:transparent; cursor:pointer; }
 body:has(dialog[open]) { overflow:hidden; }
 .photo { position:absolute; inset:0; z-index:-4; width:100%; height:100%; object-fit:cover; object-position:var(--focus); }
 .photo-back { z-index:-5; }
 .bottom { width:fit-content; max-width:100%; }
 h1 { font:clamp(56px,7vw,112px)/.94 var(--serif); letter-spacing:-.025em; text-shadow:0 2px 18px rgb(0 0 0 / .45); }
+/* One fact over the title: the festival stage of the station, in both ways. Its 11px letters keep 4.5:1 on the
+   brightest photo with a dark halo, tight and wide, under the hero's shadow; the group words share it. */
+#mood-stage { margin-bottom:var(--s3); color:var(--cream); text-shadow:0 0 2px var(--ink), 0 1px 4px var(--ink), 0 0 10px var(--ink), 0 2px 18px rgb(0 0 0 / .45); }
 .place { max-width:52ch; min-height:2lh; margin-top:14px; font:italic 21px/1.45 var(--serif); color:var(--cream); text-shadow:0 2px 18px rgb(0 0 0 / .45); text-wrap:pretty; }
 .stage-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 24px; min-height:44px; }
 .stage-action { font-size:14px; line-height:44px; color:var(--muted); }
@@ -76,25 +85,41 @@ h1 { font:clamp(56px,7vw,112px)/.94 var(--serif); letter-spacing:-.025em; text-s
 /* Off the Bus, the ticket hides; without a playlist, the whole slot hides so the photo tools start the line. */
 body:not([data-bus]) :is(.bus-ticket, .stage-action:has(#stage-spotify[hidden])) { display:none; }
 .moods { margin:20px 0 0; padding:8px 0; border:0; min-width:0; }
-.mood-list { display:flex; flex-wrap:wrap; gap:0 18px; }
+/* The rail: the way switch, then the groups of the way, each its word over its stations. Whole groups wrap. A row is the
+   word's line, the 4px under it and a 44px station. */
+.mood-list { display:flex; flex-wrap:wrap; align-items:end; gap:var(--s2) var(--s4); --row:calc(11px * 1.4 + var(--s1) + 44px); }
+.mood-group { display:flex; flex-direction:column; align-items:flex-start; gap:var(--s1); white-space:nowrap; }
+.group-moods { display:flex; gap:0 var(--s3); }
+/* Where one way would take a row fewer than the other, app.js breaks it before its last group, so a press never
+   changes the rail's height. */
+.mood-group[data-break] { flex-basis:100%; }
+/* Until app.js builds the groups, the rail holds the height they will take, so the title does not jump on a slow first
+   load: one row, and two where both ways wrap in both languages. */
+@media (min-width:761px) { .mood-list { min-height:var(--row); align-content:flex-start; } }
+@media (min-width:761px) and (max-width:1100px) { .mood-list { min-height:calc(2 * var(--row) + var(--s2)); } }
+.poster .group-name { color:var(--soft); text-shadow:0 0 2px var(--ink), 0 1px 4px var(--ink), 0 0 10px var(--ink), 0 2px 18px rgb(0 0 0 / .45); }
+body:not([data-bus]) .mood-group:has(input:checked) .group-name, .mood-group:has(.bus-link[aria-current]) .group-name { color:var(--cream); }
+/* The switch reads like the photo tools; the way shown is cream with the rail's 1px line, and the rail's divider
+   closes it. */
+.ways { display:flex; align-items:center; gap:var(--s3); }
+.ways button { min-height:44px; padding:0; border:0; background:none; color:var(--muted); font:12px Inter,sans-serif; cursor:pointer; }
+.ways button:is([aria-pressed=true], :hover) { color:var(--cream); }
+.ways span { position:relative; }
+.poster .ways::after { content:""; width:1px; height:18px; background:var(--line); }
 .mood { position:relative; min-height:44px; font:19px/2.3 var(--serif); color:var(--soft); cursor:pointer; }
 .mood input { position:absolute; inset:0; margin:0; opacity:0; cursor:pointer; }
 .mood:hover, .mood:has(input:checked) { color:var(--cream); }
 .mood span { position:relative; pointer-events:none; }
-.mood span::after, .bus-link::after { content:""; position:absolute; inset:auto 0 -6px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
-.mood:has(input:checked) span::after, .bus-link[aria-current]::after { transform:scaleX(1); }
+.mood span::after, .bus-link::after, .ways span::after { content:""; position:absolute; inset:auto 0 -6px; height:1px; background:currentColor; transform:scaleX(0); transform-origin:left; transition:transform var(--hover) var(--ease); }
+.mood:has(input:checked) span::after, .bus-link[aria-current]::after, .ways [aria-pressed=true] span::after { transform:scaleX(1); }
 /* The Bus scene has one current mark: the bus. The stage that keeps playing goes back to rest. */
 body[data-bus] .mood:has(input:checked):not(:hover) { color:var(--soft); }
 body[data-bus] .mood:has(input:checked) span::after { transform:scaleX(0); }
-/* Essentials and the Bus close the rail as one group behind a thin divider, and never wrap apart. */
-.mood-specials { display:inline-flex; align-items:center; gap:18px; white-space:nowrap; }
-.mood-specials::before { content:""; width:1px; height:18px; background:var(--line); }
-/* Below 1000px the group can start the second line, where a divider would separate nothing. */
-@media (max-width:1000px) { .mood-specials::before { display:none; } }
 .mood:has(input:focus-visible) span { outline:2px solid var(--cream); outline-offset:3px; }
-/* The Essentials ring frames the heart with the name. */
+/* The Essentials ring frames the heart with the name. Like the bus's, it rings a whole 44px target, so it keeps 1px off
+   it and stays inside the 4px under its group's word. */
 .mood-essentials:has(input:focus-visible) span { outline:none; }
-.mood-essentials:has(input:focus-visible) { outline:2px solid var(--cream); outline-offset:3px; }
+.mood-essentials:has(input:focus-visible) { outline:2px solid var(--cream); outline-offset:1px; }
 .change-photo { display:block; min-height:44px; padding:0; border:0; background:none; color:var(--muted); font:12px Inter,sans-serif; text-underline-offset:3px; cursor:pointer; }
 .change-photo:hover, .artwork-toggle[aria-pressed=true] { color:var(--cream); }
 .artwork-toggle[aria-pressed=true] { text-decoration:underline; }
@@ -107,12 +132,22 @@ body:not(:has(#hero-cover[src], #painted-artist[src])) #artwork-toggle:not(:focu
 .bus-link { position:relative; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; min-width:44px; min-height:44px; color:var(--soft); }
 .bus-link:hover, .bus-link:focus-visible, .bus-link[aria-current] { color:var(--cream); }
 .bus-link::after { inset:auto 13px 4px; }
-/* From 860px the photo tools and their count read 14px like the playlist link. The German line with a two-digit count
-   wraps below 831px of layout, and a classic 17px scrollbar takes that much from the viewport, so 860px keeps the line,
-   and the stage title, where they are. From 1101px, where the rail has room to spare in both languages, the Bus shows
-   its name after the bus, as Essentials does after its heart, its line under the name only. */
-@media (min-width:860px) { .change-photo, #photo-count { font:14px Inter,sans-serif; font-variant-numeric:tabular-nums; } }
-@media (min-width:1101px) { .bus-link .special-name { display:inline; margin-left:var(--s2); font:19px/2.3 var(--serif); } .bus-link::after { inset:auto 0 4px 26px; } }
+.bus-link:focus-visible { outline-offset:1px; }
+/* From 860px the photo tools, their count and the way switch read 14px like the playlist link. The German line with a
+   two-digit count wraps below 831px of layout, and a classic 17px scrollbar takes that much from the viewport, so 860px
+   keeps the line, and the station title, where they are. The Bus needs no name after it: its group word names it, at
+   every desktop width. */
+@media (min-width:860px) { .change-photo, #photo-count { font:14px Inter,sans-serif; font-variant-numeric:tabular-nums; } .ways button { font-size:14px; } }
+/* A short window has no height to spare, nor one under 800px wide and 820px tall, where the rail takes three rows. The
+   hero starts where the 108px header ends, the rail drops its word tier and its spacing tightens, so the photo tools stay
+   above the player bar. Each group still names itself to screen readers, and the fact over the title names the stage. */
+@media (min-width:761px) and (max-height:700px), (min-width:761px) and (max-width:800px) and (max-height:820px) {
+  .listen-layout { padding-top:108px; }
+  .mood-list { --row:44px; }
+  .poster .group-name { display:none; }
+  .moods { margin-top:var(--s2); padding-block:0; }
+  #mood-stage { margin-bottom:var(--s2); }
+}
 body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-daily, #artwork-toggle) { display:none; }
 /* Explicit ellipse radii reach transparency before every rectangular image edge. */
 .record-sleeve { position:absolute; z-index:-3; left:28%; top:-3%; width:60%; max-width:860px; aspect-ratio:1; pointer-events:none; opacity:.55; mask-image:radial-gradient(ellipse 50% 50% at 50% 50%,black 24%,rgb(0 0 0 / .92) 43%,rgb(0 0 0 / .4) 70%,transparent 100%); }
@@ -436,6 +471,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .player .transport-time { display:flex; justify-content:space-between; gap:12px; }
   /* The column is too narrow for a message beside the clock; the waveform is blank in these states anyway. */
   .player:not([data-status=paused],[data-status=playing]) :is(#track-clock, #waveform) { display:none; }
+  /* The column would cut the stage after the name, so the bar shows the name alone; the lock screen keeps both. */
+  .player .player-stage-of { display:none; }
   .player #waveform { width:100%; height:22px; }
   h1 { font-size:64px; }
 }
@@ -470,9 +507,15 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .artwork-toggle { display:none; }
   #stations-sheet .moods { margin:0; padding:0; overflow:visible; }
   #stations-sheet .mood-list { display:grid; grid-template-columns:1fr; gap:0; width:auto; }
-  /* Rows: the 48px picture spans the name and its line; the red dot marks the stage you hear now. */
-  #stations-sheet .mood-specials { display:contents; }
-  #stations-sheet .mood-specials::before, #stations-sheet :is(.mood span, .bus-link)::after { display:none; }
+  /* The two-row heading stays over the list, so a row scrolled into view lands under it, never behind it. */
+  #stations-sheet { scroll-padding-top:calc(64px + 44px + var(--s2) + 1px); }
+  /* Each group opens on its word and, for a stage, its phrase on the same line, 4px in like the rows. */
+  #stations-sheet .mood-group { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:baseline; column-gap:var(--s2); padding-top:var(--s3); white-space:normal; }
+  #stations-sheet .group-name { padding:0 0 var(--s2) var(--s1); }
+  #stations-sheet .mood-group > .sheet-line { grid-area:1 / 2; }
+  #stations-sheet .group-moods { display:block; grid-column:1 / -1; }
+  /* Rows: the 48px picture spans the name and its line; the red dot marks the station you hear now. */
+  #stations-sheet :is(.mood span, .bus-link)::after { display:none; }
   #stations-sheet .mood, #stations-sheet .bus-link { grid-column:1 / -1; display:grid; grid-template-columns:48px minmax(0,1fr) auto; align-content:center; gap:2px 16px; min-height:64px; padding:8px 4px; font:22px/1.15 var(--serif); border-bottom:1px solid var(--line); }
   #stations-sheet :is(.mood-preview, .essentials-icon, .bus-link svg) { grid-area:1 / 1 / 3; }
   #stations-sheet :is(.mood span, .special-name) { grid-area:1 / 2; }

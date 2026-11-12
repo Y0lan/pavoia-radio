@@ -260,7 +260,7 @@
     }
     if('mediaSession' in navigator && 'MediaMetadata' in window){
       const playing=preview?.entity||(s.dataFresh?t:null),art=preview?.entity.image||cover;
-      navigator.mediaSession.metadata=playing?new MediaMetadata({title:playing.title||'',artist:playing.artist||'',album:preview?playing.album||'':s.name,artwork:imagePath(art)?[{src:art}]:[]}):null;
+      navigator.mediaSession.metadata=playing?new MediaMetadata({title:playing.title||'',artist:playing.artist||'',album:preview?playing.album||'':s.album,artwork:imagePath(art)?[{src:art}]:[]}):null;
       if(preview)navigator.mediaSession.playbackState=$('preview-audio').paused?'paused':'playing';
       else navigator.mediaSession.playbackState=s.playbackState==='playing'?'playing':'paused';
     }

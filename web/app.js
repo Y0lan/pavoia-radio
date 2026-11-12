@@ -69,26 +69,26 @@ const moods = [
 
 
 const words = {
- en: { promise:'So it never ends.', choose:'Choose a stage', letterTitle:'The festival ends.', letterEnd:'The music stays.',
+ en: { promise:'So it never ends.', choose:'Choose a station', letterTitle:'The festival ends.', letterEnd:'The music stays.',
   letterOne:'Years spent finding tracks, keeping them close and collecting them in playlists named after the stages of Pavoia.',
   letterTwo:'This radio is a way to share them. To return to a little of that place between editions, and keep discovering music there.',
   love:'With love,', footer:'Pavoia Radio · A personal selection by Gaende', language:'Language', selectedBy:'Selected by Gaende',
   play:'Play', pause:'Pause', space:'Space', retry:'Try again', paused:'Paused', connecting:'Connecting…', playing:'Playing', buffering:'Buffering…',
   retrying:'Reconnecting…', blocked:'Press play to start', error:'Stream lost. Press play to retry.', untitled:'Untitled track', unknownArtist:'Unknown artist',
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
-  live:'Live', listening:'listening', audience:'listening to this stage',
+  live:'Live', listening:'listening', audience:'listening to this station',
   cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Next photo', of:'of', photoOnly:'Photo only',
   busPlace:'Somewhere in the forest. No playlist here, you have to be there.', busTicket:'Get your Pavoia ticket',
   places:['Finding your own rhythm in the open air, with no pressure to rush the day.','A growing sense of possibility: something is beginning, and you want to be part of it!','Pałac at its peak. The shared moment when everyone commits to the dance and everything else can wait.','The inward side of Pałac. Longing, tenderness, melancholy: giving those feelings room to unfold while you keep moving.','The tracks I keep close and always come back to, at different times for different reasons.','The basement. Giving yourself fully to the speed and intensity, whether the feeling is dark or joyful.','The simple happiness of dancing together in daylight. Being there already feels good; the music makes you want to join in.'],
   lines:['Sunny, groovy open-air warm-up','Bright and melodic, building up','Driving peak-time dance music','Melancholic, hypnotic and deep','The tracks I keep coming back to','Hard techno and hard trance','Happy house for daylight','Ambient, to lie down and rest','Tracks to close a set'] },
- de: { promise:'Damit es niemals aufhört.', choose:'Wähle eine Bühne', letterTitle:'Das Festival endet.', letterEnd:'Die Musik bleibt.',
+ de: { promise:'Damit es niemals aufhört.', choose:'Wähle einen Sender', letterTitle:'Das Festival endet.', letterEnd:'Die Musik bleibt.',
   letterOne:'Über Jahre gesammelt: Tracks, die bleiben. Vereint in Playlists, die die Namen der Bühnen von Pavoia tragen.',
   letterTwo:'Mit diesem Radio möchte ich sie teilen. Ein Stück dieses Ortes zwischen den Festivals wiederfinden und dort weiter Musik entdecken.',
   love:'Mit Liebe,', footer:'Pavoia Radio · Eine persönliche Auswahl von Gaende', language:'Sprache', selectedBy:'Ausgewählt von Gaende',
   play:'Abspielen', pause:'Pause', space:'Leertaste', retry:'Erneut versuchen', paused:'Pausiert', connecting:'Verbinden…', playing:'Wiedergabe', buffering:'Puffern…',
   retrying:'Neu verbinden…', blocked:'Zum Starten Play drücken', error:'Stream unterbrochen. Play erneut drücken.', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
-  live:'Live', listening:'hören', audience:'hören auf dieser Bühne',
+  live:'Live', listening:'hören', audience:'hören diesen Sender',
   cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Nächstes Foto', of:'von', photoOnly:'Nur Foto',
   busPlace:'Irgendwo im Wald. Hier gibt es keine Playlist, du musst dabei sein.', busTicket:'Hol dir dein Pavoia-Ticket',
   places:['Unter freiem Himmel den eigenen Rhythmus finden und dem Tag seine Zeit lassen.','Das Gefühl, dass immer mehr möglich ist: Etwas beginnt, und du möchtest dabei sein!','Pałac auf dem Höhepunkt. Dieser gemeinsame Moment, in dem sich alle ganz dem Tanzen hingeben und alles andere warten kann.','Pałac, mit dem Blick nach innen. Sehnsucht, Zärtlichkeit, Melancholie: diesen Gefühlen Raum geben, während du weitertanzt.','Die Tracks, die mir am Herzen liegen und zu denen ich immer wieder zurückkehre, zu verschiedenen Zeiten aus verschiedenen Gründen.','Der Keller. Sich ganz dem Tempo und der Intensität hingeben, ob düster oder voller Freude.','Die einfache Freude, bei Tageslicht zusammen zu tanzen. Hier zu sein fühlt sich schon gut an; die Musik macht Lust, mitzutanzen.'],
@@ -96,11 +96,42 @@ const words = {
 };
 words.en.places.push('A safe, quiet space to lie down, relax and feel good. Nothing demanding your energy.', 'Tracks I could play to close a set.');
 words.de.places.push('Ein sicherer, ruhiger Ort zum Hinlegen, Entspannen und Wohlfühlen. Hier musst du nichts leisten.', 'Tracks, mit denen ich ein Set beenden könnte.');
-Object.assign(words.en, {stations:'Change stage', closeStations:'Close', stationPosition:'Stage', notStreamed:'Not streamed. You have to be there.'});
-Object.assign(words.de, {stations:'Bühne wechseln', closeStations:'Schließen', stationPosition:'Bühne', notStreamed:'Nicht im Radio. Du musst dabei sein.'});
+Object.assign(words.en, {stations:'Change station', closeStations:'Close', stationPosition:'Station', notStreamed:'Not streamed. You have to be there.'});
+Object.assign(words.de, {stations:'Sender wechseln', closeStations:'Schließen', stationPosition:'Sender', notStreamed:'Nicht im Radio. Du musst dabei sein.'});
+// A station is what you hear; a stage is where it comes from, and several stations can share one. Each stage's phrase
+// is a few of its own places' words.
+Object.assign(words.en, {orderStations:'Order the stations', byFeeling:'By feeling', byStage:'By stage', day:'Day', night:'Night', anyTime:'Any time', stageOf:'{stage} stage',
+  phrases:{bermuda:'Open air', palac:'Its peak and its inward side', etage:'The basement', fontanna:'Dancing in daylight', ambiance:'A safe, quiet space', bus:'Somewhere in the forest'}});
+Object.assign(words.de, {orderStations:'Sender ordnen', byFeeling:'Nach Stimmung', byStage:'Nach Bühne', day:'Tag', night:'Nacht', anyTime:'Jederzeit', stageOf:'Bühne {stage}',
+  phrases:{bermuda:'Unter freiem Himmel', palac:'Höhepunkt und Blick nach innen', etage:'Der Keller', fontanna:'Tanzen bei Tageslicht', ambiance:'Ein sicherer, ruhiger Ort', bus:'Irgendwo im Wald'}});
 let language = 'en';
 try { const saved=localStorage.getItem('pavoia-language'); if (Object.hasOwn(words,saved)) language=saved; } catch { /* Storage is optional. */ }
 const text = key => words[language][key];
+// The festival's stages and Gaende's own selections, in the order a newcomer meets them. A stage holds the stations
+// named after it, in today's order; the Bus holds none. A station's id is still called its stage in the code
+// (mood.stage, getState().stage), as the ids and the routes have always been.
+const festival = [
+  {key:'bermuda', name:'Bermuda', ids:['bermuda-day','bermuda-evening']},
+  {key:'palac', name:'Pałac', ids:['palac-dance','palac-feel']},
+  {key:'etage', name:'Etage 0', ids:['etage-zero']},
+  {key:'fontanna', name:'Fontanna', ids:['fontanna']},
+  {key:'ambiance', name:'Ambiance', ids:['ambiance']},
+  {key:'bus', name:'The Bus', ids:[], bus:true},
+  {key:'selectedBy', ids:['closing','essentials']},
+];
+// By feeling, one festival day: in each part the energy rises to the peak and comes down; then the two with no hour.
+const ways = {stage:festival, feeling:[
+  {key:'day', ids:['bermuda-day','fontanna']},
+  {key:'night', ids:['bermuda-evening','palac-dance','etage-zero','palac-feel','closing']},
+  {key:'anyTime', ids:['ambiance','essentials']},
+  festival[5],
+]};
+// A first visit lists by stage, the order the radio always had; a press of the other way is kept.
+let way = 'stage';
+try { const saved=localStorage.getItem('pavoia-way'); if (Object.hasOwn(ways,saved)) way=saved; } catch { /* Storage is optional. */ }
+// The nine moods in the order on screen, which the arrows and the position walk; only arrangeWay() writes it, and
+// moods keeps its declared order.
+let shown = [];
 let playbackState='paused';
 let playbackText='paused';
 let radioData=null;
@@ -109,6 +140,17 @@ let loading=true;
 
 const $ = id => document.getElementById(id);
 const plain = mood => mood.title.join(' ').trim();
+// A station's stage, and its group in the way shown. A stage reads "Pałac stage"; another group reads its word, such as
+// Night or Selected by Gaende. A station named after its stage says the fact once, and names no stage after its name.
+const festivalOf = mood => festival.find(group => group.ids.includes(mood.stage));
+const groupOf = mood => ways[way].find(group => group.ids.includes(mood.stage));
+const groupName = group => group.name || text(group.key);
+const groupLabel = group => group.name ? text('stageOf').replace('{stage}', group.name) : groupName(group);
+const stageFact = mood => groupLabel(festivalOf(mood));
+const spoken = mood => festivalOf(mood).name === plain(mood) ? stageFact(mood) : `${plain(mood)}, ${stageFact(mood)}`;
+const stageSuffix = mood => { const name = festivalOf(mood).name; return name && name !== plain(mood) ? name : ''; };
+// The player bar and the lock screen: "Lost in Feelings · Pałac".
+const albumOf = mood => [plain(mood), stageSuffix(mood)].filter(Boolean).join(' · ');
 const audio = $('audio');
 const button = $('play');
 let currentMood = moods[3];
@@ -196,9 +238,10 @@ function setTitle(element, [roman, italic]) {
   element.replaceChildren(...(roman ? [`${roman} `, em] : [em]));
 }
 
-// Each label carries its stage's line: a second line in the phone sheet, a tooltip on the desktop rail.
-// The line describes the radio and stays out of its name, so the radio is called by the stage alone.
-// Essentials and the Bus close the rail as one group, so they never wrap apart.
+// Each label carries its station's line: a second line in the phone sheet, a tooltip on the desktop rail.
+// The line describes the radio and stays out of its name, so the radio is called by the station alone. Its stage,
+// hidden, follows the line by feeling, where no group word names it.
+const labels = new Map(), facts = new Map();
 for (const mood of moods) {
   const label = document.createElement('label');
   label.className = 'mood';
@@ -209,7 +252,8 @@ for (const mood of moods) {
   thumbnail.style.objectPosition = mood.photos[0].focus;
   const line = Object.assign(document.createElement('small'), { className: 'sheet-line', id: `line-${mood.id}` });
   line.setAttribute('aria-hidden', 'true');
-  label.append(input, thumbnail, text, line);
+  const fact = Object.assign(document.createElement('small'), { id: `stage-${mood.id}`, hidden: true });
+  label.append(input, thumbnail, text, line, fact);
   if (mood.stage==='essentials') {
     label.classList.add('mood-essentials');
     const heart=document.createElementNS('http://www.w3.org/2000/svg','svg');
@@ -217,9 +261,92 @@ for (const mood of moods) {
     const path=document.createElementNS('http://www.w3.org/2000/svg','path');
     path.setAttribute('d','M18 30.5S5 22.6 5 13.6A6.6 6.6 0 0 1 18 10.4a6.6 6.6 0 0 1 13 3.2c0 9-13 16.9-13 16.9Z');
     heart.append(path);label.prepend(heart);
-    $('bus-link').before(label);
-  } else $('moods').querySelector('.mood-specials').before(label);
+  }
+  labels.set(mood.stage, label);
+  facts.set(mood, fact);
 }
+
+// A group of a way is its word over its stations, and for a stage its phrase. Screen readers hear the word and the
+// phrase once, as the group's name and description, so the visible copies are hidden from them. Each group is built
+// once; the Bus's group serves both ways.
+const groups = new Map();
+function groupNode(group) {
+  if (!groups.has(group)) {
+    const node = Object.assign(document.createElement('div'), { className: 'mood-group' });
+    const name = Object.assign(document.createElement('span'), { className: 'eyebrow group-name' });
+    const phrase = Object.hasOwn(words.en.phrases, group.key) && Object.assign(document.createElement('small'), { className: 'sheet-line', id: `phrase-${group.key}` });
+    const list = Object.assign(document.createElement('div'), { className: 'group-moods' });
+    node.setAttribute('role', 'group');
+    name.setAttribute('aria-hidden', 'true');
+    if (phrase) { phrase.setAttribute('aria-hidden', 'true'); node.setAttribute('aria-describedby', phrase.id); }
+    node.append(...[name, phrase, list].filter(Boolean));
+    groups.set(group, { node, name, phrase, list });
+  }
+  return groups.get(group);
+}
+// Each group in the language shown: its word, its phrase as the word's tooltip on the rail, and its name.
+function nameGroups() {
+  for (const group of new Set(Object.values(ways).flat())) {
+    const { node, name, phrase } = groupNode(group);
+    name.textContent = groupName(group);
+    if (phrase) name.title = phrase.textContent = text('phrases')[group.key];
+    node.setAttribute('aria-label', groupLabel(group));
+  }
+}
+// The way shown orders the rail and the sheet: its groups follow the switch, which never moves, and hold the labels
+// in the way's order, so the radios stay one group in the order on screen. By feeling, a radio's stage follows its line.
+function arrangeWay() {
+  // The bus link is found while it is in the page: taking the groups out takes it out too.
+  const bus = $('bus-link');
+  shown = ways[way].flatMap(group => group.ids).map(id => moods.find(mood => mood.stage === id));
+  for (const { node } of groups.values()) node.remove();
+  $('moods').append(...ways[way].map(group => {
+    const { node, list } = groupNode(group);
+    list.replaceChildren(...group.bus ? [bus] : group.ids.map(id => labels.get(id)));
+    return node;
+  }));
+  for (const choice of $('ways').children) choice.setAttribute('aria-pressed', choice.value === way);
+  for (const mood of moods) labels.get(mood.stage).querySelector('input').setAttribute('aria-describedby', way === 'feeling' ? `line-${mood.id} stage-${mood.id}` : `line-${mood.id}`);
+  balanceRail();
+}
+// Both ways take as many rows on the rail, so a press never moves the title, nor the switch from under the pointer.
+// The rail wraps whole groups, each as wide as its word or its stations; the other way's words are measured for a
+// moment at the end of the rail. Where the way shown takes one row fewer, its last group starts a row of its own.
+// A rail that wraps says so, and the stylesheet darkens the photo behind its higher rows.
+function balanceRail() {
+  const rail = $('moods'), last = groupNode(ways[way].at(-1)).node;
+  for (const { node } of groups.values()) node.removeAttribute('data-break');
+  rail.removeAttribute('data-wraps');
+  if (mobileLayout.matches) return;
+  const other = ways[way === 'stage' ? 'feeling' : 'stage'], away = other.filter(group => !ways[way].includes(group)).map(group => groupNode(group).node);
+  rail.append(...away);
+  const width = node => node.getBoundingClientRect().width, gap = node => parseFloat(getComputedStyle(node).columnGap) || 0;
+  const wide = group => {
+    const { name, list } = groupNode(group), items = group.bus ? [$('bus-link')] : group.ids.map(id => labels.get(id));
+    return Math.max(width(name), items.reduce((sum, item) => sum + width(item), gap(list) * (items.length - 1)));
+  };
+  const [mine, theirs] = [ways[way], other].map(order => [width($('ways')), ...order.map(wide)]);
+  for (const node of away) node.remove();
+  const room = width(rail) + .01, between = gap(rail);
+  const rows = widths => widths.reduce(([count, x], w) => x && x + between + w > room ? [count + 1, w] : [count, x ? x + between + w : w], [1, 0])[0];
+  const balanced = rows(theirs) > rows(mine) && rows(mine.slice(0, -1)) + 1 === rows(theirs);
+  last.toggleAttribute('data-break', balanced);
+  rail.toggleAttribute('data-wraps', (balanced ? rows(theirs) : rows(mine)) > 1);
+}
+arrangeWay();
+window.addEventListener('resize', balanceRail);
+document.fonts.ready.then(balanceRail);
+// A way changes the order on screen and nothing else: it selects, plays and focuses nothing, so focus stays on the
+// pressed button. In the sheet, the current row stays in view.
+function chooseWay(next) {
+  if (next === way) return;
+  way = next;
+  try { localStorage.setItem('pavoia-way', way); } catch { /* Storage is optional. */ }
+  arrangeWay();
+  renderScene();
+  if ($('stations-sheet').open) (location.hash === '#bus' ? $('bus-link') : labels.get(currentMood.stage)).scrollIntoView({ block: 'nearest' });
+}
+for (const choice of $('ways').children) choice.addEventListener('click', () => chooseWay(choice.value));
 
 function closeStations() {
   if ($('stations-sheet').open) $('stations-sheet').close();
@@ -229,7 +356,10 @@ function arrangeStations() {
   const wasOpen=$('stations-sheet').open;
   closeStations();
   (mobileLayout.matches ? $('station-sheet-list') : $('station-selector-home')).append($('station-selector'));
+  // On a phone the switch is the sheet heading's second row, so both ways stay in reach while the list scrolls.
+  if (mobileLayout.matches) document.querySelector('.stations-heading').append($('ways')); else $('moods').prepend($('ways'));
   if (wasOpen && !mobileLayout.matches) document.querySelector(`input[value="${currentMood.id}"]`).focus();
+  balanceRail();
   renderScene();
 }
 // The sheet opens on the current stage, not on its close button, and scrolls it into view.
@@ -247,8 +377,9 @@ $('stations-sheet').addEventListener('click', event => {
 $('stations-sheet').addEventListener('close', () => $('open-stations').setAttribute('aria-expanded', 'false'));
 $('bus-link').addEventListener('click', closeStations);
 mobileLayout.addEventListener('change', arrangeStations);
+// The arrows, the swipes and the media keys walk the stations in the order on screen.
 function step(dir) {
-  selectMood(moods[(moods.indexOf(currentMood) + dir + moods.length) % moods.length].id);
+  selectMood(shown[(shown.indexOf(currentMood) + dir + shown.length) % shown.length].id);
 }
 let swipe = null;
 $('poster').addEventListener('pointerdown', event => {
@@ -274,7 +405,7 @@ function metadata(value) {
   $('player-album').hidden = !track?.album;
   if ('mediaSession' in navigator && 'MediaMetadata' in window) {
     navigator.mediaSession.metadata = track ? new MediaMetadata({
-      title: track.title || text('untitled'), artist: track.artist || '', album: plain(currentMood),
+      title: track.title || text('untitled'), artist: track.artist || '', album: albumOf(currentMood),
     }) : null;
   }
   tabTitle();
@@ -318,10 +449,13 @@ function renderScene() {
     if (sceneID && !reducedMotion.matches && !document.hidden) sceneText.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 240, easing: 'cubic-bezier(.22, 1, .36, 1)' });
       sceneID = nextScene;
   }
-  const index=moods.indexOf(currentMood);
+  // The hero names the station's stage over its title, in both ways; the Bus's title is its stage.
+  $('mood-stage').hidden = bus;
+  $('mood-stage').textContent = stageFact(currentMood);
+  const index=shown.indexOf(currentMood);
   $('mood-place').textContent = bus ? text('busPlace') : words[language].places[Number(currentMood.id)-1];
-  $('station-text').textContent = `${index+1} / ${moods.length}`;
-  $('station-label').textContent = `${text('stationPosition')} ${index+1} ${text('of')} ${moods.length}, ${plain(currentMood)}`;
+  $('station-text').textContent = `${index+1} / ${shown.length}`;
+  $('station-label').textContent = `${text('stationPosition')} ${index+1} ${text('of')} ${shown.length}, ${spoken(currentMood)}`;
   $('station-position').hidden = bus;
 }
 // The tab names the record while it plays, and the stage otherwise.
@@ -348,7 +482,9 @@ function render() {
   button.disabled = !currentMood.stage;
   document.querySelector(`input[value="${currentMood.id}"]`).checked = true;
   metadata(null);
-  $('player-stage').textContent = plain(currentMood);
+  // The bar names the stage after a station named otherwise; where its column is narrow, the stylesheet hides it.
+  const suffix = stageSuffix(currentMood);
+  $('player-stage').replaceChildren(plain(currentMood), ...suffix ? [Object.assign(document.createElement('span'), { className: 'player-stage-of', textContent: ` · ${suffix}` })] : []);
   if (currentMood.stage) $('player-title').textContent = text('loading');
 }
 
@@ -608,8 +744,12 @@ function localise() {
   for (const choice of $('language').children) choice.setAttribute('aria-pressed',choice.value===language);
   $('language').setAttribute('aria-label',text('language'));
   $('close-stations').setAttribute('aria-label',text('closeStations'));
+  $('ways').setAttribute('aria-label',text('orderStations'));
   document.querySelectorAll('[data-copy]').forEach(node=>{node.textContent=text(node.dataset.copy);});
   document.querySelectorAll('.mood').forEach(node=>{node.title=node.querySelector('.sheet-line').textContent=text('lines')[Number(node.querySelector('input').value)-1];});
+  for (const [mood,fact] of facts) fact.textContent=stageFact(mood);
+  nameGroups();
+  balanceRail();
   document.querySelector('.wordmark').setAttribute('aria-label',text('home'));
   document.querySelector('.player').setAttribute('aria-label',text('player'));
   renderArtworkToggle();
@@ -635,5 +775,8 @@ function tune(stage) {
 function announceRadio() {
   if (window.dispatchEvent) window.dispatchEvent(new CustomEvent('pavoia:radio'));
 }
-window.Pavoia = { stations: moods.map(m => ({id:m.stage, name:plain(m), thumb:m.photos[0].src})), getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
+// One object per station, built once, because the explorer counts stations in Maps keyed by them; the list follows the
+// order on screen, with each station's group in the way shown and its stage in the language shown.
+const stationOf = new Map(moods.map(m => [m, {id:m.stage, name:plain(m), thumb:m.photos[0].src, get group() { return groupOf(m).key; }, get fact() { return stageFact(m); }}]));
+window.Pavoia = { get stations() { return shown.map(m => stationOf.get(m)); }, getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), album:albumOf(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
   play, pause, renderScene, toggle, tune };

@@ -60,9 +60,10 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     getAttribute(name){return this.attrs[name] ?? this[name] ?? null;}
     removeAttribute(name){delete this.attrs[name];delete this[name];}
     toggleAttribute(name,enabled){if(enabled)this.setAttribute(name,'');else this.removeAttribute(name);}
-    append(...children){for(const child of children){if(typeof child==='object')child.parent=this;this.children.push(child);}}
+    // A child moves: it leaves its old parent first, and inserting it before itself changes nothing, as in a browser.
+    append(...children){for(const child of children){if(typeof child==='object'){child.remove();child.parent=this;}this.children.push(child);}}
     prepend(...children){for(const child of children.reverse())this.insertBefore(child,this.children[0]);}
-    insertBefore(child,before){const index=this.children.indexOf(before);child.parent=this;if(index<0)this.children.push(child);else this.children.splice(index,0,child);}
+    insertBefore(child,before){if(child===before)return;if(typeof child==='object')child.remove();const index=this.children.indexOf(before);child.parent=this;if(index<0)this.children.push(child);else this.children.splice(index,0,child);}
     before(child){this.parent.insertBefore(child,this);}
     after(child){child.parent=this.parent;this.parent.children.splice(this.parent.children.indexOf(this)+1,0,child);}
     replaceChildren(...children){this.textContent='';this.children=[];this.append(...children);}
@@ -76,6 +77,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
       const kind=/data-kind="([^"]+)"/.exec(selector)?.[1];return this.children.find(c=>c.dataset?.kind===kind)||null;
     }
     focus(options){document.activeElement=this;this.focusOptions=options;}
+    scrollIntoView(options){this.scrolled=options;}
     showModal(){this.open=true;this.modal=true;}
     show(){this.open=true;this.modal=false;}
     close(){this.open=false;}
@@ -93,8 +95,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   // Any other id gets a plain element, so journey.js finds every node it wires.
   const elements=new Proxy({}, {get:(_target,id)=>nodes.find(node=>node.id===id) || (nodes.push(Object.assign(new Element(),{id})),nodes.at(-1))});
   elements.photo.src='photos/selected/p005.jpg';
-  // The rail ends on the Essentials and Bus group, as in index.html.
-  elements.moods.append(Object.assign(new Element(),{className:'mood-specials'}));elements.moods.children[0].append(elements['bus-link']);
+  // The rail opens on the way switch, then the Bus, as in index.html.
+  for(const value of ['feeling','stage'])elements.ways.append(Object.assign(new Element(),{localName:'button',value,attrs:{'aria-pressed':String(value==='stage')}}));
+  elements.moods.append(elements.ways,elements['bus-link']);
   const body=new Element();
   const audio=elements.audio;
   audio.paused=true;audio.readyState=0;audio.calls=[];
@@ -251,7 +254,7 @@ test('active and paused station changes, stale play rejection and timer reset',a
  e.response=status('Dance',3);e.change('03');await flush();
  old.reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();e.playing();
  assert.equal(e.audio.src,'/stream/palac-dance.mp3');assert.equal(e.elements['player-title'].textContent,'Dance');
- assert.equal(e.mediaSession.metadata.album,'Night in Motion');
+ assert.equal(e.mediaSession.metadata.album,'Night in Motion · Pałac','the lock screen names the stage after the station');
  e.click();e.change('04');assert.equal(e.audio.src,undefined);await flush();
  assert.equal(e.elements.player.dataset.state,'paused');e.change('not-a-mood');assert.equal(e.audio.src,undefined);
 });
@@ -268,7 +271,7 @@ test('late metadata cannot overwrite a newer station or clear its poll guard',as
 test('live audience updates independently and never presents missing data as zero',async()=>{
  const e=setup();await flush();const live=e.elements['live-text'],body=e.document.body;
  e.audienceResponse=status('Count',0).audience;await e.pollAudience();assert.equal(live.textContent,'Live','nobody listening shows no count');
- assert.equal(e.elements['live-label'].textContent,'0 listening to this stage: Lost in Feelings','screen readers get the full sentence, zero included');assert.equal(body.getAttribute('data-on-air'),'');
+ assert.equal(e.elements['live-label'].textContent,'0 listening to this station: Lost in Feelings','screen readers get the full sentence, zero included');assert.equal(body.getAttribute('data-on-air'),'');
  e.audienceResponse=status('Count',2).audience;await e.pollAudience();assert.equal(live.textContent,'Live · 2 listening');
  e.response=status('Old metadata count',0);await e.poll();assert.equal(live.textContent,'Live · 2 listening');
  e.audienceResponse.measuredAt=new Date(0).toISOString();await e.pollAudience();assert.equal(live.textContent,'Live');assert.equal(e.elements['live-label'].textContent,'Live','an unknown count is never read as a number');
@@ -384,7 +387,7 @@ test('Bus navigation and metadata updates keep the playing station and source',a
  assert.equal(e.audio.src,source);assert.equal(e.audio.calls.length,calls);assert.equal(e.audio.paused,false);
  e.response=status('New track');await e.poll();
  assert.equal(e.elements['player-title'].textContent,'New track');assert.equal(e.elements.photo.src,'photos/bus-stage.jpg');
- assert.equal(e.window.Pavoia.getState().stage,'palac-dance');assert.equal(e.mediaSession.metadata.album,'Night in Motion');
+ assert.equal(e.window.Pavoia.getState().stage,'palac-dance');assert.equal(e.mediaSession.metadata.album,'Night in Motion · Pałac');
  e.setLanguage('de');
  assert.equal(e.elements['mood-place'].textContent,'Irgendwo im Wald. Hier gibt es keine Playlist, du musst dabei sein.');
  e.location.hash='';e.window.emit('popstate');await flush();assert.equal(e.elements.photo.src,photo);
@@ -496,12 +499,12 @@ test('a blocked autoplay is a neutral pause and only transient states show words
 
 test('the bar names the stage, the tab names the record and Play names its key',async()=>{
  const e=setup();await flush();
- assert.equal(e.elements['player-stage'].textContent,'Lost in Feelings');assert.equal(e.document.title,'Lost in Feelings · Pavoia Radio');
+ assert.equal(textOf(e.elements['player-stage']),'Lost in Feelings · Pałac');assert.equal(e.document.title,'Lost in Feelings · Pavoia Radio');
  assert.equal(e.elements.play.title,'Play (Space)');assert.equal(e.elements.play.getAttribute('aria-pressed'),null);
  e.click();assert.equal(e.elements.play.title,'Pause (Space)');assert.equal(e.document.title,'Lost in Feelings · Pavoia Radio','connecting is not playing yet');
  e.playing();assert.equal(e.document.title,'▶ First · Artist First · Pavoia Radio');assert.equal(e.elements['player-artist'].textContent,'Artist First');
  e.response=new Error('Offline');e.change('03');await flush();
- assert.equal(e.elements['player-stage'].textContent,'Night in Motion');assert.equal(e.elements['player-title'].textContent,'Night in Motion','a failed metadata call names the stage');
+ assert.equal(textOf(e.elements['player-stage']),'Night in Motion · Pałac');assert.equal(e.elements['player-title'].textContent,'Night in Motion','a failed metadata call names the station');
  assert.equal(e.elements['player-artist'].textContent,'','the artist line does not repeat it');
  e.setLanguage('de');assert.equal(e.elements.play.title,'Pause (Leertaste)');
  e.click();assert.equal(e.elements.play.title,'Abspielen (Leertaste)');assert.equal(e.document.title,'Night in Motion · Pavoia Radio');
@@ -614,12 +617,12 @@ test('external links carry a drawn arrow that screen readers skip',()=>{
  for(const name of ['index.html','app.js','journey.js'])assert.doesNotMatch(web(name),/↗/,name+' types no arrow into a label');
 });
 
-test('the radio page reads one size per line and one underline, and the Bus names itself on a wide screen',()=>{
- const rules=cssRules(),mid=cssRules('(min-width:860px)'),wide=cssRules('(min-width:1101px)'),phone=cssRules('(max-width:760px)');
+test('the radio page reads one size per line and one underline, and the Bus shows its name in the sheet only',()=>{
+ const rules=cssRules(),mid=cssRules('(min-width:860px)'),phone=cssRules('(max-width:760px)');
  assert.match(rules.get('.player-credits'),/font:12px Inter,sans-serif/);
  assert.match(rules.get('.player .artist-credit span'),/font-size:inherit/,'the artist line stays 12px, a credited link or plain text');
- // From 860px the action line holds the larger words in German with a 12-photo count and a classic scrollbar; from 1101px
- // the rail holds the Bus name. Narrower, each keeps the sizes that hold it on one line, so the stage title never moves.
+ // From 860px the action line holds the larger words in German with a 12-photo count and a classic scrollbar. Narrower,
+ // it keeps the sizes that hold it on one line, so the station title never moves.
  assert.match(rules.get('.stage-action'),/font-size:14px/);
  assert.match(mid.get('.change-photo, #photo-count'),/font:14px Inter,sans-serif; font-variant-numeric:tabular-nums/,'Next photo, its count and Photo only read 14px, like the playlist link, in figures of one width');
  assert.deepEqual(ordered().filter(([,list,declarations])=>list.split(/,\s*/).includes('#photo-count')&&/(?<![\w-])color:/.test(declarations)),[],'the count takes its button\'s colour at every width, so it brightens with Next photo on hover');
@@ -627,9 +630,10 @@ test('the radio page reads one size per line and one underline, and the Bus name
  assert.match(rules.get('.change-photo'),/font:12px Inter,sans-serif/);assert.match(rules.get('#photo-count'),/font:11px var\(--mono\)/);assert.match(phone.get('.change-photo'),/font:12px\/18px Inter,sans-serif/,'narrower, the line keeps the sizes it had');
  assert.match(rules.get('a[target="_blank"]:not(.stage-spotify)::after, .stage-spotify>span:first-child::after'),/display:inline-block/,'the arrow is its own box, so the underline stops at the words');
  assert.match(rules.get('.record-sleeve'),/opacity:\.55;/,'the sleeve\'s printed type stays behind the title');
- assert.match(wide.get('.bus-link .special-name'),/display:inline; margin-left:var\(--s2\); font:19px\/2\.3 var\(--serif\)/,'the Bus shows its name in the rail\'s type, as Essentials does');
- assert.match(wide.get('.bus-link::after'),/inset:auto 0 4px 26px/,'its line runs under the name, past the 18px bus and its 8px gap');
- assert.ok(lastAt('(min-width:1101px)','.bus-link::after')>lastAt('','.bus-link::after'),'the wide rule comes after the rule it overrides');
+ // The Bus's group word names it on the rail at every width, so its own name shows in the sheet's row only.
+ assert.match(rules.get('.spotify-caption, .special-name'),/display:none/,'the rail shows the bus alone');
+ assert.match(phone.get('#stations-sheet .special-name'),/display:inline/,'the sheet\'s row names it');
+ assert.deepEqual(ordered().filter(([media,list])=>media!=='(max-width:760px)'&&list.includes('special-name')).map(([media,list])=>media+' '+list),[' .spotify-caption, .special-name'],'no wider rule shows the name after the bus');
  assert.match(rules.get('#language'),/margin-right:-15px/,'the DE word ends on the gutter');assert.match(rules.get('#language button'),/min-width:44px; min-height:44px/,'and each button keeps 44px');
  const values=property=>new Set([...web('style.css').replace(/\/\*[\s\S]*?\*\//g,'').matchAll(new RegExp('(?<![\\w-])'+property+':([^;}]+)','g'))].map(m=>m[1].trim()));
  assert.deepEqual([...values('text-underline-offset')],['3px'],'one underline offset');
@@ -666,7 +670,8 @@ test('the sleeve clears the text column, which sits in a darker pool',()=>{
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
  assert.match(rules.get('.record-sleeve'),/left:28%/);
  assert.match(rules.get('.listen-layout::after'),/background:radial-gradient\(ellipse 60% 55% at 0% 70%,rgb\(11 10 9 \/ \.6\),transparent\),linear-gradient\(/,'the pool is in front of the old gradient');
- assert.match(rules.get('.listen-layout::after'),/linear-gradient\(180deg,rgb\(11 10 9 \/ \.75\),rgb\(11 10 9 \/ \.6\) 90px,rgb\(11 10 9 \/ \.25\) 160px,transparent 30%,/,'the header band is as dark as on phones, so a cover or a pale sky cannot show through the status');
+ assert.match(rules.get('.listen-layout::after'),/linear-gradient\(180deg,rgb\(11 10 9 \/ \.75\),rgb\(11 10 9 \/ \.6\) 90px,rgb\(11 10 9 \/ \.25\) 160px,rgb\(11 10 9 \/ var\(--dip, 0\)\) 30%,rgb\(11 10 9 \/ var\(--mid, \.2\)\) 45%,rgb\(11 10 9 \/ \.92\) 100%\)/,'the header band is as dark as on phones, so a cover or a pale sky cannot show through the status');
+ assert.match(rules.get('.listen-layout:has(#moods[data-wraps])'),/--dip:\.25; --mid:\.5;/,'where the rail wraps, the band rises with its higher rows: no gap above it, a darker middle');
  for(const selector of ['h1','.place'])assert.match(rules.get(selector),/text-shadow:0 2px 18px rgb\(0 0 0 \/ \.45\)/,selector+' carries the shadow at every width');
  assert.match(rules.get('.place'),/color:var\(--cream\)/,'the description reads in cream at every width');
  assert.doesNotMatch(phone.get('h1')+phone.get('.place'),/text-shadow|color:/,'the phone rules no longer carry their own copy');
@@ -683,29 +688,27 @@ test('title and description arrive together, on the shared curve',async()=>{
  assert.deepEqual(plain(fades),[{duration:360,easing:'cubic-bezier(.22, 1, .36, 1)'}],'the photo crossfade uses the same curve');
 });
 
-test('Essentials reads like every stage and closes the rail with the Bus, as one group',async()=>{
- const e=setup();await flush();const moods=e.elements.moods,specials=moods.querySelector('.mood-specials');
- assert.equal(moods.children.at(-1),specials,'the group ends the rail');
- assert.deepEqual(moods.children.slice(0,-1).map(label=>label.querySelector('input').value),['01','02','03','04','06','07','08','09'],'every other stage comes before it');
- const [essentials,bus]=specials.children;
- assert.deepEqual([essentials.querySelector('input').value,bus],['05',e.elements['bus-link']],'Essentials, then the Bus');
+test('Essentials reads like every station, and the Bus closes the stages by stage and the rail by feeling',async()=>{
+ const e=setup();await flush();const moods=e.elements.moods,bus=e.elements['bus-link'];
+ const groups=()=>moods.children.slice(1),holder=node=>groups().find(group=>group.descendants().includes(node));
+ const essentials=moods.descendants().find(n=>n.className==='mood'&&n.querySelector('input').value==='05'),last=group=>group.descendants().filter(n=>n.className==='mood').at(-1);
+ assert.deepEqual([groups().indexOf(holder(bus)),groups().length,holder(essentials)===groups().at(-1),last(holder(essentials))===essentials],[5,7,true,true],'by stage the Bus is the last stage, before Gaende\'s selections, which Essentials closes');
+ assert.deepEqual(holder(bus).children.at(-1).children,[bus],'the bus stands alone over its word');
+ e.elements.ways.children[0].emit('click');
+ assert.deepEqual([groups().indexOf(holder(bus)),groups().length,groups().indexOf(holder(essentials)),last(holder(essentials))===essentials],[3,4,2,true],'by feeling it closes the rail, after Any time, which Essentials closes');
  assert.notEqual(essentials.querySelector('span').className,'visually-hidden','its name is visible');
- assert.equal(essentials.title,'The tracks I keep coming back to','its tooltip is its line, like every stage');
- assert.match(web('index.html'),/<span class="mood-specials"><a class="bus-link" id="bus-link" href="#bus" aria-label="The Bus" aria-describedby="line-bus" title="The Bus">\s*<svg viewBox="0 0 24 24" width="18" height="18"[^>]*stroke-width="1.5"/,'an 18px bus, named on hover, inside the group');
+ assert.equal(essentials.title,'The tracks I keep coming back to','its tooltip is its line, like every station');
+ assert.match(web('index.html'),/<\/div>\s*<a class="bus-link" id="bus-link" href="#bus" aria-label="The Bus" aria-describedby="line-bus" title="The Bus">\s*<svg viewBox="0 0 24 24" width="18" height="18"[^>]*stroke-width="1.5"/,'an 18px bus, named on hover, after the switch until the page groups it');
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
- assert.match(rules.get('.mood-specials'),/display:inline-flex; align-items:center; gap:18px; white-space:nowrap/,'the heart and the bus never wrap apart');
- assert.match(rules.get('.mood-specials::before'),/width:1px; height:18px; background:var\(--line\)/,'a thin divider opens the group');
- assert.match(phone.get('#stations-sheet .mood-specials'),/display:contents/,'in the sheet they are two plain rows');
- assert.match(phone.get('#stations-sheet .mood-specials::before, #stations-sheet :is(.mood span, .bus-link)::after'),/display:none/,'with no divider and no rail underline');
+ assert.match(phone.get('#stations-sheet :is(.mood span, .bus-link)::after'),/display:none/,'the sheet\'s rows carry no rail underline');
  assert.match(rules.get('.essentials-icon'),/width:14px; height:14px;.*stroke-width:1.5/,'a small heart before the name');
  assert.match(rules.get('body:not([data-bus]) .mood-essentials:has(input:checked) .essentials-icon'),/fill:currentColor/,'the heart fills when chosen, except in the Bus scene');
  assert.ok(![...rules.keys()].includes('.mood-essentials:has(input:checked) .essentials-icon'),'no filled heart beside the current bus');
  assert.match(rules.get('.mood-essentials:has(input:focus-visible)'),/outline:2px solid var\(--cream\)/,'the keyboard ring frames the heart with the name');
  assert.match(rules.get('.mood-essentials:has(input:focus-visible) span'),/outline:none/);
- assert.match(cssRules('(max-width:1000px)').get('.mood-specials::before'),/display:none/,'no divider where the group can start a line');
- for(const [selector,body] of rules)if(selector.includes('essentials'))assert.doesNotMatch(body,/--red|width:28px/,'checked Essentials is cream like every stage: '+selector);
+ for(const [selector,body] of rules)if(selector.includes('essentials'))assert.doesNotMatch(body,/--red|width:28px/,'checked Essentials is cream like every station: '+selector);
  assert.doesNotMatch(rules.get('.bus-link'),/opacity/,'the bus is not dimmed');
- assert.match(rules.get('.mood:has(input:checked) span::after, .bus-link[aria-current]::after'),/transform:scaleX\(1\)/,'the current bus takes the stage underline');
+ assert.match(rules.get('.mood:has(input:checked) span::after, .bus-link[aria-current]::after, .ways [aria-pressed=true] span::after'),/transform:scaleX\(1\)/,'the current bus takes the station underline');
  for(const name of ['index.html','app.js','style.css'])for(const gone of ['special-tag','data-copy="special"','special:','Besonders'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
 });
 
@@ -719,7 +722,7 @@ test('the Bus scene shows one current mark, and the red dot marks the stage you 
  for(const [selector,body] of phone)if(selector.includes('#stations-sheet'))assert.doesNotMatch(body,/margin-left/,'no margin hack: '+selector);
 });
 
-test('each stage has one line: a second line in the sheet, a tooltip on the rail, in both languages',async()=>{
+test('each station has one line: a second line in the sheet, a tooltip on the rail, in both languages',async()=>{
  const e=setup();await flush();
  const lines=()=>Object.fromEntries(e.document.querySelectorAll('.mood').map(label=>[label.querySelector('input').value,[label.querySelector('.sheet-line').textContent,label.title]]));
  const expected=list=>Object.fromEntries(list.map((line,i)=>['0'+(i+1),[line,line]]));
@@ -733,8 +736,8 @@ test('each stage has one line: a second line in the sheet, a tooltip on the rail
  const html=web('index.html');
  assert.match(html,/<small class="sheet-line" id="line-bus" aria-hidden="true" data-copy="notStreamed">Not streamed\. You have to be there\.<\/small>/,'the Bus row says why it has no radio, as the link\'s description');
  assert.equal(e.run('words.de.notStreamed'),'Nicht im Radio. Du musst dabei sein.');
- assert.match(html,/<legend class="visually-hidden" data-copy="choose">Choose a stage<\/legend>/,'the legend uses the visible word');
- assert.deepEqual([e.run('words.en.choose'),e.run('words.de.choose')],['Choose a stage','Wähle eine Bühne']);
+ assert.match(html,/<legend class="visually-hidden" data-copy="choose">Choose a station<\/legend>/,'the legend uses the visible word');
+ assert.deepEqual([e.run('words.en.choose'),e.run('words.de.choose')],['Choose a station','Wähle einen Sender']);
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
  assert.match(rules.get('.station-switcher, .station-position, .mood-preview, .sheet-line, .change-photo svg'),/display:none/,'the rail shows no second line');
  assert.match(phone.get('#stations-sheet .sheet-line'),/display:block; grid-area:2 \/ 2; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:12px\/16px Inter,sans-serif; color:var\(--muted\)/);
@@ -758,13 +761,13 @@ test('the sheet opens on the current stage, or on the Bus in its scene, and clos
 
 test('the counter carries the swipe arrows, shows numbers and says the stage in words',async()=>{
  const html=web('index.html');
- assert.match(html,/<span class="station-position" id="station-position" aria-live="polite" aria-atomic="true"><svg [^>]*aria-hidden="true"><path d="m5 3-4 4 4 4m14-8 4 4-4 4M2 7h20"\/><\/svg><span id="station-text" aria-hidden="true">4 \/ 9<\/span><span id="station-label" class="visually-hidden">Stage 4 of 9, Lost in Feelings<\/span><\/span>/);
+ assert.match(html,/<span class="station-position" id="station-position" aria-live="polite" aria-atomic="true"><svg [^>]*aria-hidden="true"><path d="m5 3-4 4 4 4m14-8 4 4-4 4M2 7h20"\/><\/svg><span id="station-text" aria-hidden="true">4 \/ 9<\/span><span id="station-label" class="visually-hidden">Station 4 of 9, Lost in Feelings, Pałac stage<\/span><\/span>/);
  for(const name of ['index.html','app.js','style.css'])for(const gone of ['swipe-hint','swipeHint'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
  const e=setup();await flush();const label=e.elements['station-label'];
- assert.deepEqual([e.elements['station-text'].textContent,label.textContent],['4 / 9','Stage 4 of 9, Lost in Feelings']);
+ assert.deepEqual([e.elements['station-text'].textContent,label.textContent],['4 / 9','Station 4 of 9, Lost in Feelings, Pałac stage']);
  assert.equal(e.elements['station-position'].getAttribute('aria-label'),null,'the live region reads its words, not a label');
- e.change('03');assert.deepEqual([e.elements['station-text'].textContent,label.textContent],['3 / 9','Stage 3 of 9, Night in Motion']);
- e.setLanguage('de');assert.equal(label.textContent,'Bühne 3 von 9, Night in Motion');
+ e.change('03');assert.deepEqual([e.elements['station-text'].textContent,label.textContent],['3 / 9','Station 3 of 9, Night in Motion, Pałac stage']);
+ e.setLanguage('de');assert.equal(label.textContent,'Sender 3 von 9, Night in Motion, Bühne Pałac');
  assert.match(cssRules('(max-width:760px)').get('.station-position'),/display:flex; align-items:center; gap:6px/,'the arrows sit before the numbers');
  assert.match(cssRules('(max-width:374px)').get('.station-position svg'),/display:none/,'narrow phones drop the arrows, so the controls stay on one line');
 });
@@ -787,6 +790,231 @@ test('every mood has a stage, so no Soon code and no rail scrolling remain',asyn
  const e=setup();await flush();assert.equal(e.run('words.en.soon'),undefined);
  const small=cssRules('(max-width: 600px)');
  for(const selector of ['.moods','.mood-list','.mood','.mood + .mood::before'])assert.ok(!small.has(selector),selector+' has no phone override left');
+});
+
+// Two ways through the same nine stations. A press of the switch, the radios in the order of the DOM, the stations as
+// the explorer reads them, and the rail's groups as [name, word, phrase, stations], where the Bus is "bus".
+const press=(e,value)=>e.elements.ways.children.find(b=>b.value===value).emit('click');
+const radios=e=>e.elements.moods.descendants().filter(n=>n.localName==='input').map(n=>n.value);
+const stationIds=e=>[...e.window.Pavoia.stations].map(s=>s.id);
+const groupsOf=e=>e.elements.moods.children.filter(n=>n.className==='mood-group').map(group=>{
+ const [word,...rest]=group.children,list=rest.at(-1),phrase=rest.length>1?rest[0]:null;
+ return [group.attrs['aria-label'],word.textContent,phrase?.textContent??null,list.children.map(n=>n.id==='bus-link'?'bus':n.querySelector('input').value).join(' ')];
+});
+const byStage=['bermuda-day','bermuda-evening','palac-dance','palac-feel','etage-zero','fontanna','ambiance','closing','essentials'];
+const byFeeling=['bermuda-day','fontanna','bermuda-evening','palac-dance','etage-zero','palac-feel','closing','ambiance','essentials'];
+const remembered=()=>{const saved={};return {saved,storage:{getItem:key=>saved[key] ?? null,setItem(key,value){saved[key]=String(value);}}};};
+
+test('a first visit lists by stage, in today\'s order, with By stage pressed',async()=>{
+ const {saved,storage}=remembered(),e=setup({storage});await flush();
+ assert.deepEqual(stationIds(e),byStage,'today\'s nine, in today\'s order');
+ assert.deepEqual(radios(e),['01','02','03','04','06','07','08','09','05'],'the rail lists them in that order');
+ assert.deepEqual(e.elements.ways.children.map(b=>[b.value,b.attrs['aria-pressed']]),[['feeling','false'],['stage','true']],'By stage is pressed');
+ assert.deepEqual([e.elements['station-text'].textContent,e.window.Pavoia.getState().stage],['4 / 9','palac-feel'],'and the visit opens on Lost in Feelings, 4 / 9');
+ assert.deepEqual({...saved},{},'a first visit stores nothing');
+});
+
+test('By feeling orders the rail, the arrows, the media keys and the position, and is kept',async()=>{
+ const {saved,storage}=remembered(),e=setup({storage});await flush();const stage=()=>e.window.Pavoia.getState().stage;
+ press(e,'feeling');
+ assert.deepEqual([stationIds(e),radios(e)],[byFeeling,['01','07','02','03','06','04','09','08','05']],'the stations and the radios follow one festival day');
+ assert.deepEqual([e.elements['station-text'].textContent,e.elements['station-label'].textContent],['6 / 9','Station 6 of 9, Lost in Feelings, Pałac stage'],'the position counts on screen');
+ e.key('ArrowRight');assert.equal(stage(),'closing','the next station on screen');
+ e.actions.previoustrack();assert.equal(stage(),'palac-feel','the media keys walk the same order');
+ e.change('01');e.key('ArrowLeft');assert.equal(stage(),'essentials','the first station wraps to the last on screen');
+ assert.equal(saved['pavoia-way'],'feeling','the press is kept');
+ const again=setup({storage});await flush();
+ assert.deepEqual([stationIds(again),again.elements.ways.children.map(b=>b.attrs['aria-pressed'])],[byFeeling,['true','false']],'a later visit lists by feeling');
+ assert.equal(again.elements['station-text'].textContent,'6 / 9');
+});
+
+test('a way changes no station, no photo and no playback',async()=>{
+ const e=setup();await flush();e.click();e.playing();
+ const now=()=>[e.window.Pavoia.getState().stage,e.audio.src,e.audio.calls.length,e.audio.paused,e.elements.photo.src];
+ const before=now();
+ press(e,'feeling');await flush();assert.deepEqual(now(),before,'the same station, stream, play count and photo');
+ press(e,'stage');await flush();assert.deepEqual(now(),before,'and back');
+ const paused=setup();await flush();press(paused,'feeling');await flush();
+ assert.deepEqual([paused.audio.src,paused.audio.calls.length],[undefined,0],'paused, nothing starts');
+});
+
+test('a storage that throws, or holds another value, lists by stage, and the switch works for the visit',async()=>{
+ const denied=()=>{throw new Error('Storage denied');};
+ for(const [storage,what] of [[{getItem:denied,setItem:denied},'a storage that throws'],[{getItem:key=>key==='pavoia-way'?'mood':null,setItem(){}},'another value'],[{getItem:key=>key==='pavoia-way'?'toString':null,setItem(){}},'a name every object has']]){
+  const e=setup({storage});await flush();
+  assert.deepEqual(stationIds(e),byStage,what+' lists by stage');
+  press(e,'feeling');
+  assert.deepEqual([stationIds(e),e.elements['station-text'].textContent],[byFeeling,'6 / 9'],what+': the switch still works');
+ }
+});
+
+test('each way groups its stations under its words, in one radio group',async()=>{
+ const e=setup();await flush();const moods=e.elements.moods;
+ assert.equal(moods.children[0],e.elements.ways,'the switch opens the rail');
+ assert.deepEqual(groupsOf(e),[
+  ['Bermuda stage','Bermuda','Open air','01 02'],
+  ['Pałac stage','Pałac','Its peak and its inward side','03 04'],
+  ['Etage 0 stage','Etage 0','The basement','06'],
+  ['Fontanna stage','Fontanna','Dancing in daylight','07'],
+  ['Ambiance stage','Ambiance','A safe, quiet space','08'],
+  ['The Bus stage','The Bus','Somewhere in the forest','bus'],
+  ['Selected by Gaende','Selected by Gaende',null,'09 05']],'by stage every stage is named, with a few of its own words');
+ const groups=moods.children.slice(1);
+ assert.equal(groups.length+1,moods.children.length,'every group stays in the list of the fieldset');
+ for(const group of groups){
+  const [word,...rest]=group.children,phrase=rest.length>1?rest[0]:null;
+  assert.equal(group.attrs.role,'group');
+  assert.equal(word.attrs['aria-hidden'],'true','the word is read once, as the group\'s name: '+word.textContent);
+  if(phrase)assert.deepEqual([phrase.attrs['aria-hidden'],group.attrs['aria-describedby'],word.title],['true',phrase.id,phrase.textContent],'the phrase describes the group, and is the word\'s tooltip: '+word.textContent);
+  else assert.equal(group.attrs['aria-describedby'],undefined,'no phrase, no description');
+ }
+ e.setLanguage('de');
+ assert.deepEqual(groupsOf(e).map(g=>g.slice(0,3)).filter((_,i)=>[0,6].includes(i)),[['Bühne Bermuda','Bermuda','Unter freiem Himmel'],['Ausgewählt von Gaende','Ausgewählt von Gaende',null]]);
+ press(e,'feeling');
+ assert.deepEqual(groupsOf(e).map(g=>[g[1],g[3]]),[['Tag','01 07'],['Nacht','02 03 06 04 09'],['Jederzeit','08 05'],['The Bus','bus']],'by feeling: Day, Night, Any time, then the Bus');
+ e.setLanguage('en');
+ assert.deepEqual(groupsOf(e).map(g=>[g[0],g[1],g[2]]),[['Day','Day',null],['Night','Night',null],['Any time','Any time',null],['The Bus stage','The Bus','Somewhere in the forest']]);
+ assert.equal(moods.children[0],e.elements.ways,'the switch is still the first child after a press');
+ const inputs=moods.descendants().filter(n=>n.localName==='input');
+ assert.deepEqual([inputs.length,inputs.every(n=>n.type==='radio'&&n.name==='mood')],[9,true],'nine radios, one name, so one radio group');
+ assert.match(web('index.html'),/<fieldset class="moods" id="station-selector">\s*<legend[^>]*>[^<]*<\/legend>\s*<div class="mood-list" id="moods">\s*<div class="ways" id="ways" role="group" aria-label="Order the stations"><button type="button" value="feeling" aria-pressed="false"><span data-copy="byFeeling">By feeling<\/span><\/button><button type="button" value="stage" aria-pressed="true"><span data-copy="byStage">By stage<\/span><\/button><\/div>/,'the switch opens the list inside the fieldset, as two toggle buttons');
+ assert.equal(e.elements.ways.getAttribute('aria-label'),'Order the stations');e.setLanguage('de');assert.equal(e.elements.ways.getAttribute('aria-label'),'Sender ordnen');
+ assert.deepEqual([e.run('words.de.byFeeling'),e.run('words.de.byStage')],['Nach Stimmung','Nach Bühne']);
+});
+
+test('the hero names the station\'s stage over its title, and hides it on the Bus',async()=>{
+ const e=setup();await flush();const fact=e.elements['mood-stage'];
+ const facts=()=>Object.fromEntries(['01','03','06','07','08','09','05'].map(id=>{e.change(id);return [id,fact.textContent];}));
+ const expected={'01':'Bermuda stage','03':'Pałac stage','06':'Etage 0 stage','07':'Fontanna stage','08':'Ambiance stage','09':'Selected by Gaende','05':'Selected by Gaende'};
+ assert.deepEqual({...facts()},expected,'by stage');
+ press(e,'feeling');assert.deepEqual({...facts()},expected,'and the same facts by feeling');
+ e.setLanguage('de');e.change('03');assert.equal(fact.textContent,'Bühne Pałac');e.change('05');assert.equal(fact.textContent,'Ausgewählt von Gaende');
+ assert.equal(fact.hidden,false);
+ e.location.hash='#bus';e.window.emit('hashchange');assert.equal(fact.hidden,true,'the Bus hides it, since its title is its stage');
+ e.location.hash='';e.window.emit('popstate');assert.equal(fact.hidden,false,'leaving the Bus shows it again');
+ assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage">Pałac stage<\/p>\s*<h1 id="mood-name">/,'over the title from the first paint');
+});
+
+test('the spoken position says the stage once',async()=>{
+ const e=setup();await flush();const label=()=>e.elements['station-label'].textContent;
+ assert.equal(label(),'Station 4 of 9, Lost in Feelings, Pałac stage');
+ e.change('06');assert.equal(label(),'Station 5 of 9, Etage 0 stage','a station named after its stage says the fact alone');
+ e.change('09');assert.equal(label(),'Station 8 of 9, Closing, Selected by Gaende');
+ e.change('06');e.setLanguage('de');assert.equal(label(),'Sender 5 von 9, Bühne Etage 0');
+});
+
+test('by feeling a radio is described by its line and its stage, by stage by its line alone',async()=>{
+ const e=setup();await flush();const input=e.document.querySelector('input[value="03"]'),fact=e.elements.moods.descendants().find(n=>n.id==='stage-03');
+ assert.ok(input.parentNode.children.includes(fact),'the stage lives in its station\'s label');
+ assert.deepEqual([input.getAttribute('aria-describedby'),fact.hidden,fact.textContent],['line-03',true,'Pałac stage'],'by stage the group\'s name already says it');
+ press(e,'feeling');assert.equal(input.getAttribute('aria-describedby'),'line-03 stage-03','by feeling it follows the line');
+ e.setLanguage('de');assert.equal(fact.textContent,'Bühne Pałac');
+ press(e,'stage');assert.equal(input.getAttribute('aria-describedby'),'line-03');
+ for(const label of e.document.querySelectorAll('.mood'))assert.ok(label.children.filter(n=>n.id?.startsWith('stage-')).every(n=>n.hidden),'the stage is never shown in the label: '+label.querySelector('input').value);
+});
+
+test('on a phone the switch heads the sheet, and a way keeps the current station in view',async()=>{
+ const query='(max-width: 760px)',e=setup({media:[query]});await flush();const ways=e.elements.ways,heading=e.elements['stations-heading'],sheet=e.elements['stations-sheet'];
+ assert.deepEqual([ways.parentNode===heading,e.elements.moods.children.includes(ways)],[true,false],'the switch is the heading\'s second row, out of the list');
+ e.elements['open-stations'].emit('click');const focused=e.document.activeElement,row=e.document.querySelector('input[value="04"]').parentNode;
+ press(e,'feeling');
+ assert.deepEqual([{...row.scrolled},ways.parentNode===heading,sheet.open,e.document.activeElement===focused],[{block:'nearest'},true,true,true],'the current row stays in view; the switch stays in the heading, the sheet open and focus where it was');
+ row.scrolled=undefined;e.location.hash='#bus';e.window.emit('hashchange');e.elements['open-stations'].emit('click');press(e,'stage');
+ assert.deepEqual([{...e.elements['bus-link'].scrolled},row.scrolled],[{block:'nearest'},undefined],'in the Bus scene the bus row is the one kept in view');
+ e.queries.get(query).change(false);
+ assert.equal(e.elements.moods.children[0],ways,'wider, the switch opens the rail again');
+});
+
+test('the bar and the lock screen add the stage to a station named otherwise',async()=>{
+ for(const journey of [false,true]){
+  const e=setup({journey});await flush();const bar=e.elements['player-stage'],from=journey?' through the explorer':'';
+  assert.deepEqual([bar.children.length,bar.children[0],bar.children[1].className,bar.children[1].textContent],[2,'Lost in Feelings','player-stage-of',' · Pałac'],'the name, then its stage');
+  assert.deepEqual([e.window.Pavoia.getState().album,e.mediaSession.metadata.album],['Lost in Feelings · Pałac','Lost in Feelings · Pałac'],'the lock screen says both'+from);
+  for(const [id,name] of [['06','Etage 0'],['09','Closing']]){e.change(id);await flush();assert.deepEqual([bar.children,e.mediaSession.metadata.album],[[name],name],name+': no stage after it'+from);}
+  e.change('01');await flush();assert.equal(e.mediaSession.metadata.album,'Under the Sun · Bermuda');
+ }
+ assert.match(cssRules('(min-width:761px) and (max-width:1100px)').get('.player .player-stage-of'),/display:none/,'where the bar\'s column would cut the stage, the bar shows the name alone');
+});
+
+test('Pavoia.stations keeps one object per station across ways, with its group and its fact',async()=>{
+ const e=setup();await flush();const before=[...e.window.Pavoia.stations],fontanna=before.find(s=>s.id==='fontanna');
+ assert.notEqual(e.window.Pavoia.stations,e.window.Pavoia.stations,'a new list on every read');
+ assert.ok([...e.window.Pavoia.stations].every((s,i)=>s===before[i]),'of the same objects');
+ assert.deepEqual([fontanna.name,fontanna.thumb,fontanna.group,fontanna.fact],['Fontanna','photos/selected/p052.jpg','fontanna','Fontanna stage']);
+ press(e,'feeling');const after=[...e.window.Pavoia.stations];
+ assert.deepEqual(after.map(s=>s.id),byFeeling);
+ assert.ok(after.length===9&&after.every(s=>before.includes(s)),'the same objects, in the new order');
+ assert.equal(after.find(s=>s.id==='fontanna'),fontanna);
+ assert.deepEqual([fontanna.group,fontanna.fact],['day','Fontanna stage']);
+ e.setLanguage('de');assert.equal(fontanna.fact,'Bühne Fontanna');
+});
+
+test('the rail is two tiers, and the pressed way carries the rail\'s line',()=>{
+ const rules=cssRules(),phone=cssRules('(max-width:760px)'),mid=cssRules('(min-width:860px)');
+ assert.match(rules.get('.mood-list'),/display:flex; flex-wrap:wrap; align-items:end; gap:var\(--s2\) var\(--s4\)/,'the switch sits on the stations\' line; groups 24px apart, wrapped rows 8px');
+ assert.match(rules.get('.mood-group'),/display:flex; flex-direction:column; align-items:flex-start; gap:var\(--s1\); white-space:nowrap/,'a group is its word 4px over its stations, and wraps whole');
+ assert.match(rules.get('.group-moods'),/display:flex; gap:0 var\(--s3\)/,'its stations 16px apart');
+ assert.match(rules.get('.mood span::after, .bus-link::after, .ways span::after'),/height:1px; background:currentColor; transform:scaleX\(0\)/,'the switch shares the rail\'s line');
+ assert.match(rules.get('.mood:has(input:checked) span::after, .bus-link[aria-current]::after, .ways [aria-pressed=true] span::after'),/transform:scaleX\(1\)/,'so the pressed way is marked by more than its colour');
+ assert.match(rules.get('.ways button'),/min-height:44px;.*color:var\(--muted\); font:12px Inter,sans-serif/,'the switch reads like the photo tools');
+ assert.match(rules.get('.ways button:is([aria-pressed=true], :hover)'),/color:var\(--cream\)/);
+ assert.match(mid.get('.ways button'),/font-size:14px/,'and grows with them from 860px');
+ assert.ok(lastAt('(min-width:860px)','.ways button')>lastAt('','.ways button'),'the 860px rule comes after the rule it overrides');
+ assert.match(rules.get('.poster .ways::after'),/width:1px; height:18px; background:var\(--line\)/,'the rail\'s divider closes the switch, on the rail only');
+ assert.match(rules.get('.mood-essentials:has(input:focus-visible)'),/outline:2px solid var\(--cream\); outline-offset:1px/,'the ring around the whole Essentials target keeps inside the 4px under its word');
+ assert.match(rules.get('.bus-link:focus-visible'),/outline-offset:1px/,'and so does the bus\'s');
+ assert.match(rules.get('body:not([data-bus]) .mood-group:has(input:checked) .group-name, .mood-group:has(.bus-link[aria-current]) .group-name'),/color:var\(--cream\)/,'the current station\'s word turns cream');
+ assert.match(rules.get('#mood-stage'),/margin-bottom:var\(--s3\); color:var\(--cream\); text-shadow:0 0 2px var\(--ink\), 0 1px 4px var\(--ink\), 0 0 10px var\(--ink\), 0 2px 18px rgb\(0 0 0 \/ \.45\)/,'one fact over the title, in cream, with a dark halo under the hero\'s shadow');
+ assert.match(rules.get('.poster .group-name'),/color:var\(--soft\); text-shadow:0 0 2px var\(--ink\), 0 1px 4px var\(--ink\), 0 0 10px var\(--ink\), 0 2px 18px rgb\(0 0 0 \/ \.45\)/,'the group words read in soft over the photo, with the same halo');
+ assert.match(rules.get('.stations-heading'),/position:sticky;.*display:grid; grid-template-columns:minmax\(0,1fr\) auto; grid-template-rows:64px; align-items:center; background:var\(--surface\); border-bottom:1px solid var\(--line\)/,'the sheet\'s title keeps its 64px row, the switch goes under it');
+ assert.match(rules.get('.stations-heading .ways'),/grid-column:1 \/ -1; gap:var\(--s4\); padding-bottom:var\(--s2\)/,'8px under the switch hold its focus ring');
+ assert.match(phone.get('#stations-sheet'),/scroll-padding-top:calc\(64px \+ 44px \+ var\(--s2\) \+ 1px\)/,'a row scrolled into view clears the two-row heading');
+ const sheet=['#stations-sheet .mood-group','#stations-sheet .group-name','#stations-sheet .mood-group > .sheet-line','#stations-sheet .group-moods'].map(selector=>phone.get(selector));
+ assert.ok(sheet.every(Boolean),'the sheet\'s group headings have their rules');
+ assert.ok(sheet.join('').includes('var(--s1)')&&!/(?<![\w-])\d+px/.test(sheet.join('')),'they use the spacing scale, 4px in like the rows');
+ const added=ordered().filter(([,list])=>/mood-group|group-moods|group-name|\.ways|#mood-stage|player-stage-of/.test(list)).map(([,,declarations])=>declarations).join('');
+ assert.deepEqual([[...added.matchAll(/rgb\([^)]*\)/g)].map(m=>m[0]).filter(v=>v!=='rgb(0 0 0 / .45)'),/#[0-9a-f]{3,8}\b/i.test(added)],[[],false],'no colour of their own: tokens, and the hero\'s shadow');
+ for(const name of ['index.html','app.js','style.css'])assert.ok(!web(name).includes('mood-specials'),'no .mood-specials left in '+name);
+ assert.ok(!web('style.css').includes('1101px'),'no wide rule names the Bus after the bus');
+});
+
+test('a way takes as many rows on the rail as the other, so a press never moves the title or the switch',async()=>{
+ const e=setup();await flush();
+ // Widths as a browser lays them out: the switch, a station, the bus, 7px a letter of a group's word, 24px between the
+ // groups and 16px between the stations of a group, on a rail `room` wide.
+ let room=1310;const P=e.Element.prototype;
+ const wide=n=>n.id==='moods'?room:n.id==='ways'?156:n.id==='bus-link'?44:n.className==='mood'?100:n.className==='eyebrow group-name'?7*n.textContent.length:0;
+ P.getBoundingClientRect=function(){const width=wide(this);return {left:0,top:0,right:width,bottom:0,width,height:0};};
+ Object.defineProperty(P,'computed',{configurable:true,get(){return {columnGap:this.id==='moods'?'24px':this.className==='group-moods'?'16px':'0px'};}});
+ const press=value=>e.elements.ways.children.find(b=>b.value===value).emit('click');
+ const groups=()=>e.elements.moods.children.filter(n=>n.className==='mood-group');
+ const broken=()=>groups().filter(n=>n.getAttribute('data-break')!==null).map(n=>n.getAttribute('aria-label'));
+ const wraps=()=>e.elements.moods.getAttribute('data-wraps')!==null;
+ // By stage the rail needs 1321px and takes two rows; by feeling it needs 1297px and would take one.
+ e.window.emit('resize');
+ assert.deepEqual([broken(),wraps(),groups().length],[[],true,7],'by stage wraps by itself, and the other way\'s groups measured at the end are gone');
+ press('feeling');
+ assert.deepEqual([broken(),wraps(),groups().length],[['The Bus stage'],true,4],'by feeling breaks before its last group, so it takes the same two rows');
+ press('stage');assert.deepEqual([broken(),wraps()],[[],true],'by stage needs no break');
+ room=1400;e.window.emit('resize');assert.deepEqual([broken(),wraps()],[[],false],'where both ways fit in one row, nothing breaks');
+ press('feeling');assert.deepEqual([broken(),wraps()],[[],false]);
+ room=1000;e.window.emit('resize');assert.deepEqual([broken(),wraps()],[[],true],'where both take two rows, nothing breaks either');
+ room=1310;e.window.emit('resize');assert.deepEqual(broken(),['The Bus stage'],'a resize balances the rail again');
+ e.queries.get('(max-width: 760px)').change(true);assert.deepEqual([broken(),wraps()],[[],false],'the phone sheet is a list: no break and no wrap');
+ assert.match(cssRules().get('.mood-group[data-break]'),/flex-basis:100%/,'a break puts the last group on a row of its own');
+});
+
+test('a short window keeps the photo tools above the player bar, and the rail holds its height before app.js runs',()=>{
+ const short='(min-width:761px) and (max-height:700px), (min-width:761px) and (max-width:800px) and (max-height:820px)',compact=cssRules(short),rules=cssRules();
+ assert.match(compact.get('.listen-layout'),/padding-top:108px/,'the hero starts where the 108px header ends');
+ assert.match(compact.get('.poster .group-name'),/display:none/,'the rail drops its word tier');
+ assert.match(compact.get('.mood-list'),/--row:44px/,'so a row is one station high');
+ assert.match(compact.get('.moods'),/margin-top:var\(--s2\); padding-block:0/,'and its spacing tightens');
+ assert.match(compact.get('#mood-stage'),/margin-bottom:var\(--s2\)/,'the fact over the title stays, closer to it');
+ for(const selector of ['.listen-layout','.poster .group-name','.mood-list','.moods','#mood-stage'])assert.ok(lastAt(short,selector)>lastAt('',selector),'the short-window rule comes after the rule it overrides: '+selector);
+ assert.match(rules.get('.mood-list'),/--row:calc\(11px \* 1\.4 \+ var\(--s1\) \+ 44px\)/,'a row is the word\'s line, the 4px under it and a 44px station');
+ assert.match(cssRules('(min-width:761px)').get('.mood-list'),/min-height:var\(--row\); align-content:flex-start/,'before app.js builds the groups, a laptop\'s rail already holds one row');
+ assert.match(cssRules('(min-width:761px) and (max-width:1100px)').get('.mood-list'),/min-height:calc\(2 \* var\(--row\) \+ var\(--s2\)\)/,'and two where both ways always wrap');
 });
 
 const entity=(id,type='artist')=>({entity:{id,type,title:'Name '+id},included:[]});
@@ -2018,7 +2246,7 @@ test('Switch to this stage tunes the radio without starting it, then gives way t
  const e=setup({journey:true});await flush();e.discovery={items:[]};
  const content=await stagePlace(e,'#statistics/bermuda-day'),button=byClass(content,'stage-switch')[0],kind=byClass(content,'eyebrow')[0],title=content.descendants().find(n=>n.localName==='h3'),shown=[...content.children];
  button.focus();button.emit('click');await flush();
- assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.elements['player-stage'].textContent,button.hidden,textOf(kind),e.document.activeElement===title,sameRows(content.children,shown)],['bermuda-day',false,'Under the Sun',true,'Stage · On air',true,true],'the player bar shows the stage, still paused; the button goes, its focus to the name, and On air shows');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,textOf(e.elements['player-stage']),button.hidden,textOf(kind),e.document.activeElement===title,sameRows(content.children,shown)],['bermuda-day',false,'Under the Sun · Bermuda',true,'Stage · On air',true,true],'the player bar shows the station and its stage, still paused; the button goes, its focus to the name, and On air shows');
  e.window.Pavoia.tune('palac-feel');await flush();
  assert.deepEqual([button.hidden,textOf(kind),sameRows(content.children,shown)],[false,'Stage',true],'another stage tuned elsewhere brings the button back and puts the dot out');
  assert.match(cssRules().get('#explorer :is(#music-status button, #history-more, .stage-switch)'),/border:1px solid var\(--line\)/,'a bordered button');

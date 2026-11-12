@@ -53,11 +53,11 @@ with sync_playwright() as p:
  loaded()
  assert page.locator('#station-story').count()==0
  assert page.locator('.broadcast-mark').is_visible()
- assert page.locator('#go-deeper').inner_text()=="See the roots it's built on"
+ assert page.locator('#go-deeper').inner_text()=="See the roots it’s built on"
  assert page.locator('.top #go-deeper').count()==0
  assert page.locator('.roots-footer #go-deeper').count()==1
  assert page.locator('.swipe-hint').count()==0 and page.locator('#station-position svg').is_visible()
- assert page.locator('#open-stations').inner_text()=='Change stage'
+ assert page.locator('#open-stations').inner_text()=='Change station'
  assert page.locator('#station-selector').evaluate("n=>n.closest('dialog')?.id==='stations-sheet'")
  assert page.locator('#language').evaluate("n=>getComputedStyle(n).appearance==='none'&&getComputedStyle(n).borderTopWidth==='0px'")
  for identifier in range(1,10):
@@ -81,7 +81,8 @@ with sync_playwright() as p:
     select(f'{identifier:02}');no_overflow();shot(f'station-{identifier:02}-{width}')
   page.locator('#open-stations').click()
   assert page.locator('#moods .mood').count()==9
-  assert page.locator('#bus-link').evaluate('n=>n===n.parentElement.lastElementChild&&n.previousElementSibling.classList.contains("mood-essentials")')
+  # By stage the Bus stands alone over its word, the last stage, before Gaende's selections, which Essentials closes.
+  assert page.locator('#bus-link').evaluate('n=>n.parentElement.children.length===1&&n.closest(".mood-group").nextElementSibling.querySelector(".group-moods").lastElementChild.classList.contains("mood-essentials")')
   assert page.locator('.essentials-icon').is_visible()
   assert page.locator('.mood-essentials').bounding_box()['height']>=64
   assert page.locator('#stations-sheet').evaluate('n=>n.scrollWidth<=n.clientWidth')
