@@ -50,6 +50,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   class Element {
     constructor(){this.dataset={};this.events={};this.children=[];this.attrs={};this.textContent='';this.complete=true;this.naturalWidth=100;this.classList={add(){},remove(){},toggle(){}};this.style={setProperty(key,value){this[key]=value;}};}
     get parentNode(){return this.parent||null;}
+    // Writing the text replaces the children, as in a browser.
+    get textContent(){return this.text;}
+    set textContent(value){this.text=value;this.children=[];}
     addEventListener(name,fn){(this.events[name] ||= new Set()).add(fn);}
     removeEventListener(name,fn){this.events[name]?.delete(fn);}
     emit(name,event={}){for(const fn of [...this.events[name] || []]) fn(event);}
@@ -106,7 +109,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   const document=Object.assign(new Element(),{body,activeElement:body,documentElement:new Element(),fonts:{ready:Promise.resolve()},getElementById:id=>elements[id],createElement:tag=>Object.assign(new Element(),{localName:tag},tag==='input'?{value:''}:{}),createElementNS:()=>new Element(),
     // env.openDialog stands for the modal stations sheet; the explorer counts as an open dialog, never a modal one.
     querySelector:selector=> selector==='dialog:modal' ? env.openDialog || null : selector==='dialog[open]' ? env.openDialog || (elements.explorer.open ? elements.explorer : null) : selector.startsWith('input') ? elements.moods.descendants().find(n=>n.localName==='input'&&selector.includes(`"${n.value}"`)) || new Element() : elements[selector.slice(1)],
-    querySelectorAll:selector=>selector==='.explorer-nav a' ? (env.nav ||= ['#explore','#history','#statistics'].map((href,i)=>{const link=i?new Element():elements['roots-tab'];link.setAttribute('href',href);return link;})) : selector==='.mood' ? elements.moods.descendants().filter(n=>n.className==='mood') : selector==='main, .roots-footer' ? [elements.main,elements['roots-footer']] : []});
+    querySelectorAll:selector=>selector==='.explorer-nav a' ? (env.nav ||= ['#explore','#history','#statistics','#index/artists'].map((href,i)=>{const link=i===0?elements['roots-tab']:i===3?elements['index-tab']:new Element();link.setAttribute('href',href);return link;})) : selector==='.mood' ? elements.moods.descendants().filter(n=>n.className==='mood') : selector==='main, .roots-footer' ? [elements.main,elements['roots-footer']] : []});
   class MediaMetadata{constructor(value){Object.assign(this,value);}}
   const window=new Element();
   window.MediaMetadata=MediaMetadata;window.dispatchEvent=event=>window.emit(event.type,event);
@@ -122,7 +125,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     back(){this.go(-1);}};
   // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
   const queries=new Map();
-  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],response:status('First'),
+  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],namesRequests:[],response:status('First'),
     entries:()=>entries.map(entry=>entry.hash),position:()=>at,evict(n){entries.splice(0,n);at-=n;},
     visit(target){location.hash=target;window.emit('popstate');window.emit('hashchange');},
     click:()=>elements.play.emit('click'),
@@ -145,8 +148,12 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
     localStorage:storage,
     // A test calls an observer's fn as the browser would after a resize; disconnect() stops it.
     ResizeObserver:class{constructor(fn){this.fn=fn;this.targets=[];env.observers.push(this);}observe(el){this.targets.push(el);}disconnect(){this.targets=[];}},
-    // env.discovery is one reply for every discovery path, or a function of the path; env.historyReply, once set, answers History the same way.
+    // Computed styles as a test sets them on an element (el.computed), and no custom property.
+    getComputedStyle:el=>({getPropertyValue:()=>'',...el.computed}),
+    // env.discovery is one reply for every discovery path, or a function of the path; env.historyReply, once set, answers History the same way;
+    // env.names, once set, holds the names document of each kind, or is a function of the path and the signal.
     fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) :
+      url.startsWith('/api/library/names?')&&env.names ? (env.namesRequests.push({url,signal}),Promise.resolve(typeof env.names==='function'?env.names(url,signal):env.names[new URL(url,'http://radio').searchParams.get('kind')]).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.includes('/history?')&&env.historyReply ? (env.historyRequests.push({url,signal}),Promise.resolve(env.historyReply(url)).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
@@ -156,7 +163,10 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   };
   runInNewContext(source,context);
   env.run=code=>runInContext(code,context);
-  if(journey){elements['discovery-query'].value='';elements['history-day'].value='';elements['history-day'].validity={valid:true};runInContext(web('closeness.js'),context);runInContext(web('journey.js'),context);}
+  if(journey){elements['discovery-query'].value='';elements['history-day'].value='';elements['history-day'].validity={valid:true};elements['index-query'].value='';
+    // The Index's head is static markup: its two sides and its two orders.
+    for(const side of ['artists','labels'])elements['index-sides'].append(Object.assign(new Element(),{localName:'a',dataset:{side}}));
+    for(const by of ['name','tracks'])elements['index-order'].append(Object.assign(new Element(),{localName:'a',dataset:{by}}));runInContext(web('closeness.js'),context);runInContext(web('journey.js'),context);}
   return env;
 }
 
@@ -861,7 +871,7 @@ test('a result replaces the search in the explorer\'s entry, and the Roots tab r
  const searches=e.discoveryRequests.length;follow(e,firstLink(results));await flush();
  assert.deepEqual([e.location.hash,e.entries().length,results.hidden,e.elements['explore-workspace'].hidden],['#explore/art_0123456789ab',2,true,false],'the result replaces the search, so the explorer keeps one entry');
  const tab=()=>e.elements['roots-tab'].getAttribute('href'),current=()=>e.nav.map(link=>link.getAttribute('aria-current'));
- assert.deepEqual(current(),['page',null,null],'Roots stays the current tab though its link carries the search');
+ assert.deepEqual(current(),['page',null,null,null],'Roots stays the current tab though its link carries the search');
  link('#history');link(tab());await flush();
  assert.deepEqual([e.location.hash,results.hidden,query.value,e.discoveryRequests.length,textOf(e.elements['discovery-status'])],['#explore?q=jimi',false,'jimi',searches+1,'1 result'],'the Roots tab returns to the same results, without searching again, and says their count to screen readers only');
  query.value='jules';query.emit('input');e.fire(300);await flush();
@@ -1053,15 +1063,15 @@ test('the search field takes focus only where a pointer cannot open a keyboard',
 
 test('the explorer header is one row: tabs, the search on Roots, and ✕',async()=>{
  const html=web('index.html'),top=html.slice(html.indexOf('<header class="explorer-top">'),html.indexOf('</header>',html.indexOf('<header class="explorer-top">')));
- assert.deepEqual([...top.matchAll(/<(h2|nav|a|form|label|input|button)\b/g)].map(m=>m[1]),['h2','nav','a','a','a','form','label','input','button'],'no eyebrow, no Play radio, no Search button');
+ assert.deepEqual([...top.matchAll(/<(h2|nav|a|form|label|input|button)\b/g)].map(m=>m[1]),['h2','nav','a','a','a','a','form','label','input','button'],'no eyebrow, no Play radio, no Search button');
  assert.match(top,/<h2 id="explorer-title" class="visually-hidden" data-journey="roots">The roots<\/h2>/,'one constant name, for screen readers');
- assert.match(top,/<a href="#explore" id="roots-tab" data-journey="exploreTab">Roots<\/a><a href="#history" data-journey="history">History<\/a><a href="#statistics" data-journey="statistics">Statistics<\/a>/);
+ assert.match(top,/<a href="#explore" id="roots-tab" data-journey="exploreTab">Roots<\/a><a href="#history" data-journey="history">History<\/a><a href="#statistics" data-journey="statistics">Statistics<\/a><a href="#index\/artists" id="index-tab" data-journey="indexTab">Index<\/a>/);
  assert.match(top,/<label for="discovery-query" class="visually-hidden" data-journey="searchLabel">/);
  assert.match(top,/<input id="discovery-query" type="search" maxlength="100" autocomplete="off" enterkeyhint="search" placeholder="Search artists, tracks, releases, labels">/);
  assert.match(top,/<button id="explorer-close" type="button" aria-label="Back to listening" title="Back to listening"><svg [^>]*aria-hidden="true"><path d="m6 6 12 12M18 6 6 18"\/><\/svg><\/button>/,'the sheet\'s ✕');
  assert.ok(!html.includes('explorer-play')&&!web('waveform.js').includes('explorer-play'),'the second play button is gone');
  const journey=web('journey.js');
- for(const pair of ["roots:'The roots'","roots:'Die Wurzeln'","exploreTab:'Roots'","exploreTab:'Wurzeln'","statistics:'Statistics'","statistics:'Statistik'","history:'Verlauf'"])assert.ok(journey.includes(pair),pair);
+ for(const pair of ["roots:'The roots'","roots:'Die Wurzeln'","exploreTab:'Roots'","exploreTab:'Wurzeln'","statistics:'Statistics'","statistics:'Statistik'","history:'Verlauf'","indexTab:'Index'"])assert.ok(journey.includes(pair),pair);
  for(const gone of ['explore','exploreLabel','connections','backListen','playRadio','pauseRadio','search','limited','selected','source'])assert.doesNotMatch(journey,new RegExp('(?<![\\w$])'+gone+':'),gone+' is gone');
  const e=setup({journey:true});await flush();
  assert.deepEqual([e.elements['explorer-close'].getAttribute('aria-label'),e.elements['explorer-close'].title,e.elements['discovery-query'].placeholder],['Back to listening','Back to listening','Search artists, tracks, releases, labels']);
@@ -1096,7 +1106,7 @@ test('the explorer frame stops above the player bar and its controls read in Int
  assert.match(rules.get('#explorer input::placeholder'),/color:var\(--muted\); opacity:1;/,'the placeholder, now the field\'s only visible name, reads at 5.4:1 in the palette');
  assert.match(rules.get('#explorer input[type=search]::-webkit-search-cancel-button'),/appearance:none/,'one ✕ in the explorer: the browser\'s clear mark goes, from the search and from a list\'s filter');
  assert.match(rules.get('html'),/scrollbar-gutter:stable/,'locking the page scroll keeps the scrollbar\'s room, so the player bar does not move');
- const actions='#explorer :is(#music-status button, #history-more, .list-more, .stage-switch)';
+ const actions='#explorer :is(#music-status button, #history-more, .stage-switch)';
  assert.match(rules.get(actions),/min-height:44px; padding:0 var\(--s3\); font:14px Inter,sans-serif; border:1px solid var\(--line\);/,'Try again and Show earlier tracks');
  assert.match(rules.get(actions+':hover'),/border-color:var\(--muted\)/);
  assert.match(rules.get('#explorer button'),/min-height:44px/);
@@ -1342,7 +1352,7 @@ test('the profile keeps its picture box, names its type above the title and read
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
  assert.match(rules.get('.picture'),/position:relative; display:grid; place-items:center;.*border-radius:2px;.*font:20px var\(--serif\); color:var\(--soft\); background:var\(--raised\)/);assert.match(rules.get('.picture[data-type=artist]'),/border-radius:50%/);
  assert.match(rules.get('.picture::before'),/content:attr\(data-initial\) \/ ''/,'the letter, which screen readers skip');
- assert.match(rules.get('.picture:has(> img:not([hidden]))::before'),/visibility:hidden/,'a shown image hides the letter, also behind a transparent logo');
+ assert.match(rules.get('.picture:has(> img:not([hidden], [data-wait]))::before'),/visibility:hidden/,'a shown image hides the letter, also behind a transparent logo; a lazy one once it has loaded');
  assert.match(rules.get('.picture::after'),/position:absolute; inset:0; border-radius:inherit; box-shadow:inset 0 0 0 1px var\(--line\)/,'a 1px inner edge, so a white cover is no blank tile');
  assert.match(rules.get('.picture img'),/position:absolute; inset:0;/);
  assert.match(rules.get('.entity-heading .picture'),/width:120px; height:120px; font-size:56px/);assert.match(phone.get('.entity-heading .picture'),/width:88px; height:88px; font-size:40px/);
@@ -1993,7 +2003,7 @@ test('a link that leaves with its place hands focus to the next one: a stage pla
  const shared=link('#statistics/fontanna');shared.focus();e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};follow(e,shared);await flush();
  assert.deepEqual([e.location.hash,e.document.activeElement===title(),textOf(title())],['#statistics/fontanna',true,'Fontanna'],'a stage it shares tracks with, never the page');
  const see=link('#history/fontanna');see.focus();follow(e,see);await flush();
- assert.deepEqual([e.location.hash,e.document.activeElement===currentStage(e),currentStage(e).textContent],['#history/fontanna',true,'Fontanna'],'See what played starts History on its stage in the row');
+ assert.deepEqual([e.location.hash,e.document.activeElement===currentStage(e),textOf(currentStage(e))],['#history/fontanna',true,'Fontanna'],'See what played starts History on its stage in the row');
  const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;e.visit('#explore/art_000000000001');await flush();
  const place=byClass(inspector(e),'entity-line')[0].descendants().find(n=>n.getAttribute?.('href')==='#statistics/essentials');
  place.focus();e.response={...status('First'),...stageStats({scope:'essentials'}),...stageMusic()};follow(e,place);await flush();
@@ -2011,22 +2021,22 @@ test('Switch to this stage tunes the radio without starting it, then gives way t
  assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.elements['player-stage'].textContent,button.hidden,textOf(kind),e.document.activeElement===title,sameRows(content.children,shown)],['bermuda-day',false,'Under the Sun',true,'Stage · On air',true,true],'the player bar shows the stage, still paused; the button goes, its focus to the name, and On air shows');
  e.window.Pavoia.tune('palac-feel');await flush();
  assert.deepEqual([button.hidden,textOf(kind),sameRows(content.children,shown)],[false,'Stage',true],'another stage tuned elsewhere brings the button back and puts the dot out');
- assert.match(cssRules().get('#explorer :is(#music-status button, #history-more, .list-more, .stage-switch)'),/border:1px solid var\(--line\)/,'a bordered button');
+ assert.match(cssRules().get('#explorer :is(#music-status button, #history-more, .stage-switch)'),/border:1px solid var\(--line\)/,'a bordered button');
 });
 
 test('History and Statistics keep their stage and day in the address, in one entry, behind a stage row',async()=>{
  const e=setup({journey:true});await flush();e.discovery={items:[]};e.historyReply=answer(played(50,0,'9:1'));
- const row=e.elements['stage-row'],links=()=>row.children.map(a=>[a.textContent,a.getAttribute('href'),a.attrs['aria-current']??null]),tabs=()=>e.document.querySelectorAll('.explorer-nav a').map(a=>a.getAttribute('href'));
+ const row=e.elements['stage-row'],links=()=>row.children.map(a=>[textOf(a),a.getAttribute('href'),a.attrs['aria-current']??null]),tabs=()=>e.document.querySelectorAll('.explorer-nav a').map(a=>a.getAttribute('href'));
  await stagePlace(e,'#statistics/radio',{scope:'radio'});const kept=e.entries().length;
  assert.deepEqual([links()[0],links()[6],links().at(-1),links().length],[['All stages','#statistics/radio','page'],['Fontanna','#statistics/fontanna',null],['Essentials','#statistics/essentials',null],10],'All stages, then the nine stages; the current one marked');
  e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};follow(e,stageLink(e,'fontanna'));await flush();
- assert.deepEqual([e.location.hash,e.entries().length,currentStage(e).textContent],['#statistics/fontanna',kept,'Fontanna'],'a stage in the row replaces the explorer\'s one entry');
+ assert.deepEqual([e.location.hash,e.entries().length,textOf(currentStage(e))],['#statistics/fontanna',kept,'Fontanna'],'a stage in the row replaces the explorer\'s one entry');
  follow(e,byClass(e.elements['music-content'],'row').find(a=>a.getAttribute('href')==='#statistics/bermuda-evening'));await flush();
  assert.deepEqual([e.location.hash,e.entries().length],['#statistics/bermuda-evening',kept],'so does a stage it shares tracks with');
  routeTo(e,'#history/bermuda-day/2026-03-28');await flush();
- assert.deepEqual([links().length,links()[0],e.elements['history-day'].value,asked(e).get('until'),tabs()],[9,['Under the Sun','#history/bermuda-day/2026-03-28','page'],'2026-03-28',new Date(2026,2,29).toISOString(),['#explore','#history/bermuda-day/2026-03-28','#statistics/bermuda-evening']],'History: the nine stages, each keeping the day; each tab keeps its last place');
+ assert.deepEqual([links().length,links()[0],e.elements['history-day'].value,asked(e).get('until'),tabs()],[9,['Under the Sun','#history/bermuda-day/2026-03-28','page'],'2026-03-28',new Date(2026,2,29).toISOString(),['#explore','#history/bermuda-day/2026-03-28','#statistics/bermuda-evening','#index/artists']],'History: the nine stages, each keeping the day; each tab keeps its last place');
  const today=localDay(new Date());
- for(const [typed,place] of [['#statistics','#statistics/palac-feel'],['#statistics/bus','#statistics/palac-feel'],['#statistics/library','#statistics/radio'],['#statistics/library/artists','#statistics/radio'],['#statistics/library/more','#statistics/radio'],['#statistics/fontanna/more','#statistics/fontanna'],['#statistics/bus/artists','#statistics/palac-feel'],['#history','#history/palac-feel'],['#history/radio','#history/palac-feel'],['#history/%E0','#history/palac-feel'],['#history/fontanna/2999-01-01','#history/fontanna'],['#history/fontanna/'+today,'#history/fontanna'],['#history/fontanna/2026-3-28','#history/fontanna']]){
+ for(const [typed,place] of [['#statistics','#statistics/palac-feel'],['#statistics/bus','#statistics/palac-feel'],['#statistics/library','#statistics/radio'],['#statistics/library/artists','#index/artists?by=tracks'],['#statistics/library/more','#statistics/radio'],['#statistics/fontanna/more','#statistics/fontanna'],['#statistics/bus/artists','#index/artists?by=tracks'],['#history','#history/palac-feel'],['#history/radio','#history/palac-feel'],['#history/%E0','#history/palac-feel'],['#history/fontanna/2999-01-01','#history/fontanna'],['#history/fontanna/'+today,'#history/fontanna'],['#history/fontanna/2026-3-28','#history/fontanna']]){
   e.visit(typed);await flush();assert.equal(e.location.hash,place,typed);
  }
  assert.equal(e.elements['history-day'].value,today,'a bare stage shows today, the live list');
@@ -2040,8 +2050,9 @@ test('History and Statistics keep their stage and day in the address, in one ent
  currentStage(e).focus();e.setLanguage('de');await flush();
  assert.deepEqual([row.attrs['aria-label'],links()[0][0],links().at(-1)[0],e.document.activeElement===currentStage(e)],['Bühne','Alle Bühnen','Essentials',true],'in German, and focus in the row stays on the current stage');
  const rules=cssRules(),phone=cssRules('(max-width:760px)');
- assert.match(rules.get('.stage-row a'),/font:19px\/1\.2 var\(--serif\); color:var\(--soft\);/,'the radio rail\'s style');assert.match(rules.get('.stage-row a:is(:hover, [aria-current])'),/color:var\(--cream\)/);
- assert.match(rules.get('.stage-row a[aria-current]::after'),/height:1px; background:currentColor/,'a 1px line under the current stage');
+ assert.match(rules.get('.stage-row a, .index-order a'),/font:19px\/1\.2 var\(--serif\); color:var\(--soft\);/,'the radio rail\'s style, which the Index\'s orders share');assert.match(rules.get('.stage-row a:is(:hover, [aria-current]), .index-order a:is(:hover, [aria-current])'),/color:var\(--cream\)/);
+ assert.match(rules.get(':is(.stage-row, .index-order) a[aria-current] > span::after'),/position:absolute; inset:auto 0 -3px; height:1px; background:currentColor/,'a 1px line under the current stage\'s name only, 8px above the 44px link\'s bottom as before');
+ assert.ok(row.children.every(a=>a.children.length===1&&a.children[0].localName==='span'),'each stage is its name in a span, which carries the line');
  assert.match(phone.get('.stage-row'),/flex-wrap:nowrap; margin-inline:calc\(-1 \* var\(--gutter\)\); padding-inline:var\(--gutter\); overflow-x:auto; scrollbar-width:none; padding-block:6px; margin-block:-6px;/,'one line on a phone, edge to edge, the gutter inside, with 6px above and below for a focus ring');
  const css=web('style.css');assert.ok(css.indexOf('.stage-row { flex:1 0')>css.indexOf('.stage-row { position:relative'),'the phone rule comes after the rule it overrides');
  assert.match(web('index.html'),/<form id="music-filters" class="music-filters"><nav id="stage-row" class="stage-row" aria-label="Stage"><\/nav><label id="history-day-label">/,'the row, then the Day field');
@@ -2103,14 +2114,6 @@ const everyName=(over={})=>{
  const topArtists=[{name:'Jasper Tygner',count:300},{name:'Various Artists',count:299},{name:'Âme',count:298},...Array.from({length:247},(_,i)=>({name:'Act '+(i+1),count:i<240?297-i:1}))];
  return stageStats({topArtists,artists:topArtists.length,labels:Array.from({length:130},(_,i)=>({name:'Label '+(i+1),count:130-i})),...over});
 };
-const statsAsked=e=>e.requests.filter(r=>r.url.includes('/statistics?')).length;
-const listOf=e=>byClass(e.elements['music-content'],'list-rows')[0];
-const listRows=e=>listOf(e).children.map(li=>li.children[0]);
-const orderLinks=e=>byClass(e.elements['music-content'],'list-controls')[0].children[1].children;
-// A real click reaches the order link first, then the document.
-const press=(e,a)=>{const event={button:0,target:{closest:()=>a},preventDefault(){this.defaultPrevented=true;}};a.emit('click',event);e.document.emit('click',event);return event;};
-const typeIn=(e,text)=>{const field=byClass(e.elements['music-content'],'list-controls')[0].children[0];field.value=text;field.emit('input');return field;};
-
 test('with every name kept, a stage links its artists and labels in its numbers, and its regions keep their top names',async()=>{
  const e=setup({journey:true});await flush();e.discovery={items:[]};
  let content=await stagePlace(e,'#statistics/bermuda-day',everyName());
@@ -2137,112 +2140,290 @@ test('with every name kept, a stage links its artists and labels in its numbers,
  assert.deepEqual(counts(),[['Most tracks by 860',undefined,undefined],['Most tracks on',undefined,undefined]],'with 12 names only, the counts are plain, as before');
 });
 
-test('a list of names shows a hundred rows, adds a hundred more on request, and filters and orders them in place, with no request or new entry',async()=>{
- const e=setup({journey:true});await flush();
- const media='/api/discovery/media/'+'a'.repeat(40);
- e.discovery=url=>({items:new URL(url,'http://x').searchParams.get('q')==='Jasper Tygner'?[{id:'art_0000000000c1',type:'artist',title:'Jasper Tygner',image:media}]:[]});
- const content=await stagePlace(e,'#statistics/bermuda-day',everyName()),asked=statsAsked(e),kept=e.entries().length,title=()=>content.descendants().find(n=>n.localName==='h3');
- const link=byClass(content,'entity-heading')[0].descendants().find(n=>n.getAttribute?.('href')==='#statistics/bermuda-day/artists');e.elements.explorer.scrollTop=446;link.focus();follow(e,link);await flush();
- assert.deepEqual([e.location.hash,statsAsked(e)-asked,e.entries().length,textOf(title()),e.document.activeElement===title(),e.elements.explorer.scrollTop],['#statistics/bermuda-day/artists',0,kept,'Artists',true,0],'the numbers just shown, no request, the same entry, and focus on the title, at the top: a place reached from far down it starts at its title, filter and orders');
- const [about]=byClass(content,'entity-heading')[0].children,eyebrow=about.children[0].children[0];
- assert.deepEqual([eyebrow.textContent,eyebrow.getAttribute('href'),textOf(about.children[2])],['Under the Sun','#statistics/bermuda-day','250 artists, most tracks first'],'its place over its title, a link back');
- const field=byClass(content,'list-controls')[0].children[0],orders=orderLinks(e);
- assert.deepEqual([field.type,field.attrs['aria-label'],orders.map(a=>[a.textContent,a.getAttribute('href'),a.attrs['aria-current']??null])],['search','Filter artists',[['Most tracks','#statistics/bermuda-day/artists','true'],['A to Z','#statistics/bermuda-day/artists',null]]]);
- let rows=listRows(e);
- assert.deepEqual([rows.length,rows.slice(0,3).map(a=>[a.getAttribute('href'),textOf(a)]),byClass(rows[0],'picture')[0].children[0].src,byClass(rows[2],'picture')[0].dataset.initial],
-  [100,[['#explore/art_0000000000c1','Jasper Tygner300 tracks'],[null,'Various Artists299 tracks'],['#explore/artist/%C3%82me','Âme298 tracks']],media,'Â'],'a hundred rows; a name found in this visit opens its record and shows its picture, Various Artists is plain text');
- const more=content.children.at(-1);more.focus();more.emit('click');
- assert.deepEqual([listRows(e).length,more.hidden,e.document.activeElement===more,more.textContent],[200,false,true,'Show more'],'a hundred more, focus kept on the button');
- rows=listRows(e);more.emit('click');
- assert.deepEqual([listRows(e).length,more.hidden,e.document.activeElement===listRows(e)[200],sameRows(listRows(e).slice(0,200),rows),textOf(listRows(e).at(-1))],[250,true,true,true,'Act 2471 track'],'the last fifty, the rows shown stay, focus on the first new one when the button goes; one track is one');
- typeIn(e,'AME');
- const spoken=()=>content.children.find(n=>n.attrs?.role==='status');
- assert.deepEqual([listRows(e).map(textOf),more.hidden,byClass(content,'list-status')[0].textContent,spoken().textContent],[['Âme298 tracks'],true,'1 of 250',''],'case and accents aside, the rows and how many match at once, so the rows move once; saying it waits for a pause');
- e.fire(300);assert.deepEqual([spoken().textContent,cls(spoken()),byClass(content,'list-status')[0].attrs.role],['1 of 250','visually-hidden',undefined],'then says how many match, politely');
- typeIn(e,'act 1');assert.deepEqual([listRows(e).length,more.hidden],[100,false],'paging starts again at a hundred');e.fire(300);assert.equal(byClass(content,'list-status')[0].textContent,'111 of 250');
- typeIn(e,'zz');e.fire(300);assert.deepEqual([listRows(e).length,more.hidden,byClass(content,'list-status')[0].textContent],[0,true,'No artist matches “zz”.']);
- typeIn(e,'');e.fire(300);assert.deepEqual([listRows(e).length,byClass(content,'list-status')[0].textContent],[100,'']);
- orders[1].focus();const event=press(e,orders[1]);await flush();
- assert.deepEqual([event.defaultPrevented,e.location.hash,e.entries().length,statsAsked(e)-asked,orders.map(a=>a.attrs['aria-current']??null),textOf(about.children[2]),e.document.activeElement===orders[1]],[true,'#statistics/bermuda-day/artists',kept,0,[null,'true'],'250 artists, A to Z',true],'A to Z changes neither the address nor the entries, and keeps focus');
- assert.deepEqual(listRows(e).slice(0,11).map(a=>byClass(a,'row-name')[0].textContent),['Act 1','Act 2','Act 3','Act 4','Act 5','Act 6','Act 7','Act 8','Act 9','Act 10','Act 11'],'numbers in order, 9 before 10');
- typeIn(e,'e');assert.deepEqual(listRows(e).map(a=>byClass(a,'row-name')[0].textContent),['Âme','Jasper Tygner'],'the filter keeps the order: Âme files under A, before Jasper Tygner, who has more tracks');
- const ctrl={button:0,ctrlKey:true,target:{closest:()=>orders[0]},preventDefault(){this.defaultPrevented=true;}};orders[0].emit('click',ctrl);e.document.emit('click',ctrl);
- assert.deepEqual([ctrl.defaultPrevented??false,orders[1].attrs['aria-current']],[false,'true'],'Ctrl and Cmd keep opening the list in a new tab');
+// The Index: every artist and label of the playlists, from the names documents, A to Z or most tracks first.
+const pic=c=>'/api/discovery/media/'+c.repeat(40);
+const artistNames=()=>({kind:'artists',updatedAt:'2026-10-20T00:00:00Z',total:20,items:[
+ {name:'Maceo Plex',id:'art_01a5cef5b30e',image:pic('a'),count:13,stages:{'palac-dance':8,'bermuda-day':3,'bermuda-evening':2}},
+ {name:'Âme',count:4,stages:{'bermuda-evening':3,'palac-dance':1}},
+ {name:'Øostil',count:1,stages:{fontanna:1}},
+ {name:'&ME',id:'art_000000000a01',count:2,stages:{'palac-feel':2}},
+ {name:'8Kays',count:1,stages:{essentials:1}},
+ {name:'Kiasmos',count:5,stages:{'bermuda-day':5}},
+ {name:'Frivolous',count:42,stages:{fontanna:17,'bermuda-day':9,essentials:7,'bermuda-evening':5,'palac-dance':2,ambiance:1,closing:1}},
+ {name:'Act 10',count:120,stages:{closing:120}},
+ {name:'Act 9',count:2,stages:{fontanna:1,'bermuda-day':1}},
+ {name:'Amelie Lens',count:23,stages:{'palac-dance':23}},
+ {name:'Various Artists',count:50,stages:{fontanna:50}},
+ {name:'Bad Id',id:'art_nothex',count:3,stages:{'bermuda-day':3}},
+ {name:'Wrong Kind',id:'lab_000000000a02',count:6,stages:{'bermuda-day':6}},
+ {name:'Bad Picture',image:'https://elsewhere.example/x.jpg',count:2,stages:{'palac-feel':2}},
+ {name:'Somewhere',count:2,stages:{nowhere:2,radio:1,'etage-zero':2,'palac-feel':0,ambiance:1.5}},
+ {name:'Nobody',count:0,stages:{fontanna:1}},{name:'Half',count:1.5,stages:{}},{name:'  ',count:3,stages:{}},{name:7,count:3},null,
+]});
+const labelNames=()=>({kind:'labels',updatedAt:'2026-10-20T00:00:00Z',total:3,items:[
+ {name:'Mad Decent',id:'lab_000000000b01',count:12,stages:{'palac-dance':12}},
+ {name:'Diynamic Music',count:57,stages:{'bermuda-day':57}},
+ {name:'Kompakt',id:'art_000000000b02',count:1,stages:{'bermuda-day':1}},
+]});
+const indexed=async(over={})=>{const e=setup({journey:true,...over});await flush();e.discovery=url=>entity(url.split('/').pop());e.names={artists:artistNames(),labels:labelNames()};return e;};
+const sectionsOf=e=>byClass(e.elements['music-content'],'index-section');
+const indexRowsOf=e=>byClass(e.elements['music-content'],'row');
+const rowOf=(e,name)=>indexRowsOf(e).find(a=>byClass(a,'row-name')[0].textContent===name);
+const marksOf=e=>sectionsOf(e).map(s=>s.dataset.mark);
+const namesIn=section=>byClass(section,'row-name').map(n=>n.textContent);
+const lineOf=a=>[byClass(a,'row-line')[0]?.textContent,byClass(a,'row-fact').map(textOf)[0]??null];
+const stageOf=(e,id)=>e.elements['stage-row'].children.find(a=>a.dataset.stage===id);
+const countsOf=e=>Object.fromEntries(e.elements['stage-row'].children.map(a=>[a.dataset.stage,a.children[1].textContent]));
+// A typed address: a browser fires hashchange as a task of its own, after the microtasks of popstate.
+const browse=async(e,hash)=>{e.location.hash=hash;e.window.emit('popstate');await flush();e.window.emit('hashchange');await flush();};
+const typeIndex=(e,text)=>{const field=e.elements['index-query'];field.value=text;field.emit('input');e.fire(120);return field;};
+// A key in the field goes to the field first, then to the document, as a browser sends it.
+const keyIn=(e,key)=>{const event={key,code:key,repeat:false,isComposing:false,ctrlKey:false,metaKey:false,altKey:false,target:control('input',{type:'search'}),defaultPrevented:false,preventDefault(){this.defaultPrevented=true;}};e.elements['index-query'].emit('keydown',event);e.document.emit('keydown',event);return event;};
+
+test('the Index has an address: a side, a stage, an order and a filter, and the old lists of names lead to it, in one entry',async()=>{
+ const e=await indexed();
+ routeTo(e,'#index');await flush();const kept=e.entries().length,tab=e.elements['index-tab'];
+ assert.deepEqual([e.location.hash,kept,e.elements['music-view'].dataset.view,e.elements['index-head'].hidden,tab.attrs['aria-current'],tab.getAttribute('href')],['#index/artists',2,'index',false,'page','#index/artists'],'bare #index is the Artists side, on All stages, in one entry above the page');
+ for(const [typed,place] of [['#index/labels','#index/labels'],['#index/tracks','#index/artists'],['#index/artists/radio','#index/artists'],['#index/artists/bus','#index/artists'],['#index/artists/library','#index/artists'],
+  ['#index/labels/fontanna?by=tracks&q=ame&x=1','#index/labels/fontanna?by=tracks&q=ame'],['#index/artists?by=name','#index/artists'],['#index/artists?by=size&q=','#index/artists'],['#index/artists?q=a%20b','#index/artists?q=a+b'],
+  ['#index/artists?q='+'a'.repeat(250),'#index/artists?q='+'a'.repeat(200)],
+  ['#statistics/bermuda-day/artists','#index/artists/bermuda-day?by=tracks'],['#statistics/radio/labels','#index/labels?by=tracks'],['#statistics/library/artists','#index/artists?by=tracks'],['#statistics/bus/labels','#index/labels?by=tracks']]){
+  routeTo(e,typed);await flush();assert.deepEqual([e.location.hash,tab.getAttribute('href'),e.entries().length],[place,place,kept],typed);
+ }
+ assert.equal(e.elements['index-query'].value,'','the field shows the filter of the address');
+ routeTo(e,'#index/artists/fontanna?q=fri');await flush();
+ assert.deepEqual([e.elements['index-query'].value,e.elements['stage-row'].children.map(a=>[textOf(a.children[0]),a.getAttribute('href'),a.attrs['aria-current']??null]).slice(0,2),textOf(stageOf(e,'fontanna').children[0]),stageOf(e,'fontanna').attrs['aria-current']],
+  ['fri',[['All stages','#index/artists?q=fri',null],['Under the Sun','#index/artists/bermuda-day?q=fri',null]],'Fontanna','page'],'All stages first; each stage keeps the side, the order and the filter');
+ assert.deepEqual([...e.elements['index-sides'].children,...e.elements['index-order'].children].map(a=>[a.getAttribute('href'),a.attrs['aria-current']??null]),
+  [['#index/artists/fontanna','page'],['#index/labels/fontanna',null],['#index/artists/fontanna?q=fri','true'],['#index/artists/fontanna?by=tracks&q=fri',null]],'the sides drop the filter, the orders keep it');
+ follow(e,e.elements['index-order'].children[1]);await flush();follow(e,stageOf(e,'radio'));await flush();follow(e,e.elements['index-sides'].children[1]);await flush();
+ assert.deepEqual([e.location.hash,e.entries().length],['#index/labels?by=tracks',kept],'sides, orders and stages replace the one entry');
+ e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};routeTo(e,'#statistics/fontanna');await flush();
+ assert.deepEqual([tab.getAttribute('href'),e.document.querySelectorAll('.explorer-nav a')[2].getAttribute('href'),e.elements['index-head'].hidden,e.elements['music-view'].dataset.view],['#index/labels?by=tracks','#statistics/fontanna',true,'statistics'],'the tab keeps its last place; the head shows only in the Index');
+ e.history.go(-1);await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash],[false,''],'Back closes the explorer in one step');
 });
 
-test('a record opened from a list comes back, through the Statistics tab, to the same filter, order, rows and place, with focus on its row',async()=>{
- const e=setup({journey:true});await flush();const explorer=e.elements.explorer,content=e.elements['music-content'];
- e.discovery=url=>url.includes('/search?')?{items:[{id:'art_000000000a12',type:'artist',title:new URL(url,'http://x').searchParams.get('q')}]}:entity(url.split('/').pop());
- e.response={...status('First'),...everyName()};routeTo(e,'#statistics/bermuda-day/artists');await flush();
- assert.equal(statsAsked(e),1,'a list reached first asks for its numbers once');
- press(e,orderLinks(e)[1]);typeIn(e,'act');content.children.at(-1).emit('click');
- const shown=listRows(e),row=shown[150],kept=e.entries().length,asked=statsAsked(e);
- explorer.scrollTop=5000;row.focus();follow(e,row);await flush();
- assert.deepEqual([e.location.hash,e.document.activeElement.localName,textOf(e.document.activeElement)],['#explore/art_000000000a12','h3','Name art_000000000a12'],'the record by its name, focus on its title');
- const tab=e.document.querySelectorAll('.explorer-nav a')[2];
- assert.equal(tab.getAttribute('href'),'#statistics/bermuda-day/artists','the Statistics tab carries the list');
- routeTo(e,tab.getAttribute('href'));await flush();
- assert.deepEqual([statsAsked(e)-asked,sameRows(listRows(e),shown),byClass(content,'list-controls')[0].children[0].value,orderLinks(e)[1].attrs['aria-current'],explorer.scrollTop,e.document.activeElement===row,e.entries().length],[0,true,'act','true',5000,true,kept],'the same 200 rows, filter and order, scrolled where they were, focus on the row opened');
- e.location.hash='#statistics/bermuda-day/artists';e.window.emit('popstate');explorer.scrollTop=10;e.window.emit('hashchange');await flush();
- assert.deepEqual([sameRows(listRows(e),shown),explorer.scrollTop],[true,10],'restore() twice changes nothing');
- // A tap focuses no link: the row is found by the link clicked, not by the focus left on another one.
- const tapped=listRows(e)[3];follow(e,tapped);await flush();routeTo(e,'#statistics/bermuda-day/artists');await flush();
- assert.equal(e.document.activeElement,tapped);
- // History in between draws the list again, from the numbers already fetched.
- routeTo(e,'#history');await flush();routeTo(e,'#statistics/bermuda-day/artists');await flush();
- assert.deepEqual([statsAsked(e)-asked,listRows(e).length,byClass(content,'list-controls')[0].children[0].value,e.document.activeElement===content.descendants().find(n=>n.localName==='h3')],[0,100,'',true],'a fresh list, at its title, with no request');
- const back=byClass(content,'eyebrow')[0].children[0];back.focus();follow(e,back);await flush();
- assert.deepEqual([e.location.hash,textOf(content.descendants().find(n=>n.localName==='h3')),e.document.activeElement===content.descendants().find(n=>n.localName==='h3')],['#statistics/bermuda-day','Under the Sun',true],'its place, at its name');
-});
-
-test('the last Show more hands focus to its first new name, even when that name is plain text',async()=>{
- const e=setup({journey:true});await flush();e.discovery={items:[]};
- const topArtists=[...Array.from({length:100},(_,i)=>({name:'Act '+(i+1),count:300-i})),{name:'Various Artists',count:100},...Array.from({length:5},(_,i)=>({name:'Late '+(i+1),count:50-i}))];
- e.response={...status('First'),...stageStats({topArtists,artists:topArtists.length,labels:[]})};routeTo(e,'#statistics/bermuda-day/artists');await flush();
- const more=e.elements['music-content'].children.at(-1);more.focus();more.emit('click');
- const first=listRows(e)[100],active=e.document.activeElement;
- assert.deepEqual([more.hidden,textOf(first),active===first,active.getAttribute('href')!=null||active.tabIndex===-1],[true,'Various Artists100 tracks',true,true],'focus on Various Artists, which can hold it');
-});
-
-test('a place kept from History never scrolls a list drawn after it',async()=>{
- const e=setup({journey:true});await flush();e.discovery={items:[]};const explorer=e.elements.explorer;
- e.response={...status('First'),...everyName()};routeTo(e,'#history');await flush();
- explorer.scrollTop=700;routeTo(e,'#statistics/bermuda-day/artists');await flush();
- assert.equal(explorer.scrollTop,0,'the list starts at its top');
- e.location.hash='#statistics/bermuda-day/artists';e.window.emit('popstate');e.window.emit('hashchange');await flush();
- assert.equal(explorer.scrollTop,0,'and the second restore() of the move does not bring History\'s place');
-});
-
-test('All stages lists its labels, a stage row keeps the list, and an address the numbers cannot fill is the place itself',async()=>{
- const e=setup({journey:true});await flush();e.discovery={items:[]};const content=e.elements['music-content'];
- e.response={...status('First'),...everyName({scope:'radio'})};routeTo(e,'#statistics/radio/labels');await flush();const kept=e.entries().length;
- const [about]=byClass(content,'entity-heading')[0].children,rows=listRows(e);
- assert.deepEqual([about.children.map(textOf),byClass(content,'list-controls')[0].children[0].attrs['aria-label'],rows.length,rows[0].getAttribute('href'),byClass(rows[0],'picture')[0].dataset.type,textOf(rows[0])],
-  [['All stages','Labels','130 labels, most tracks first'],'Filter labels',100,'#explore/label/Label%201','label','Label 1130 tracks']);
- assert.deepEqual([currentStage(e).textContent,stageLink(e,'fontanna').getAttribute('href'),e.entries().length],['All stages','#statistics/fontanna/labels',kept],'the stage row marks All stages, and keeps the list for the others');
- assert.equal(currentStage(e).getAttribute('href'),'#statistics/radio','its own stage leads back to its place, a 44px way back besides the eyebrow');
- follow(e,currentStage(e));await flush();
- assert.deepEqual([e.location.hash,Boolean(listOf(e)),textOf(content.descendants().find(n=>n.localName==='h3')),e.entries().length],['#statistics/radio',false,'All stages',kept]);
- routeTo(e,'#statistics/radio/labels');await flush();
- typeIn(e,'x');e.fire(300);assert.equal(byClass(content,'list-status')[0].textContent,'No label matches “x”.');
+test('a names document keeps only valid names, ids, pictures and stages, and files each name under its folded first letter, # last',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();
+ assert.deepEqual([e.namesRequests.map(r=>r.url),marksOf(e)],[['/api/library/names?kind=artists'],['A','B','F','K','M','O','S','W','#']]);
+ assert.deepEqual(sectionsOf(e).map(namesIn),[['Act 9','Act 10','Âme','Amelie Lens'],['Bad Id','Bad Picture'],['Frivolous'],['Kiasmos'],['Maceo Plex'],['Øostil'],['Somewhere'],['Wrong Kind'],['&ME','8Kays']],
+  'Âme under A and Øostil under O, numbers read as numbers, symbols and digits under # at the end; Various Artists, empty names and counts that are not whole tracks are left out');
+ const href=name=>rowOf(e,name).getAttribute('href');
+ assert.deepEqual(['Maceo Plex','&ME','Âme','Bad Id','Wrong Kind'].map(href),['#explore/art_01a5cef5b30e','#explore/art_000000000a01','#explore/artist/%C3%82me','#explore/artist/Bad%20Id','#explore/artist/Wrong%20Kind'],'an artist id opens its record; a bad id or a label\'s id falls back to the name');
+ assert.deepEqual([rowOf(e,'Somewhere').dataset.stages,lineOf(rowOf(e,'Somewhere'))[0],rowOf(e,'Frivolous').dataset.stages],['etage-zero','Etage 0','fontanna bermuda-day essentials bermuda-evening palac-dance ambiance closing'],'unknown stages and counts that are not whole tracks go');
+ const [section]=sectionsOf(e),heading=section.children[0];
+ assert.deepEqual([section.localName,section.attrs['aria-labelledby'],heading.localName,heading.id,heading.attrs['aria-label'],textOf(heading),cls(section.children[1])],['section','m-A','h3','m-A','A, 4 artists','A 4','index-rows'],'each section is labelled by its mark, which says how many it holds');
+ assert.deepEqual([sectionsOf(e).at(-1).children[0].attrs['aria-label'],sectionsOf(e)[2].children[0].attrs['aria-label']],['Numbers and symbols, 2 artists','F, 1 artist']);
+ follow(e,e.elements['index-sides'].children[1]);await flush();
+ assert.deepEqual([marksOf(e),indexRowsOf(e).map(a=>[a.getAttribute('href'),byClass(a,'picture')[0].dataset.type]),sectionsOf(e)[0].children[0].attrs['aria-label']],
+  [['D','K','M'],[['#explore/label/Diynamic%20Music','label'],['#explore/label/Kompakt','label'],['#explore/lab_000000000b01','label']],'D, 1 label'],'labels: square pictures, a label id only from lab_');
  e.setLanguage('de');await flush();
- assert.deepEqual([byClass(content,'entity-heading')[0].children[0].children.map(textOf),orderLinks(e).map(a=>a.textContent),byClass(content,'list-controls')[0].children[0].attrs['aria-label'],content.children.at(-1).textContent],[['Alle Bühnen','Labels','130 Labels, die meisten Tracks zuerst'],['Die meisten Tracks','A bis Z'],'Labels filtern','Mehr zeigen']);
- typeIn(e,'x');e.fire(300);assert.equal(byClass(content,'list-status')[0].textContent,'Kein Label passt zu „x“.');
- typeIn(e,'label 1');e.fire(300);assert.equal(byClass(content,'list-status')[0].textContent,'42 von 130');
- press(e,orderLinks(e)[1]);assert.equal(textOf(byClass(content,'entity-heading')[0].children[0].children[2]),'130 Labels, von A bis Z');
- e.setLanguage('en');await flush();
- // A kind of list there is not is the place itself.
- e.response={...status('First'),...everyName(),...stageMusic()};routeTo(e,'#statistics/bermuda-day/years');await flush();
- assert.deepEqual([e.location.hash,textOf(content.descendants().find(n=>n.localName==='h3')),Boolean(listOf(e)),e.entries().length],['#statistics/bermuda-day','Under the Sun',false,kept]);
- // The server still cutting its lists at 12: a list address is its place.
- e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};routeTo(e,'#statistics/fontanna/artists');await flush();
- assert.deepEqual([e.location.hash,textOf(content.descendants().find(n=>n.localName==='h3')),Boolean(listOf(e)),e.entries().length,e.document.querySelectorAll('.explorer-nav a')[2].getAttribute('href')],['#statistics/fontanna','Fontanna',false,kept,'#statistics/fontanna'],'the stage place, in the same entry');
- const rules=cssRules(),phone=cssRules('(max-width:760px)');
- assert.match(rules.get('.list-controls'),/display:flex; flex-wrap:wrap;/);assert.match(rules.get('.list-controls input'),/flex:0 1 360px/);
- assert.match(phone.get('.list-controls input'),/flex-basis:100%/);assert.ok(lastAt('(max-width:760px)','.list-controls input')>lastAt('','.list-controls input'),'on a phone the filter takes the width and the orders go under it');
- assert.match(rules.get('.list-rows'),/list-style:none/);assert.match(rules.get('#explorer a.text-button'),/min-height:44px/,'All 250 artists keeps a 44px target');
- assert.match(rules.get('.eyebrow a'),/position:relative; padding-block:var\(--s1\);/,'the eyebrow link lies over the title, so all of its padding takes a tap');
- assert.match(rules.get('.eyebrow a:focus-visible'),/outline-offset:0/,'its ring keeps clear of the title');
+ assert.deepEqual([sectionsOf(e)[0].children[0].attrs['aria-label'],e.elements['index-query'].attrs['aria-label'],e.elements['index-sides'].attrs['aria-label'],e.elements['index-order'].attrs['aria-label']],['D, 1 Label','Labels filtern','Künstler oder Labels','Reihenfolge']);
+});
+
+test('a row shows its picture once it loads, or no box in A to Z, and its initial is a letter or a digit',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();
+ const img=byClass(rowOf(e,'Maceo Plex'),'picture')[0].children[0];
+ assert.deepEqual([img.localName,img.src,img.loading,img.decoding,img.dataset.wait,img.hidden??false,rowOf(e,'Maceo Plex').attrs['data-bare']],['img',pic('a'),'lazy','async','',false,undefined],'a lazy picture is never hidden, since Chrome never loads a lazy image that is not displayed: it waits unseen over its initial');
+ img.emit('load');assert.equal(img.dataset.wait,undefined,'once loaded it covers its initial');
+ const other=byClass(rowOf(e,'Frivolous'),'picture')[0];assert.deepEqual([other.children.length,rowOf(e,'Frivolous').attrs['data-bare']],[0,''],'no picture: no image, and the row is bare');
+ assert.deepEqual([byClass(rowOf(e,'Bad Picture'),'picture')[0].children.length,rowOf(e,'Bad Picture').attrs['data-bare']],[0,''],'a picture from elsewhere is none');
+ img.emit('error');assert.deepEqual([byClass(rowOf(e,'Maceo Plex'),'picture')[0].children.length,rowOf(e,'Maceo Plex').attrs['data-bare']],[0,''],'a picture that fails leaves the row bare');
+ assert.deepEqual(['&ME','8Kays','Øostil','Âme'].map(n=>byClass(rowOf(e,n),'picture')[0].dataset.initial),['M','8','Ø','Â'],'the first letter or digit, else the first character');
+ const rules=cssRules();
+ assert.match(rules.get('#music-view[data-by=name] .row[data-bare] .picture'),/visibility:hidden/,'in A to Z a bare row shows no box; the margin letter says its initial');
+ assert.match(rules.get('.picture img[data-wait]'),/visibility:hidden/);
+ assert.equal(e.elements['music-view'].dataset.by,'name');follow(e,e.elements['index-order'].children[1]);await flush();
+ assert.equal(e.elements['music-view'].dataset.by,'tracks','in Most tracks a bare row shows its initial');
+});
+
+test('each row says where a name plays and how often: the first stage and how many more, Also on or Only here on a stage, and no count of one',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();
+ assert.deepEqual(['Maceo Plex','Frivolous','Act 9','Øostil'].map(n=>lineOf(rowOf(e,n))),[['Night in Motion and 2 more','13 tracks'],['Fontanna and 6 more','42 tracks'],['Under the Sun and 1 more','2 tracks'],['Fontanna',null]],
+  'most tracks first, the stage bar\'s order on ties; one track says no count');
+ const maceo=rowOf(e,'Maceo Plex'),fact=byClass(maceo,'row-fact')[0];
+ assert.deepEqual([fact.textContent,cls(fact.children[0]),fact.children[0].textContent],['13','fact-word',' tracks'],'the number and the word apart, so a phone can show the number only');
+ assert.match(cssRules('(max-width:760px)').get('.fact-word'),/position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset\(50%\)/,'a screen reader still hears the word');
+ routeTo(e,'#index/artists/bermuda-day');await flush();
+ assert.deepEqual([rowOf(e,'Maceo Plex')===maceo,...['Maceo Plex','Kiasmos','Frivolous'].map(n=>lineOf(rowOf(e,n)))],[true,['Also on Night in Motion and 1 more','3 tracks'],['Only here','5 tracks'],['Also on Fontanna and 5 more','9 tracks']],'the same row, its line and count for the stage');
+ assert.deepEqual(namesIn(e.elements['music-content']),['Act 9','Bad Id','Frivolous','Kiasmos','Maceo Plex','Wrong Kind'],'a stage lists only the names that play on it');
+ e.setLanguage('de');await flush();
+ assert.deepEqual(['Maceo Plex','Kiasmos'].map(n=>lineOf(rowOf(e,n))),[['Auch auf Night in Motion und 1 weitere','3 Tracks'],['Nur hier','5 Tracks']]);
+ const journey=web('journey.js'),strings=journey.slice(journey.indexOf('const copy'),journey.indexOf('const word'));
+ for(const key of ['indexTab','sides','order','namesLoading','namesError','alsoOnStages','onlyHere','lookAll','markArtists','markArtist1','markLabels','markLabel1','symbols','band','band1'])assert.equal(strings.match(new RegExp('(?<![\\w$])'+key+':','g'))?.length,2,key+' in English and German');
+ for(const gone of ['listArtists','listLabels','byCount','byName','showMore'])assert.doesNotMatch(strings,new RegExp('(?<![\\w$])'+gone+':'),gone+' is gone');
+ for(const gone of ['renderList','placeStats','list-controls','list-rows','list-more','list-status'])assert.ok(!journey.includes(gone)&&!web('style.css').includes(gone),gone+' is gone');
+ assert.ok(!cssRules().has('.eyebrow a'));
+});
+
+test('Most tracks groups the names in bands of track counts, most first, ties A to Z, and the bands say so',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists?by=tracks');await flush();
+ assert.deepEqual([marksOf(e),sectionsOf(e).map(namesIn)],[['100+','20+','10+','5+','2+','1'],[['Act 10'],['Frivolous','Amelie Lens'],['Maceo Plex'],['Wrong Kind','Kiasmos'],['Âme','Bad Id','Act 9','Bad Picture','Somewhere','&ME'],['Øostil','8Kays']]],'empty bands are left out');
+ assert.deepEqual([sectionsOf(e)[0].children[0].attrs['aria-label'],sectionsOf(e).at(-1).children[0].attrs['aria-label'],textOf(sectionsOf(e)[1].children[0])],['100 tracks or more, 1 artist','One track, 2 artists','20+ 2']);
+ routeTo(e,'#index/artists/palac-dance?by=tracks');await flush();
+ assert.deepEqual([marksOf(e),sectionsOf(e).map(namesIn)],[['20+','5+','2+','1'],[['Amelie Lens'],['Maceo Plex'],['Frivolous'],['Âme']]],'on a stage, the counts of that stage');
+ e.setLanguage('de');await flush();assert.equal(sectionsOf(e)[0].children[0].attrs['aria-label'],'20 Tracks oder mehr, 1 Künstler');
+});
+
+test('the filter ignores case and accents, writes the address in place, and the stage bar and the note follow it',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();const kept=e.entries().length,note=e.elements['index-note'];
+ assert.deepEqual([countsOf(e),note.textContent],[{radio:'14','bermuda-day':'6','bermuda-evening':'3','palac-dance':'4','palac-feel':'2','etage-zero':'1',fontanna:'3',ambiance:'1',closing:'2',essentials:'2'},''],'each stage counts its names; no note without a filter');
+ const field=e.elements['index-query'];field.value='AME';field.emit('input');
+ assert.deepEqual([namesIn(e.elements['music-content']).length,e.location.hash],[14,'#index/artists'],'the list waits for a pause in typing');
+ e.fire(120);
+ assert.deepEqual([namesIn(e.elements['music-content']),note.textContent,e.location.hash,e.entries().length,e.elements['index-tab'].getAttribute('href'),stageOf(e,'fontanna').getAttribute('href'),e.elements['index-order'].children[1].getAttribute('href')],
+  [['Âme','Amelie Lens'],'2 of 14','#index/artists?q=AME',kept,'#index/artists?q=AME','#index/artists/fontanna?q=AME','#index/artists?by=tracks&q=AME'],'then draws, writes the address in the same entry and keeps the filter in every link');
+ assert.deepEqual(countsOf(e),{radio:'2','bermuda-day':'','bermuda-evening':'1','palac-dance':'2','palac-feel':'','etage-zero':'',fontanna:'',ambiance:'',closing:'',essentials:''},'the counts follow the filter, and a count of 0 is left empty');
+ assert.equal(e.elements['index-said'].textContent,'','the count is said once typing pauses');e.fire(300);assert.equal(e.elements['index-said'].textContent,'2 of 14');
+ typeIndex(e,'oostil');assert.deepEqual(namesIn(e.elements['music-content']),['Øostil'],'Ø reads as O');
+ typeIndex(e,'zz');assert.deepEqual([namesIn(e.elements['music-content']),note.textContent,note.children.length],[[],'No artist matches “zz”.',0]);
+ // Typed with the list scrolled past its top, the list comes back under the head, so it starts under the field.
+ const explorer=e.elements.explorer,rects={'music-content':-2000,'index-head':-2200,'music-filters':72};explorer.scrollTop=3000;
+ for(const [id,top] of Object.entries(rects))e.elements[id].getBoundingClientRect=()=>({top,bottom:top+61});
+ typeIndex(e,'zzz');assert.equal(explorer.scrollTop,3000-2200-133,'the head\'s top under the stage bar');
+ e.elements['music-content'].getBoundingClientRect=()=>({top:300,bottom:361});typeIndex(e,'zz');assert.equal(explorer.scrollTop,3000-2200-133,'a list whose top shows stays where it is');
+ for(const id of Object.keys(rects))delete e.elements[id].getBoundingClientRect;
+ routeTo(e,'#index/artists/ambiance?q=ame');await flush();
+ const look=note.children.find(n=>n.localName==='a');
+ assert.deepEqual([textOf(note),look.getAttribute('href'),e.entries().length],['No artist matches “ame”. Look on all stages (2)','#index/artists?q=ame',kept],'a stage with no match offers every stage, with how many match there');
+ assert.match(cssRules().get('.index-note a'),/text-decoration:underline; text-decoration-color:var\(--muted\); text-underline-offset:3px/,'a link in a sentence');
+ routeTo(e,'#index/artists/bermuda-day?q=ame');await flush();assert.equal(textOf(note),'No artist matches “ame”. Look on all stages (2)');
+ routeTo(e,'#index/artists/palac-dance?q=ame');await flush();assert.deepEqual([textOf(note),note.children.length],['2 of 4',0],'the total is the names on this stage');
+ e.setLanguage('de');await flush();typeIndex(e,'zz');assert.deepEqual([textOf(note),note.children.length],['Kein Künstler passt zu „zz“.',0],'no other stage holds one: no link');
+ typeIndex(e,'a');assert.equal(textOf(note),'3 von 4');
+});
+
+test('in the field, Escape empties it first and Enter opens the first name shown',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();const field=e.elements['index-query'];
+ typeIndex(e,'kia');
+ let event=keyIn(e,'Escape');
+ assert.deepEqual([event.defaultPrevented,field.value,namesIn(e.elements['music-content']).length,e.location.hash,e.elements.explorer.open],[true,'',14,'#index/artists',true],'the text goes and the list draws at once; the explorer stays');
+ event=keyIn(e,'Escape');assert.deepEqual([e.elements.explorer.open],[false],'a second Escape closes it, as everywhere');
+ routeTo(e,'#index/artists');await flush();field.value='mace';field.emit('input');
+ e.elements['index-find'].emit('submit',{preventDefault(){}});await flush();
+ assert.deepEqual([e.location.hash,e.document.activeElement.localName],['#explore/art_01a5cef5b30e','h3'],'Enter opens the first name for the text typed so far');
+ routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
+ assert.equal(e.document.activeElement,rowOf(e,'Maceo Plex'),'and comes back to it as to a row clicked');
+ assert.equal(web('index.html').match(/<form id="index-find" class="index-find" role="search"><input id="index-query" type="search" maxlength="200" autocomplete="off" enterkeyhint="go" spellcheck="false"><\/form>/)?.length,1);
+});
+
+test('focus stays on a side, an order or a stage through its redraw, a row\'s goes to the same name or the field, and a pointer starts in the field',async()=>{
+ for(const fine of [true,false]){
+  const e=await indexed({media:fine?['(pointer:fine)']:[]});routeTo(e,'#index/artists');await flush();
+  assert.equal(e.document.activeElement,fine?e.elements['index-query']:e.elements.explorer,fine?'a first entry with a mouse starts in the field':'a touch screen raises no keyboard');
+  // A click on the Index tab focuses the tab before it opens the Index, as a browser does.
+  e.response={...status('First'),...stageStats(),...stageMusic()};routeTo(e,'#statistics/bermuda-day');await flush();
+  const tab=e.elements['index-tab'];tab.focus();follow(e,tab);await flush();
+  assert.equal(e.document.activeElement,fine?e.elements['index-query']:tab,fine?'so does an entry by a click on the Index tab':'and a tap on the tab leaves the keyboard down');
+  // Look on all stages goes with the sentence it is in: it hands its focus to the field, or with touch to the explorer,
+  // never to the page.
+  routeTo(e,'#index/artists/ambiance?q=ame');await flush();
+  const look=e.elements['index-note'].children.find(n=>n.localName==='a');look.focus();follow(e,look);await flush();
+  assert.deepEqual([e.location.hash,e.document.activeElement===(fine?e.elements['index-query']:e.elements.explorer),textOf(e.elements['index-note'])],['#index/artists?q=ame',true,'2 of 14'],'the link in the note');
+ }
+ const e=await indexed({media:['(pointer:fine)']});routeTo(e,'#index/artists');await flush();
+ const [,labels]=e.elements['index-sides'].children,[,tracks]=e.elements['index-order'].children;
+ labels.focus();follow(e,labels);await flush();assert.deepEqual([e.document.activeElement===labels,marksOf(e)],[true,['D','K','M']],'a side');
+ tracks.focus();follow(e,tracks);await flush();assert.deepEqual([e.document.activeElement===tracks,marksOf(e)[0]],[true,'50+'],'an order');
+ stageOf(e,'bermuda-day').focus();follow(e,stageOf(e,'bermuda-day'));await flush();
+ assert.deepEqual([e.document.activeElement===stageOf(e,'bermuda-day'),e.location.hash],[true,'#index/labels/bermuda-day?by=tracks'],'a stage: the new current one');
+ routeTo(e,'#index/artists');await flush();
+ const maceo=rowOf(e,'Maceo Plex');maceo.focus();await browse(e,'#index/artists/bermuda-day');
+ assert.equal(e.document.activeElement,maceo,'a row whose name stays keeps focus');
+ rowOf(e,'Kiasmos').focus();await browse(e,'#index/artists/palac-dance');
+ assert.equal(e.document.activeElement,e.elements['index-query'],'a row whose name goes hands focus to the field, never to the page');
+ rowOf(e,'Maceo Plex').focus();e.setLanguage('de');await flush();
+ assert.deepEqual([e.document.activeElement===rowOf(e,'Maceo Plex'),rowOf(e,'Maceo Plex')!==maceo,lineOf(rowOf(e,'Maceo Plex'))[0]],[true,true,'Auch auf Under the Sun und 1 weitere'],'in another language, the same name\'s new row');
+});
+
+test('a stage that Tab reached in the bar stays in view when the names come, and the bar centres the current stage otherwise',async()=>{
+ // The bar as a browser lays it out in a 300 px row: each stage 90 px wide, 30 px more with its count, 10 px apart. The
+ // labels come late, as on a first visit over a slow network.
+ const laidOut=async()=>{
+  const e=await indexed(),row=e.elements['stage-row'],wide=a=>90+(a.children[1]?.textContent?30:0),run=links=>links.reduce((x,a)=>x+wide(a)+10,0);
+  let left=0;Object.defineProperty(row,'scrollLeft',{get:()=>left,set:v=>{left=Math.max(0,Math.min(row.scrollWidth-300,v));}});
+  Object.defineProperty(row,'scrollWidth',{get:()=>run(row.children)-10});row.clientWidth=300;
+  Object.defineProperty(e.Element.prototype,'offsetLeft',{configurable:true,get(){return this.parent===row?run(row.children.slice(0,row.children.indexOf(this))):0;}});
+  Object.defineProperty(e.Element.prototype,'offsetWidth',{configurable:true,get(){return this.parent===row?wide(this):0;}});
+  let answer;e.names=url=>url.endsWith('kind=artists')?artistNames():new Promise(resolve=>{answer=resolve;});
+  return {e,row,come:async()=>{answer(labelNames());await flush();},middle:a=>a.offsetLeft-(300-a.offsetWidth)/2,shows:a=>a.offsetLeft>=row.scrollLeft&&a.offsetLeft+a.offsetWidth<=row.scrollLeft+300};
+ };
+ const {e,row,come,middle}=await laidOut();routeTo(e,'#index/artists/fontanna');await flush();
+ assert.equal(row.scrollLeft,middle(stageOf(e,'fontanna')),'the current stage in the middle');
+ const labels=e.elements['index-sides'].children[1];labels.focus();follow(e,labels);await flush();
+ assert.deepEqual([countsOf(e).radio,row.scrollLeft],['',middle(stageOf(e,'fontanna'))],'while the labels load, the counts go and the current stage stays in the middle');
+ // Shift+Tab goes back to All stages, far from Fontanna, and the browser scrolls the row to show it.
+ const all=stageOf(e,'radio');all.focus();row.scrollLeft=0;await come();
+ assert.deepEqual([e.location.hash,countsOf(e).radio,e.document.activeElement===all,row.scrollLeft],['#index/labels/fontanna','3',true,0],'All stages stays where it is, in view, as the counts come');
+ // Focus that leaves the row lets the next count centre the current stage again.
+ e.elements['index-query'].focus();typeIndex(e,'mad');
+ assert.deepEqual([countsOf(e).radio,row.scrollLeft],['1',middle(stageOf(e,'fontanna'))],'with focus in the field, the current stage goes back to the middle');
+ // The same slow load with focus on one stage: whether it shows whole before and after the counts, where the row ends,
+ // and where that stage's middle is.
+ const slow=async(from,id,left)=>{const t=await laidOut();routeTo(t.e,from);await flush();follow(t.e,t.e.elements['index-sides'].children[1]);await flush();
+  const a=stageOf(t.e,id);a.focus();if(left!==undefined)t.row.scrollLeft=left;const before=t.shows(a);await t.come();
+  return {focused:t.e.document.activeElement===a,before,after:t.shows(a),left:t.row.scrollLeft,middle:Math.max(0,t.middle(a))};};
+ // On a phone, Chrome's Shift+Tab can leave All stages half hidden. The counts then bring it into view, at the row's start.
+ assert.deepEqual(await slow('#index/artists/fontanna','radio',50),{focused:true,before:false,after:true,left:0,middle:0},'All stages, half hidden');
+ // Tab took focus to the last stage that shows whole. The counts widen the stages before it and push it out, so it goes
+ // to the middle.
+ assert.deepEqual(await slow('#index/artists','bermuda-evening'),{focused:true,before:true,after:true,left:155,middle:155},'As Night Begins, pushed out');
+ // A stage that still shows whole after the counts stays where it is, rather than move under the listener's eyes.
+ assert.deepEqual(await slow('#index/artists','bermuda-day'),{focused:true,before:true,after:true,left:0,middle:40},'Under the Sun, still whole');
+});
+
+test('a record opened from the Index comes back through its tab to the same row, at the same height, focused, with no request',async()=>{
+ const e=await indexed();const explorer=e.elements.explorer,list=e.elements['music-content'];
+ routeTo(e,'#index/artists/bermuda-day?by=tracks');await flush();const kept=e.entries().length,asked=e.namesRequests.length;
+ const row=rowOf(e,'Maceo Plex');explorer.clientHeight=600;explorer.scrollTop=700;
+ row.getBoundingClientRect=()=>({top:1000-explorer.scrollTop,bottom:1056-explorer.scrollTop});
+ follow(e,row);await flush();
+ assert.deepEqual([e.location.hash,e.document.activeElement.localName,explorer.scrollTop],['#explore/art_01a5cef5b30e','h3',0],'the record, at its title');
+ routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
+ assert.deepEqual([e.location.hash,e.namesRequests.length-asked,e.document.activeElement===row,explorer.scrollTop,row.getBoundingClientRect().top,e.entries().length,countsOf(e).radio],
+  ['#index/artists/bermuda-day?by=tracks',0,true,700,300,kept,'14'],'the same rows, the row where it stood, focused, and the stage bar\'s counts');
+ e.window.emit('popstate');explorer.scrollTop=10;e.window.emit('hashchange');await flush();
+ assert.equal(explorer.scrollTop,10,'the place is used once: a browser move restores twice');
+ // A window made shorter while the record showed: the row stays in view, above the dialog's bottom.
+ follow(e,row);await flush();explorer.clientHeight=200;routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
+ assert.deepEqual([row.getBoundingClientRect().top,e.document.activeElement===row],[144,true]);
+ // Left by a tab, the Index keeps its first row under the bar, with no focus.
+ e.response={...status('First'),...stageStats(),...stageMusic()};routeTo(e,'#statistics/bermuda-day');await flush();
+ assert.ok(!list.descendants().includes(row),'another place draws its own');
+ e.history.go(-1);await flush();assert.equal(explorer.open,false,'and Back closes the explorer in one step');
+});
+
+test('the names load once per side and page, Try again asks again after a failure, and the head works without them',async()=>{
+ const e=await indexed();let hold=null;
+ e.names=(url,signal)=>new Promise((resolve,reject)=>{hold={resolve,kind:new URL(url,'http://x').searchParams.get('kind')};signal.addEventListener('abort',()=>reject(new DOMException('This operation was aborted','AbortError')));});
+ routeTo(e,'#index/artists');await flush();
+ assert.deepEqual([e.elements['music-status'].textContent,e.elements['index-head'].hidden,countsOf(e).radio],['Loading the names…',false,''],'only an empty list says it is loading');
+ routeTo(e,'#index/artists/fontanna');await flush();
+ assert.deepEqual([e.namesRequests.map(r=>r.signal.aborted),e.elements['music-status'].textContent],[[true,false],'Loading the names…'],'another stage while the names load asks again at once, rather than wait on the request it dropped');
+ routeTo(e,'#index/labels');await flush();routeTo(e,'#index/artists');await flush();
+ assert.deepEqual(e.namesRequests.map(r=>[new URL(r.url,'http://x').searchParams.get('kind'),r.signal.aborted]),[['artists',true],['artists',true],['labels',true],['artists',false]],'a request dropped on the way leaves the cache, so the next one asks again');
+ hold.resolve(artistNames());await flush();
+ routeTo(e,'#index/labels');await flush();hold.resolve(labelNames());await flush();routeTo(e,'#index/artists/fontanna');await flush();routeTo(e,'#index/labels?by=tracks');await flush();
+ assert.deepEqual([e.namesRequests.length,marksOf(e)],[5,['50+','10+','1']],'then once per side for the page');
+ const f=await indexed();f.names={labels:labelNames()};
+ routeTo(f,'#index/artists/fontanna');await flush();
+ const status=f.elements['music-status'],retry=status.children[1];
+ assert.deepEqual([textOf(status),retry.localName,sectionsOf(f).length,countsOf(f).radio,f.elements['index-head'].hidden,f.elements['index-sides'].children[1].getAttribute('href')],['The names could not load. Try again','button',0,'',false,'#index/labels/fontanna'],'a sentence and Try again, no list and no counts; the sides still switch');
+ typeIndex(f,'fri');assert.deepEqual([f.location.hash,sectionsOf(f).length],['#index/artists/fontanna?q=fri',0],'a filter typed with no names draws nothing');
+ f.names={artists:artistNames()};retry.emit('click');await flush();
+ assert.deepEqual([f.namesRequests.length,sectionsOf(f).map(namesIn),f.elements['index-note'].textContent,status.textContent,countsOf(f).fontanna],[2,[['Frivolous']],'1 of 3','','1'],'Try again asks again and draws the filtered list');
+ // The labels shown before a side that fails are not its names: a filter typed then draws nothing.
+ const g=await indexed();g.names={labels:labelNames()};routeTo(g,'#index/labels');await flush();routeTo(g,'#index/artists');await flush();
+ typeIndex(g,'mad');assert.deepEqual([sectionsOf(g).length,textOf(g.elements['music-status'])],[0,'The names could not load. Try again']);
+ // The note goes with the list it speaks of: a side that loads, then fails, says only that, never the last filter's sentence.
+ let answer;const h=await indexed();h.names=url=>url.endsWith('kind=artists')?artistNames():new Promise(resolve=>{answer=resolve;});
+ routeTo(h,'#index/artists/ambiance?q=ame');await flush();const note=h.elements['index-note'];
+ assert.equal(textOf(note),'No artist matches “ame”. Look on all stages (2)');
+ follow(h,h.elements['index-sides'].children[1]);await flush();
+ assert.deepEqual([h.location.hash,textOf(note),textOf(h.elements['music-status'])],['#index/labels/ambiance','','Loading the names…'],'while the labels load');
+ answer(null);await flush();
+ assert.deepEqual([textOf(note),textOf(h.elements['music-status'])],['','The names could not load. Try again'],'and once they fail: one note');
+ typeIndex(h,'kos');assert.deepEqual([h.location.hash,textOf(note)],['#index/labels/ambiance?q=kos',''],'a filter typed then adds none');
 });
 
 test('History reads time, title and artist on the one row at every width, under sticky day names, with red only for Now',()=>{

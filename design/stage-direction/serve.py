@@ -3,9 +3,11 @@
 
 The live radio sends no CORS headers, so the preview mirrors production's same-origin
 paths (/api/radio/<id>, /stream/<id>.mp3) by relaying them to the live server.
+With PAVOIA_NAMES set to a folder, /api/library/names?kind=… answers from its names-<kind>.json instead.
 Usage: python3 serve.py [port]   (default 14521)
 """
 import http.server
+import os
 import sys
 import re
 import urllib.parse
@@ -20,8 +22,9 @@ sys.path.insert(0, str(PROJECT / 'ops'))
 from manage import SCENES
 STAGES = tuple(scene['id'] for scene in SCENES)
 ROUTES = {f'/api/radio/{stage}{suffix}' for stage in STAGES for suffix in ('', '/stats', '/catalogue', '/changes', '/history', '/music')}
-ROUTES.update(('/api/library/catalogue', '/api/library/statistics', '/api/audience'))
+ROUTES.update(('/api/library/catalogue', '/api/library/statistics', '/api/library/names', '/api/audience'))
 ROUTES.update(f'/stream/{stage}.mp3' for stage in STAGES)
+NAMES = os.environ.get('PAVOIA_NAMES')
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -45,6 +48,8 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         if not self.path.startswith(('/api/radio/', '/api/library/', '/api/audience', '/stream/')):
             return super().do_GET()
         path = urllib.parse.urlsplit(self.path).path
+        if path == '/api/library/names' and NAMES:
+            return self.names()
         artwork = re.fullmatch(r'/api/radio/(?:' + '|'.join(STAGES) + r')/artwork/[0-9]{1,32}/(?:cover|portrait)', path)
         artwork = artwork or re.fullmatch(r'/api/library/artwork/[0-9]{1,32}/(?:cover|portrait)', path)
         if path not in ROUTES and not artwork:
@@ -70,6 +75,23 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except OSError:
             if not started:
                 self.send_error(502, 'Live radio unreachable')
+
+    # A stand-in names document, as the Go handler answers: 400 for another kind, 503 when it is missing, and image
+    # addresses on this origin, so the page accepts them.
+    def names(self):
+        kind = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query).get('kind', [''])[0]
+        if kind not in ('artists', 'labels'):
+            return self.send_error(400, 'invalid names kind')
+        try:
+            text = (Path(NAMES) / f'names-{kind}.json').read_text(encoding='utf-8')
+        except OSError:
+            return self.send_error(503, 'names unavailable')
+        body = re.sub(r'https://[^"/]+(/api/discovery/media/)', r'\1', text).encode()
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
 
 if __name__ == '__main__':
