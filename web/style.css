@@ -202,6 +202,18 @@ body:not([data-bus]) .mood-essentials:has(input:checked) .essentials-icon { fill
 .roots path { vector-effect:non-scaling-stroke; }
 .roots-button { position:relative; max-width:calc(100% - 32px); min-height:56px; padding:14px 24px; border:1px solid var(--soft); border-radius:2px; background:var(--ink); color:var(--cream); font:italic 24px/1.25 var(--serif); text-wrap:balance; cursor:pointer; }
 .roots-button:hover { background:var(--cream); color:var(--ink); }
+/* The keyboard shortcuts: a quiet disclosure centred under the roots, in the Statistics notes' style. A touch screen
+   shows it only once ? opened it, and keeps it while its summary holds the focus, so closing never drops the focus.
+   Opened by ?, it scrolls clear of the player bar. */
+.keys { width:fit-content; margin:var(--s2) auto 0; scroll-margin-bottom:calc(var(--bar) + var(--s3)); }
+.keys summary { margin-inline:auto; }
+.keys dl { display:grid; grid-template-columns:auto auto; align-items:baseline; gap:var(--s2) var(--s3); margin:var(--s2) 0 0; }
+.keys dt { text-align:right; font-size:11px; line-height:1.4; }
+.keys kbd { font:11px/1.4 var(--mono); color:var(--muted); }
+.keys dd { margin:0; font-size:14px; line-height:1.4; color:var(--soft); }
+/* M acts on the volume slider, so its row goes where the slider goes (the fixedVolume query in journey.js). */
+@media (max-width:760px), (pointer:coarse) { .keys .key-mute { display:none; } }
+@media (hover:none) and (pointer:coarse) { .keys:not([open]):not(:focus-within) { display:none; } }
 @media (max-width:760px) {
   .roots-footer { padding-bottom:32px; }
   .roots-ground { height:300px; }
@@ -663,8 +675,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .years-peak { position:absolute; top:0; transform:translateX(-50%); white-space:nowrap; }
 /* How the numbers are counted: a quiet text button that opens the notes. */
 .stage-notes { margin-top:var(--s4); }
-.stage-notes summary { width:fit-content; min-height:44px; line-height:44px; font-size:12px; color:var(--soft); cursor:pointer; }
-.stage-notes summary:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
+.stage-notes summary, .keys summary { width:fit-content; min-height:44px; line-height:44px; font-size:12px; color:var(--soft); cursor:pointer; }
+.stage-notes summary:is(:hover, :focus-visible), .keys summary:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 @media (max-width:600px) {
   #history-more { width:100%; }
   .music-filters label { width:100%; }

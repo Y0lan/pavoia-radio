@@ -104,6 +104,11 @@ Object.assign(words.en, {orderStations:'Order the stations', byFeeling:'By feeli
   phrases:{bermuda:'Open air', palac:'Its peak and its inward side', etage:'The basement', fontanna:'Dancing in daylight', ambiance:'A safe, quiet space', bus:'Somewhere in the forest'}});
 Object.assign(words.de, {orderStations:'Sender ordnen', byFeeling:'Nach Stimmung', byStage:'Nach Bühne', day:'Tag', night:'Nacht', anyTime:'Jederzeit', stageOf:'Bühne {stage}',
   phrases:{bermuda:'Unter freiem Himmel', palac:'Höhepunkt und Blick nach innen', etage:'Der Keller', fontanna:'Tanzen bei Tageslicht', ambiance:'Ein sicherer, ruhiger Ort', bus:'Irgendwo im Wald'}});
+// The shortcuts under the roots: each key's name where it has one, and what it does.
+Object.assign(words.en, {keysTitle:'Keyboard shortcuts', keySpace:'Play or pause', keyArrowsName:'Left and right arrows', keyArrows:'Previous or next station',
+  keyNumbers:'The station at that place in the list', keyMute:'Sound off, and on again', keyFilter:'In the Index: filter the names', keyClose:'Back to listening', keyHelp:'Show or hide these shortcuts'});
+Object.assign(words.de, {keysTitle:'Tastenkürzel', keySpace:'Abspielen oder pausieren', keyArrowsName:'Pfeiltasten links und rechts', keyArrows:'Vorheriger oder nächster Sender',
+  keyNumbers:'Der Sender an dieser Stelle der Liste', keyMute:'Ton aus und wieder an', keyFilter:'Im Index: Namen filtern', keyClose:'Zurück zum Radio', keyHelp:'Diese Kürzel zeigen oder verbergen'});
 let language = 'en';
 try { const saved=localStorage.getItem('pavoia-language'); if (Object.hasOwn(words,saved)) language=saved; } catch { /* Storage is optional. */ }
 const text = key => words[language][key];
@@ -642,11 +647,12 @@ button.addEventListener('click', toggle);
 // A control last pressed with the mouse or a finger does not capture it, even if Tab reached it first.
 // The arrows stay with a modal dialog, the stations sheet; the explorer leaves the player and its keys in reach.
 let keyboardFocus = false;
+const typing = 'input:not([type=range],[type=radio]), textarea, select, [contenteditable]';
 document.addEventListener('focusin', event => { keyboardFocus = event.target.matches(':focus-visible'); });
 document.addEventListener('pointerdown', () => { keyboardFocus = false; }, true);
 document.addEventListener('keydown', event => {
   const target = event.target;
-  if (event.ctrlKey || event.metaKey || event.altKey || target.matches('input:not([type=range],[type=radio]), textarea, select, [contenteditable]')) return;
+  if (event.ctrlKey || event.metaKey || event.altKey || target.matches(typing)) return;
   if (event.code === 'Space') {
     if ((keyboardFocus && target.matches('button, summary')) || target.matches('[type=radio]:not(:checked)')) return;
     event.preventDefault();
@@ -655,6 +661,24 @@ document.addEventListener('keydown', event => {
     step(event.key === 'ArrowLeft' ? -1 : 1);
   }
 });
+// The other page keys listen on the window, after every handler of the document, so a key the Index or Escape took
+// stays theirs. They wait while typing, with Ctrl, Cmd or Alt, and while the stations sheet is open. 1 to 9 pick the
+// station at that place on screen, as the rail does, so a paused radio stays paused. M mutes where the volume shows.
+// ? opens or closes the shortcuts under the roots, which the open explorer covers.
+window.addEventListener('keydown', event => {
+  if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.target.matches?.(typing) || document.querySelector('dialog:modal')) return;
+  if (/^[1-9]$/.test(event.key)) selectMood(shown[event.key - 1].id);
+  else if (event.key === 'm' || event.key === 'M') window.Pavoia.toggleMute?.();
+  else if (event.key === '?' && !$('explorer').open) toggleKeys();
+});
+function toggleKeys() {
+  const keys = $('keys'), summary = keys.querySelector('summary');
+  keys.open = !keys.open;
+  // ? gave this focus, not Tab, so Space still plays; Enter and ? still open and close the list.
+  summary.focus({ preventScroll: true });
+  keyboardFocus = false;
+  if (keys.open) keys.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
+}
 if ('mediaSession' in navigator) {
   for (const [action, handler] of Object.entries({ play, pause, stop: pause, previoustrack: () => step(-1), nexttrack: () => step(1) })) {
     try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* Unsupported action. */ }

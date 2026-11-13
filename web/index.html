@@ -5,7 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0b0a09">
   <title>Pavoia Radio</title>
+  <meta name="description" content="So it never ends. A personal selection by Gaende.">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Pavoia Radio">
+  <meta property="og:title" content="Pavoia Radio">
+  <meta property="og:description" content="So it never ends. A personal selection by Gaende.">
+  <meta property="og:url" content="https://pavoia.gaende.box.ca/">
+  <meta property="og:image" content="https://pavoia.gaende.box.ca/photos/hero-night.jpg">
+  <meta property="og:image:width" content="2000">
+  <meta property="og:image:height" content="1333">
+  <meta property="og:image:alt" content="Pałac at night, a crowd dancing in blue light">
+  <meta name="twitter:card" content="summary_large_image">
   <link rel="icon" href="assets/gaende-icon-white.svg" type="image/svg+xml">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="assets/apple-touch-icon.png">
   <link rel="stylesheet" href="style.css">
   <script src="app.js" defer></script>
   <script src="closeness.js" defer></script>
@@ -28,7 +41,7 @@
       <canvas id="waveform" aria-hidden="true"></canvas>
       <progress id="track-progress" max="1" value="0" aria-label="Live track progress"></progress>
     </div>
-    <label class="volume-control"><span data-journey="volume">Volume</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1"></label>
+    <label class="volume-control"><span data-journey="volume">Volume</span><input id="volume" type="range" min="0" max="1" step="0.05" value="1" aria-keyshortcuts="M"></label>
   </div>
   <main>
       <header class="top">
@@ -99,6 +112,17 @@
       </svg>
       <button type="button" id="go-deeper" class="roots-button" data-journey="deeper">See the roots it’s built on</button>
     </div>
+    <details id="keys" class="keys"><summary data-copy="keysTitle">Keyboard shortcuts</summary>
+      <dl>
+        <dt><kbd data-copy="space">Space</kbd></dt><dd data-copy="keySpace">Play or pause</dd>
+        <dt><kbd data-copy="keyArrowsName">Left and right arrows</kbd></dt><dd data-copy="keyArrows">Previous or next station</dd>
+        <dt><kbd>1–9</kbd></dt><dd data-copy="keyNumbers">The station at that place in the list</dd>
+        <dt class="key-mute"><kbd>M</kbd></dt><dd class="key-mute" data-copy="keyMute">Sound off, and on again</dd>
+        <dt><kbd>/</kbd></dt><dd data-copy="keyFilter">In the Index: filter the names</dd>
+        <dt><kbd>Esc</kbd></dt><dd data-copy="keyClose">Back to listening</dd>
+        <dt><kbd>?</kbd></dt><dd data-copy="keyHelp">Show or hide these shortcuts</dd>
+      </dl>
+    </details>
   </footer>
 
   <dialog id="stations-sheet" aria-labelledby="stations-title">

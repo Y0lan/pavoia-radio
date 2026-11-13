@@ -32,7 +32,7 @@
   ];
   const copy = {
     en:{ deeper:'See the roots it’s built on',roots:'The roots',back:'Back to listening',
-      spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day',volume:'Volume',
+      spotifyTrack:'Open track on Spotify',spotifyStage:'Follow this playlist on Spotify',spotifyDaily:'I add new tracks every day',volume:'Volume',muted:'Muted',
       searchLabel:'Artist, track, release or label',searchPlaceholder:'Search artists, tracks, releases, labels',nothingOnAir:'Nothing on air right now. Search to start.',
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
       artist:'Artist',track:'Track',release:'Release',label:'Label',playlist:'Playlist',primary:'Artist',featured:'Featuring',remixer:'Remixed by',
@@ -51,7 +51,7 @@
       showList:'Show as a list',showMap:'Show as a map',mapHint:'The nearer a name, the closer it is. Pick one to go there.',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',roots:'Die Wurzeln',back:'Zurück zum Radio',
-      spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',
+      spotifyTrack:'Track auf Spotify öffnen',spotifyStage:'Folge dieser Playlist auf Spotify',spotifyDaily:'Ich füge jeden Tag neue Tracks hinzu',volume:'Lautstärke',muted:'Stumm',
       searchLabel:'Künstler, Track, Veröffentlichung oder Label',searchPlaceholder:'Künstler, Tracks, Alben, Labels suchen',nothingOnAir:'Gerade läuft nichts. Suche, um anzufangen.',
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
       artist:'Künstler',track:'Track',release:'Veröffentlichung',label:'Label',playlist:'Playlist',primary:'Künstler',featured:'Mit',remixer:'Remix von',
@@ -291,7 +291,7 @@
     $('explorer-close').setAttribute('aria-label',word('back'));
     $('explorer-close').title=word('back');
     stageRow.setAttribute('aria-label',word('stages'));$('index-sides').setAttribute('aria-label',word('sides'));$('index-order').setAttribute('aria-label',word('order'));
-    $('discovery-query').placeholder=word('searchPlaceholder');
+    $('discovery-query').placeholder=word('searchPlaceholder');sayVolume();
     renderPlayer();redraw();
     if(dialog.open&&view!=='explore'){fillRow();loadMusic();}
   }
@@ -638,12 +638,24 @@
   radio.stopPreview=()=>{if(!preview)return false;finishPreview();return true;};
   $('preview-audio').addEventListener('ended',finishPreview);
   $('preview-audio').addEventListener('error',()=>{if(preview){$('discovery-status').textContent=word('previewError');finishPreview();}});
-  try{const saved=parseFloat(localStorage.getItem('pavoia-volume'));if(saved>=0&&saved<=1)$('volume').value=saved;}catch{/* Storage is optional. */}
+  const storedVolume=()=>{try{const saved=parseFloat(localStorage.getItem('pavoia-volume'));if(saved>=0&&saved<=1)return saved;}catch{/* Storage is optional. */}return null;};
+  if(storedVolume()!==null)$('volume').value=storedVolume();
   // Where the stylesheet hides the slider, the device sets the level, so a remembered low volume cannot silence the radio.
   const fixedVolume=matchMedia('(max-width:760px), (pointer:coarse)');
   const volume=()=>{$('audio').volume=$('preview-audio').volume=fixedVolume.matches?1:Number($('volume').value);};volume();
   fixedVolume.addEventListener('change',volume);
-  $('volume').addEventListener('input',()=>{volume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
+  // At 0 the slider says Muted.
+  const sayVolume=()=>{if(Number($('volume').value))$('volume').removeAttribute('aria-valuetext');else $('volume').setAttribute('aria-valuetext',word('muted'));};
+  // M puts the slider to 0 and back to the level it had, or the stored one. It stores nothing, so a reload comes back at
+  // the stored level, and a hand on the slider forgets the kept one. Where the slider is hidden, M does nothing.
+  let unmuted=null;
+  radio.toggleMute=()=>{
+    if(fixedVolume.matches)return;
+    const level=Number($('volume').value);
+    if(level>0){unmuted=level;$('volume').value=0;}else{$('volume').value=unmuted||storedVolume()||1;unmuted=null;}
+    volume();sayVolume();
+  };
+  $('volume').addEventListener('input',()=>{unmuted=null;volume();sayVolume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
   // The footer opens the record on air; only with nothing on air does it open the search.
   $('go-deeper').addEventListener('click',()=>go(entityID(nowID())?'#explore/'+nowID():'#explore'));
   // ✕ and Escape. An entry this page opened goes back to the page's entry right under it, and

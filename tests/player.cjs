@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { readFileSync } = require('node:fs');
+const { readFileSync, existsSync } = require('node:fs');
 const { resolve } = require('node:path');
 const { runInNewContext, runInContext } = require('node:vm');
 const web = name => readFileSync(resolve(__dirname, '../web/'+name), 'utf8');
@@ -138,7 +138,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     setLanguage:value=>elements.language.emit('click',{target:{value}}),
     focus:target=>document.emit('focusin',{target}),
     pointer:()=>document.emit('pointerdown',{}),
-    key(code,target=control('body'),extra={}){const event={code,key:code==='Space'?' ':code,target,repeat:false,ctrlKey:false,metaKey:false,altKey:false,prevented:false,preventDefault(){event.prevented=true;},...extra};document.emit('keydown',event);return event;},change:id=>elements.moods.emit('change',{target:{value:id}}),
+    // A key goes down: the document's listeners hear it first, then the window's, as it bubbles in a browser. A printable
+    // key comes through extra ({key:'5'}).
+    key(code,target=control('body'),extra={}){const event={code,key:code==='Space'?' ':code,target,repeat:false,ctrlKey:false,metaKey:false,altKey:false,isComposing:false,prevented:false,defaultPrevented:false,preventDefault(){event.prevented=event.defaultPrevented=true;},...extra};document.emit('keydown',event);window.emit('keydown',event);return event;},change:id=>elements.moods.emit('change',{target:{value:id}}),
     playing:()=>{audio.readyState=4;audio.emit('playing');},
     error:()=>{audio.error={code:2};audio.emit('error');},
     poll:()=>intervals[0](),
@@ -3210,4 +3212,120 @@ test('a start the browser blocks during a reconnect stops trying and asks for pl
  e.audio.calls.at(-1).reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
  assert.deepEqual([e.elements['playback-status'].textContent,e.window.Pavoia.getState().wanted,e.timers.size],['Press play to start',false,0]);
  e.window.emit('online');e.document.emit('visibilitychange');assert.equal(e.audio.src,undefined);
+});
+
+// Step 3: the page keys, the shortcuts, the install icon and the share preview.
+const digit=(e,n,extra={})=>e.key('Digit'+n,undefined,{key:String(n),...extra});
+const keysMarkup=()=>{const html=web('index.html');return html.slice(html.indexOf('<details id="keys"'),html.indexOf('</details>')+10);};
+
+test('1 to 9 go to the station at that place on screen, as the rail does, and never start playback',async()=>{
+ const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage,length=e.entries().length;
+ digit(e,5);assert.equal(stage(),'etage-zero','5 is the fifth station by stage');
+ assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.calls.length,e.audio.src],[false,0,undefined],'a paused radio stays paused and asks for no stream');
+ assert.deepEqual([e.url(),e.entries().length],['/?station=etage-zero',length],'the address names it in place, as the rail does');
+ e.key('Numpad1',undefined,{key:'1'});assert.equal(stage(),'bermuda-day','the keypad gives the same key');
+ digit(e,0);assert.equal(stage(),'bermuda-day','0 names no station');
+ e.click();const calls=e.audio.calls.length;
+ digit(e,3);assert.deepEqual([stage(),e.audio.calls.length,e.audio.src],['palac-dance',calls+1,'/stream/palac-dance.mp3'],'a playing radio connects once to the new station');
+ digit(e,3);assert.equal(e.audio.calls.length,calls+1,'its own number changes nothing');
+ press(e,'feeling');digit(e,2);assert.equal(stage(),'fontanna','By feeling, 2 is the second station of that order');
+ digit(e,6);assert.equal(stage(),'palac-feel','and 6 the sixth');
+ e.click();e.location.hash='#bus';e.window.emit('hashchange');await flush();const before=e.urls().length;
+ digit(e,9);
+ assert.deepEqual([stage(),e.urls().length,e.document.body.getAttribute('data-bus'),e.window.Pavoia.getState().wanted,e.audio.src],['essentials',before+1,null,false,undefined],'from the Bus a number leaves it with one entry, as the rail does, and stays paused');
+});
+
+test('the page keys wait while typing, with a modifier, with the stations sheet open, and when an earlier handler took the key',async()=>{
+ const e=setup({journey:true,storage:{getItem:key=>key==='pavoia-volume'?'0.6':null,setItem(){}}});await flush();
+ e.elements.keys.append(Object.assign(new e.Element(),{localName:'summary'}));
+ const now=()=>[e.window.Pavoia.getState().stage,e.audio.volume,Boolean(e.elements.keys.open)],before=now();
+ const tries=(why,target,extra={})=>{for(const key of ['5','m','?'])e.key(key==='?'?'Slash':key==='m'?'KeyM':'Digit'+key,target,{key,...extra});assert.deepEqual(now(),before,why);};
+ for(const [target,why] of [[control('input',{type:'search'}),'search field'],[control('textarea'),'textarea'],[control('select'),'select'],[control('div',{contenteditable:''}),'editable text']])tries(why,target);
+ for(const extra of [{ctrlKey:true},{metaKey:true},{altKey:true}])tries(JSON.stringify(extra),undefined,extra);
+ tries('a held key',undefined,{repeat:true});
+ tries('a key that composes text',undefined,{isComposing:true});
+ e.openDialog={};tries('the modal stations sheet keeps its keys');e.openDialog=null;
+ const took=event=>event.preventDefault();e.document.addEventListener('keydown',took);
+ tries('a key an earlier handler took, such as the Index type-ahead');
+ e.document.removeEventListener('keydown',took);
+ for(const [target,why] of [[control('input',{type:'range'}),'the volume slider'],[control('input',{type:'radio'}),'a station'],[control('button',{},true),'a button']]){digit(e,5,{target});assert.equal(e.window.Pavoia.getState().stage,'etage-zero',why+' leaves the number to the page');digit(e,4);}
+ digit(e,5);e.key('KeyM',undefined,{key:'M'});e.key('Slash',undefined,{key:'?'});assert.deepEqual(now(),['etage-zero',0,true],'with none of these, each key acts');
+});
+
+test('M turns the sound off and back on where the volume shows, stores nothing, and does nothing where the device sets the level',async()=>{
+ const query='(max-width:760px), (pointer:coarse)',saved={'pavoia-volume':'0.6'},writes=[],storage={getItem:key=>saved[key] ?? null,setItem(key,value){writes.push(key);saved[key]=String(value);}};
+ const e=setup({journey:true,storage});await flush();const slider=e.elements.volume,m=()=>e.key('KeyM',undefined,{key:'m'});
+ assert.equal(e.audio.volume,0.6);assert.equal(slider.getAttribute('aria-valuetext'),null,'a level above 0 says no word');
+ m();assert.deepEqual([Number(slider.value),e.audio.volume,slider.getAttribute('aria-valuetext')],[0,0,'Muted'],'M puts the slider to 0 and says Muted');
+ e.setLanguage('de');assert.equal(slider.getAttribute('aria-valuetext'),'Stumm','in German too');
+ saved['pavoia-volume']='0.9';
+ e.key('KeyM',undefined,{key:'M'});assert.deepEqual([Number(slider.value),e.audio.volume,slider.getAttribute('aria-valuetext')],[0.6,0.6,null],'M again brings back the level it kept, not the one another tab stored, and the word goes');
+ assert.deepEqual(writes.filter(key=>key==='pavoia-volume'),[],'mute writes no storage');
+ m();slider.value='0.5';slider.emit('input');
+ assert.deepEqual([slider.getAttribute('aria-valuetext'),e.audio.volume],[null,0.5],'a hand move of the slider after a mute takes the word away');
+ m();slider.value='0';slider.emit('input');m();assert.equal(Number(slider.value),1,'a hand on the slider forgets the kept level: the stored 0 gives way to full');
+ saved['pavoia-volume']='0.4';slider.value='0.4';slider.emit('input');m();slider.value='0.3';slider.emit('input');slider.value='0';slider.emit('input');saved['pavoia-volume']='0.4';m();
+ assert.equal(Number(slider.value),0.4,'with no kept level, M brings the stored one back');
+ assert.match(web('index.html'),/<input id="volume" type="range"[^>]* aria-keyshortcuts="M">/,'the slider names its key, and no new button is added');
+ const phone=setup({journey:true,storage:{getItem:key=>key==='pavoia-volume'?'0.6':null,setItem(){}},media:[query]});await flush();
+ phone.key('KeyM',undefined,{key:'m'});assert.deepEqual([phone.audio.volume,phone.elements.volume.getAttribute('aria-valuetext')],[1,null],'where the slider is hidden, M does nothing');
+ phone.queries.get(query).change(false);assert.equal(phone.audio.volume,0.6,'and a wider window finds the slider where it was');
+ const denied=()=>{throw new Error('Storage denied');};
+ const blocked=setup({journey:true,storage:{getItem:denied,setItem:denied}});await flush();blocked.elements.volume.value='0.4';blocked.elements.volume.emit('input');
+ blocked.key('KeyM',undefined,{key:'m'});assert.equal(blocked.audio.volume,0,'without storage, M still mutes');
+ blocked.key('KeyM',undefined,{key:'m'});assert.deepEqual([Number(blocked.elements.volume.value),blocked.audio.volume],[0.4,0.4],'and brings back the level it kept');
+});
+
+test('? opens the shortcuts under the roots button, in both languages, only while the explorer is closed',async()=>{
+ const e=setup();await flush();const keys=e.elements.keys,summary=Object.assign(new e.Element(),{localName:'summary'});keys.append(summary);
+ const ask=()=>e.key('Slash',undefined,{key:'?',shiftKey:true});
+ ask();assert.deepEqual(JSON.parse(JSON.stringify([keys.open,e.document.activeElement===summary,keys.scrolled,summary.focusOptions])),[true,true,{block:'nearest',behavior:'smooth'},{preventScroll:true}],'? opens the shortcuts, brings them into view and focuses their summary');
+ ask();assert.deepEqual([keys.open,e.document.activeElement===summary],[false,true],'? again closes them, and focus stays on the summary');
+ // Chromium marks the focus a script gives during a keydown :focus-visible, as if the keyboard had reached the summary.
+ Object.assign(summary,{tag:'summary',focusVisible:true,matches:selector=>cssMatches(selector,summary),focus(options){e.document.activeElement=this;this.focusOptions=options;e.focus(this);}});
+ ask();ask();assert.deepEqual([e.key('Space',summary).prevented,keys.open,e.window.Pavoia.getState().wanted],[true,false,true],'after ? and ?, Space plays, since ? and not Tab focused the summary');
+ e.key('Space',summary);ask();assert.deepEqual([e.key('Space',summary).prevented,keys.open,e.window.Pavoia.getState().wanted],[true,true,true],'with the list open, Space still plays');
+ e.key('Space',summary);e.focus(summary);assert.equal(e.key('Space',summary).prevented,false,'a summary Tab reached keeps its own Space');ask();
+ e.elements.explorer.open=true;ask();assert.equal(keys.open,false,'the open explorer covers them, so ? does nothing');
+ const still=setup({media:['(prefers-reduced-motion: reduce)']});await flush();still.elements.keys.append(Object.assign(new still.Element(),{localName:'summary'}));
+ still.key('Slash',undefined,{key:'?'});assert.deepEqual({...still.elements.keys.scrolled},{block:'nearest',behavior:'auto'},'reduced motion jumps');
+ const html=web('index.html'),block=keysMarkup();
+ assert.ok(html.indexOf(block)>html.indexOf('<div class="roots-ground">')&&html.indexOf(block)<html.indexOf('</footer>'),'the shortcuts sit in the footer, after the roots');
+ assert.match(block,/^<details id="keys" class="keys"><summary data-copy="keysTitle">Keyboard shortcuts<\/summary>\s*<dl>/,'a native disclosure over a list of terms');
+ assert.deepEqual([...block.matchAll(/<dt(?: class="key-mute")?><kbd(?: data-copy="(\w+)")?>([^<]+)<\/kbd><\/dt><dd(?: class="key-mute")? data-copy="(\w+)">/g)].map(m=>[m[1]||m[2],m[3]]),
+  [['space','keySpace'],['keyArrowsName','keyArrows'],['1–9','keyNumbers'],['M','keyMute'],['/','keyFilter'],['Esc','keyClose'],['?','keyHelp']],'each key, then what it does');
+ const sliderGone='(max-width:760px), (pointer:coarse)';
+ assert.ok(block.includes('<dt class="key-mute"><kbd>M</kbd></dt><dd class="key-mute" data-copy="keyMute">')&&web('style.css').includes(`@media ${sliderGone} { .keys .key-mute { display:none; } }`)&&web('journey.js').includes(`matchMedia('${sliderGone}')`),'the M row goes where the volume slider goes, by the same query');
+ const words=e.run('words'),copied=[...block.matchAll(/data-copy="(\w+)"/g)].map(m=>m[1]);
+ assert.deepEqual(copied.map(key=>[words.en[key],words.de[key]]),[
+  ['Keyboard shortcuts','Tastenkürzel'],['Space','Leertaste'],['Play or pause','Abspielen oder pausieren'],['Left and right arrows','Pfeiltasten links und rechts'],
+  ['Previous or next station','Vorheriger oder nächster Sender'],['The station at that place in the list','Der Sender an dieser Stelle der Liste'],['Sound off, and on again','Ton aus und wieder an'],
+  ['In the Index: filter the names','Im Index: Namen filtern'],['Back to listening','Zurück zum Radio'],['Show or hide these shortcuts','Diese Kürzel zeigen oder verbergen']],'every words in English and German');
+ const rules=cssRules();
+ assert.match(rules.get('.stage-notes summary, .keys summary'),/min-height:44px; line-height:44px; font-size:12px; color:var\(--soft\)/,'the summary is the Statistics notes\' quiet 12px button');
+ assert.match(rules.get('.keys kbd'),/font:11px\/1\.4 var\(--mono\); color:var\(--muted\)/,'a key is a mono fact');
+ assert.match(rules.get('.keys dd'),/font-size:14px; line-height:1\.4; color:var\(--soft\)/,'what it does reads 14px, and a wrapped line keeps the text style\'s height');
+ assert.match(rules.get('.keys dt'),/font-size:11px; line-height:1\.4/,'so does a wrapped key name');
+ assert.doesNotMatch([...rules].filter(([selector])=>selector.includes('.keys')).map(([,d])=>d).join(''),/border|background/,'no border, no background');
+ assert.match(cssRules('(hover:none) and (pointer:coarse)').get('.keys:not([open]):not(:focus-within)'),/display:none/,'a touch screen sees nothing new until ? opens it, and a closed list keeps a focused summary');
+});
+
+test('the head names the manifest, the icons and one share preview; the manifest uses the page\'s ink',()=>{
+ const html=web('index.html'),head=html.slice(0,html.indexOf('</head>')),manifest=JSON.parse(web('manifest.webmanifest'));
+ const ink=/--ink:\s*(#[0-9a-f]{6})/.exec(web('style.css'))[1];
+ assert.deepEqual([manifest.background_color,manifest.theme_color,/<meta name="theme-color" content="([^"]+)">/.exec(head)[1]],[ink,ink,ink],'the manifest and the theme colour are the page\'s ink');
+ assert.deepEqual([manifest.id,manifest.name,manifest.short_name,manifest.start_url,manifest.scope,manifest.display],['/','Pavoia Radio','Pavoia','/','/','standalone']);
+ assert.deepEqual(manifest.icons.map(icon=>[icon.src,icon.sizes,icon.type,icon.purpose||'any']),[['assets/icon-192.png','192x192','image/png','any'],['assets/icon-512.png','512x512','image/png','any'],['assets/icon-maskable-512.png','512x512','image/png','maskable']]);
+ assert.ok(!('shortcuts' in manifest)&&!('serviceworker' in manifest),'no shortcuts, no service worker');
+ assert.match(head,/<link rel="icon" href="assets\/gaende-icon-white.svg" type="image\/svg\+xml">\s*<link rel="manifest" href="manifest.webmanifest">\s*<link rel="apple-touch-icon" href="assets\/apple-touch-icon.png">/,'the manifest and the touch icon follow the favicon');
+ // The CI test checks out without LFS, so only the files' presence is checked, never their bytes.
+ for(const path of [...manifest.icons.map(icon=>icon.src),'assets/apple-touch-icon.png'])assert.ok(existsSync(resolve(__dirname,'../web/'+path)),path+' is in web/');
+ const meta=[...head.matchAll(/<meta (name|property)="([^"]+)" content="([^"]*)">/g)].map(m=>[m[2],m[3]]).filter(([key])=>key!=='viewport'&&key!=='theme-color');
+ assert.deepEqual(meta,[['description','So it never ends. A personal selection by Gaende.'],['og:type','website'],['og:site_name','Pavoia Radio'],['og:title','Pavoia Radio'],
+  ['og:description','So it never ends. A personal selection by Gaende.'],['og:url','https://pavoia.gaende.box.ca/'],['og:image','https://pavoia.gaende.box.ca/photos/hero-night.jpg'],
+  ['og:image:width','2000'],['og:image:height','1333'],['og:image:alt','Pałac at night, a crowd dancing in blue light'],['twitter:card','summary_large_image']],'one description, one preview, one picture');
+ for(const [key,value] of meta.filter(([key])=>key==='og:url'||key==='og:image')){
+  const url=new URL(value);assert.equal(url.protocol,'https:',key+' is absolute https');
+  assert.ok(existsSync(resolve(__dirname,'../web/'+(url.pathname==='/'?'index.html':url.pathname.slice(1)))),key+' points to a file the site serves');
+ }
 });
