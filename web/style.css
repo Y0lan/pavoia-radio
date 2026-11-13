@@ -729,9 +729,13 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .explorer-top { column-gap:var(--s3); }
 }
 #explorer .collection-note { color:var(--soft); font-size:12px; line-height:1.4; max-width:75ch; margin-block:var(--s3); }
-/* On air now keeps the line of its total when the total goes, so the nine rows never move under the pointer. In a
-   row, a long artist ends in an ellipsis before the station, which always shows. */
-#music-content[data-key^="history:radio:"] > .collection-note { min-height:1lh; }
+/* On air now reads its total on its heading's line, so the total comes and goes and the nine rows never move under the
+   pointer, with no empty line kept for it. One heading over nine rows has no need to stick. In a row, a long artist
+   ends in an ellipsis before the station, which always shows. */
+#music-content[data-key^="history:radio:"] { display:grid; grid-template-columns:auto minmax(0,1fr); column-gap:var(--s3); align-items:baseline; }
+#music-content[data-key^="history:radio:"] > * { grid-column:1 / -1; }
+#music-content[data-key^="history:radio:"] > .history-day { grid-column:1; position:static; }
+#music-content[data-key^="history:radio:"] > .collection-note { grid-column:2; margin:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
 /* Its Day field is off: on a phone it goes, and on a wide screen it keeps its box, unseen and out of the Tab order, so
    the row of stations stands where it stands on a station. */
 #history-day-label[data-off] { display:none; }

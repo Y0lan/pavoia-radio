@@ -98,6 +98,9 @@ async page => {
     assert(await page.locator('#music-content > a.row .row-name').evaluateAll(names=>names.every(n=>getComputedStyle(n).whiteSpace==='nowrap'&&getComputedStyle(n).textOverflow==='ellipsis')),'A title wraps at '+width);
     // A long artist ends in an ellipsis before the station, which shows whole on every row.
     assert(await page.locator('#music-content > a.row .row-line').evaluateAll(lines=>lines.every(l=>{const s=l.lastElementChild,b=l.getBoundingClientRect(),r=s.getBoundingClientRect();return r.left>=b.left-0.5&&r.right<=b.right+0.5&&s.scrollWidth<=s.clientWidth+1;})),'A station is cut off its row at '+width);
+    // The total reads on the heading's line, whole, and the first row comes 8px under the heading, as in a station's History.
+    assert(await page.locator('#music-content').evaluate(c=>{const h=c.children[0].getBoundingClientRect(),t=c.children[1],b=t.getBoundingClientRect(),row=c.querySelector(':scope > a.row').getBoundingClientRect();
+      return b.top>=h.top&&b.bottom<=h.bottom&&b.left>=h.right&&t.scrollWidth<=t.clientWidth+1&&Math.abs(row.top-h.bottom-8)<=1;}),'The total is not on the heading\'s line at '+width);
     await page.screenshot({path:'output/playwright/music-on-air-'+width+'.png'});
   }
   // The total goes when one station fails and comes back with it, and the nine rows stay where they are.
