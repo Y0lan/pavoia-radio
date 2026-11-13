@@ -165,13 +165,14 @@ def configure():
     }}
 ''' for path, port in artwork_scenes)
     # Browsers refuse scripts and styles with a wrong type because the site sends nosniff, and
-    # nginx's built-in type map lacks js, css, svg and fonts.
+    # nginx's built-in type map lacks js, css, svg and fonts. A type missing here is served as application/octet-stream,
+    # so the install icons (png) and the web app manifest have their own.
     def static_site(env):
         return "".join(f'''    location {match} {{
       limit_except GET {{ deny all; }}
       root {ROOT / f"web-{env}"};
       try_files {files} =404;
-      types {{ text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; font/woff2 woff2; font/ttf ttf; text/plain txt; }}
+      types {{ text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; image/png png; application/manifest+json webmanifest; font/woff2 woff2; font/ttf ttf; text/plain txt; }}
       charset utf-8;
       charset_types text/css text/javascript text/plain image/svg+xml;
       expires epoch;

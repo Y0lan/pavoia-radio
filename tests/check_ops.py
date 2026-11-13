@@ -214,7 +214,7 @@ class OpsChecks(unittest.TestCase):
             self.assertIn("limit_except GET { deny all; }", routes[path])
         self.assertEqual(set(routes), expected | {"/"})
         # Both sites: the same headers, streams and APIs; each page comes from its own static release.
-        types = "types { text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; font/woff2 woff2; font/ttf ttf; text/plain txt; }"
+        types = "types { text/html html; text/css css; text/javascript js; image/svg+xml svg; image/jpeg jpg; image/png png; application/manifest+json webmanifest; font/woff2 woff2; font/ttf ttf; text/plain txt; }"
         charset = "charset utf-8;\n      charset_types text/css text/javascript text/plain image/svg+xml;"
         for env, block, port, host in (("prod", prod, 14500, "pavoia.gaende.box.ca"), ("dev", dev, 14520, "pavoia-dev.gaende.box.ca")):
             self.assertIn(f"listen 0.0.0.0:{port};", block)
