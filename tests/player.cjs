@@ -132,7 +132,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     back(){this.go(-1);}};
   // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
   const queries=new Map();
-  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],namesRequests:[],changesRequests:[],response:status('First'),
+  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],namesRequests:[],changesRequests:[],airRequests:[],response:status('First'),
     entries:()=>entries.map(entry=>entry.hash),urls:()=>entries.map(entry=>location.pathname+entry.search+entry.hash),url:()=>location.pathname+query+current,position:()=>at,evict(n){entries.splice(0,n);at-=n;},
     visit(target){location.hash=target;window.emit('popstate');window.emit('hashchange');},
     click:()=>elements.play.emit('click'),
@@ -161,8 +161,12 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     getComputedStyle:el=>({getPropertyValue:()=>'',...el.computed}),
     // env.discovery is one reply for every discovery path, or a function of the path; env.historyReply, once set, answers History the same way;
     // env.names, once set, holds the names document of each kind, or is a function of the path and the signal; env.changes,
-    // once set, answers each page of a station's changes as a function of the path.
-    fetch:(url,{signal})=>url.includes('/changes?')&&env.changes ? (env.changesRequests.push({url,signal}),Promise.resolve(env.changes(url,signal)).then(data=>({ok:Boolean(data),json:async()=>data}))) :
+    // once set, answers each page of a station's changes as a function of the path; env.air, once set, answers each
+    // station's /api/radio/<id> as a function of its id (data, null for a failed answer, or a promise of either), for the
+    // page's own poll too, as the server does unless the data names another stage, and drops one aborted.
+    fetch:(url,{signal})=>/^\/api\/radio\/[a-z-]+$/.test(url)&&env.air ? (()=>{const id=url.split('/').pop();env.airRequests.push({id,at:clock.now,signal});
+      return new Promise((resolve,reject)=>{signal?.addEventListener('abort',()=>reject(new Error('aborted')));Promise.resolve(env.air(id)).then(data=>resolve({ok:Boolean(data),json:async()=>data&&{stage:{id},...data}}),reject);});})() :
+      url.includes('/changes?')&&env.changes ? (env.changesRequests.push({url,signal}),Promise.resolve(env.changes(url,signal)).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.startsWith('/api/library/names?')&&env.names ? (env.namesRequests.push({url,signal}),Promise.resolve(typeof env.names==='function'?env.names(url,signal):env.names[new URL(url,'http://radio').searchParams.get('kind')]).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.includes('/history?')&&env.historyReply ? (env.historyRequests.push({url,signal}),Promise.resolve(env.historyReply(url)).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
@@ -2376,9 +2380,9 @@ test('History and Statistics keep their stage and day in the address, in one ent
  follow(e,byClass(e.elements['music-content'],'row').find(a=>a.getAttribute('href')==='#statistics/bermuda-evening'));await flush();
  assert.deepEqual([e.location.hash,e.entries().length],['#statistics/bermuda-evening',kept],'so does a stage it shares tracks with');
  routeTo(e,'#history/bermuda-day/2026-03-28');await flush();
- assert.deepEqual([links().length,links()[0],e.elements['history-day'].value,asked(e).get('until'),tabs()],[9,['Under the Sun','#history/bermuda-day/2026-03-28','page'],'2026-03-28',new Date(2026,2,29).toISOString(),['#explore','#history/bermuda-day/2026-03-28','#statistics/bermuda-evening','#index/artists']],'History: the nine stages, each keeping the day; each tab keeps its last place');
+ assert.deepEqual([links().length,links()[0],links()[1],e.elements['history-day'].value,asked(e).get('until'),tabs()],[10,['All stations','#history/radio',null],['Under the Sun','#history/bermuda-day/2026-03-28','page'],'2026-03-28',new Date(2026,2,29).toISOString(),['#explore','#history/bermuda-day/2026-03-28','#statistics/bermuda-evening','#index/artists']],'History: All stations, which has no day, then the nine stages, each keeping the day; each tab keeps its last place');
  const today=localDay(new Date());
- for(const [typed,place] of [['#statistics','#statistics/palac-feel'],['#statistics/bus','#statistics/palac-feel'],['#statistics/library','#statistics/radio'],['#statistics/library/artists','#index/artists?by=tracks'],['#statistics/library/more','#statistics/radio'],['#statistics/fontanna/more','#statistics/fontanna'],['#statistics/bus/artists','#index/artists?by=tracks'],['#history','#history/palac-feel'],['#history/radio','#history/palac-feel'],['#history/%E0','#history/palac-feel'],['#history/fontanna/2999-01-01','#history/fontanna'],['#history/fontanna/'+today,'#history/fontanna'],['#history/fontanna/2026-3-28','#history/fontanna']]){
+ for(const [typed,place] of [['#statistics','#statistics/palac-feel'],['#statistics/bus','#statistics/palac-feel'],['#statistics/library','#statistics/radio'],['#statistics/library/artists','#index/artists?by=tracks'],['#statistics/library/more','#statistics/radio'],['#statistics/fontanna/more','#statistics/fontanna'],['#statistics/bus/artists','#index/artists?by=tracks'],['#history','#history/palac-feel'],['#history/radio','#history/radio'],['#history/radio/2026-03-28','#history/radio'],['#history/%E0','#history/palac-feel'],['#history/fontanna/2999-01-01','#history/fontanna'],['#history/fontanna/'+today,'#history/fontanna'],['#history/fontanna/2026-3-28','#history/fontanna']]){
   e.visit(typed);await flush();assert.equal(e.location.hash,place,typed);
  }
  assert.equal(e.elements['history-day'].value,today,'a bare stage shows today, the live list');
@@ -2912,7 +2916,7 @@ const byStageRow=['Under the Sun','As Night Begins','| Night in Motion','Lost in
 test('the station rows follow the radio\'s way and part its groups with a line',async()=>{
  const e=await indexed({storage:{getItem:key=>key==='pavoia-way'?'feeling':null,setItem(){}}});e.historyReply=answer(played(5));
  routeTo(e,'#history');await flush();
- assert.deepEqual(rowNames(e),byFeelingRow,'History lists the feeling order, with a line before Night and before Any time');
+ assert.deepEqual(rowNames(e),['All stations','| Under the Sun',...byFeelingRow.slice(1)],'History lists All stations, then the feeling order, with a line before Night and before Any time');
  await stagePlace(e,'#statistics/radio',{scope:'radio'});
  assert.deepEqual(rowNames(e),['All stations','| Under the Sun',...byFeelingRow.slice(1)],'All stations is a group of its own in Statistics');
  routeTo(e,'#index/artists');await flush();
@@ -2920,7 +2924,7 @@ test('the station rows follow the radio\'s way and part its groups with a line',
  assert.ok(e.elements['stage-row'].children.every(a=>a.localName==='a'),'the children stay links');
  const s=await indexed();s.historyReply=answer(played(5));
  routeTo(s,'#history');await flush();
- assert.deepEqual(rowNames(s),byStageRow,'with nothing stored, by stage: a line before Night in Motion, Etage 0, Fontanna, Ambiance and Closing');
+ assert.deepEqual(rowNames(s),['All stations','| Under the Sun',...byStageRow.slice(1)],'with nothing stored, All stations, then by stage: a line before Night in Motion, Etage 0, Fontanna, Ambiance and Closing');
  await stagePlace(s,'#statistics/radio',{scope:'radio'});
  assert.deepEqual(rowNames(s),['All stations','| Under the Sun',...byStageRow.slice(1)],'and six in Statistics');
  assert.ok(s.elements['stage-row'].children.every(a=>a.localName==='a'));
@@ -3704,4 +3708,183 @@ test('the last page of changes hands focus to the first row that opens a track, 
  assert.deepEqual([new URL(page.url,'http://radio').searchParams.get('before'),page.signal.aborted],['14',false]);
  routeTo(f,'#history');await flush();
  assert.equal(page.signal.aborted,true,'leaving Statistics drops the page');
+});
+
+// Step 6, On air now: History's All stations. Each station's answer from one function of its id; a track started a minute
+// before t0 that has `left` ms to run then, so its row asks again when it ends, 5 s after, between 20 s and 2 min.
+const airAt=(t0,id,{left=300000,listeners=1,available=true,track=true}={})=>({track:track?{id:'7'+byStage.indexOf(id),title:'Title '+id,artist:'Artist '+id,startedAt:new Date(t0-60000).toISOString(),durationMs:60000+left}:null,
+  audience:available?{available:true,listeners,measuredAt:new Date(t0).toISOString()}:{available:false}});
+const airRows=e=>e.elements['music-content'].children.filter(n=>n.localName==='a');
+// A row as read: its time, its name, its line, its link and whether it is Now.
+const airRead=a=>[a.children[0].textContent,...a.children[1].children.map(textOf),a.getAttribute('href'),a.attrs['aria-current']??null];
+const airAsks=(e,from=0)=>e.airRequests.slice(from).map(r=>r.id).sort();
+// The view's timers: its waits are 20 s to 2 min, the ones no other part of the explorer uses.
+const airWaits=e=>[...e.timers.values()].map(t=>t.delay).filter(d=>[20000,60000,65000,90000,95000,120000].includes(d)).sort((a,b)=>a-b);
+const airOpen=async(e,air)=>{e.air=air;routeTo(e,'#history/radio');await flush();return e.elements['music-content'];};
+const stationNames=['Under the Sun','As Night Begins','Night in Motion','Lost in Feelings','Etage 0','Fontanna','Ambiance','Closing','Essentials'];
+
+test('History\'s All stations lists the nine stations in screen order with what each plays, and Now only on the tuned one',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now,content=await airOpen(e,id=>airAt(t0,id));
+ assert.deepEqual([e.location.hash,content.children.map(n=>n.localName+'.'+n.className).slice(0,3),content.children[0].textContent,airRows(e).length,textOf(currentStage(e)),currentStage(e).getAttribute('href')],
+  ['#history/radio',['h3.history-day','p.collection-note','a.row'],'On air now',9,'All stations','#history/radio'],'a day heading, the total, then nine rows; All stations is current in the row');
+ const time=id=>new Date(t0-60000).toLocaleTimeString('en',{timeStyle:'short'});
+ assert.deepEqual(airRows(e).map(airRead),byStage.map((id,i)=>[id==='palac-feel'?'Now':time(id),'Title '+id,'Artist '+id+' · '+stationNames[i],'#explore/plex_7'+i,id==='palac-feel'?'true':null]),'by stage: the time, the title over its artist and station, a link to the record; Now only on the station tuned');
+ assert.deepEqual([airRows(e)[0].children[0].localName,airRows(e)[0].children[0].dateTime,airRows(e)[0].children[1].children.map(n=>n.className)],['time',new Date(t0-60000).toISOString(),['row-name','row-line']],'History\'s row: the time first');
+ assert.deepEqual(airRows(e)[5].children[1].children[1].children.map(textOf),['Artist fontanna',' · Fontanna'],'the station in a span of its own, so a long artist ends before it');
+ assert.deepEqual([e.elements['history-day-label'].hidden,e.elements['history-day-label'].attrs['data-off'],e.elements['history-more'].hidden,e.elements['music-status'].textContent],[false,'',true,''],'the Day field is off, and there is no Show earlier tracks');
+ // Another language redraws the words in place, with no request.
+ const asked=e.airRequests.length,rows=airRows(e);e.setLanguage('de');await flush();
+ assert.deepEqual([content.children[0].textContent,airRows(e)[3].children[0].textContent,sameRows(airRows(e),rows),e.airRequests.length,textOf(currentStage(e))],['Gerade läuft','Jetzt',true,asked,'Alle Sender'],'in German, the same rows and no request');
+ // By feeling, the rows follow that order.
+ const f=setup({journey:true,storage:{getItem:key=>key==='pavoia-way'?'feeling':null,setItem(){}}});await flush();await airOpen(f,id=>airAt(t0,id));
+ assert.deepEqual(airRows(f).map(a=>a.children[1].children[0].textContent),byFeeling.map(id=>'Title '+id),'the order on screen');
+});
+
+test('each station refreshes after its track ends, between 20 s and 2 min, and nothing is asked while hidden',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now,left={'bermuda-day':90000,'bermuda-evening':180000,'palac-dance':1000};
+ await airOpen(e,id=>airAt(t0,id,{left:left[id]??300000}));
+ assert.deepEqual([airAsks(e),airWaits(e)],[[...byStage].sort(),[20000,95000,...Array(7).fill(120000)]],'one request per station, then one wait each: 5 s past its end, at least 20 s, at most 2 min');
+ let from=e.airRequests.length;clock.now=t0+95000;e.fire(95000);await flush();
+ assert.deepEqual(airAsks(e,from),['bermuda-day'],'90 s left: asked again at +95 s');
+ from=e.airRequests.length;clock.now=t0+120000;for(let i=0;i<7;i++)e.fire(120000);await flush();
+ assert.ok(airAsks(e,from).includes('bermuda-evening'),'3 min left: asked at +120 s, the cap');
+ assert.ok(airWaits(e).includes(65000),'then 65 s later, at +185 s');
+ clock.now=t0+185000;from=e.airRequests.length;e.fire(65000);await flush();assert.deepEqual(airAsks(e,from),['bermuda-evening']);
+ assert.ok(airWaits(e).every(d=>d>=20000&&d<=120000),'no station waits under 20 s or over 2 min');
+ // Hidden, the view asks nothing and keeps no timer; shown, it asks all nine at once.
+ e.document.hidden=true;e.document.emit('visibilitychange');from=e.airRequests.length;await flush();
+ assert.deepEqual([airWaits(e),e.airRequests.length-from],[[],0],'hidden: no timer and no request');
+ e.document.hidden=false;e.document.emit('visibilitychange');await flush();
+ assert.deepEqual(airAsks(e,from),[...byStage,'palac-feel'].sort(),'shown: the nine stations, and the page\'s own poll of the station tuned');
+ assert.equal(airWaits(e).length,9,'each with its wait again');
+});
+
+test('the total counts audio connections on all stations only when all nine answered, and hides a zero',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now,waiting=new Map();
+ const content=await airOpen(e,id=>new Promise(resolve=>waiting.set(id,()=>resolve(airAt(t0,id,{listeners:byStage.indexOf(id)})))));
+ const total=content.children[1];
+ for(const id of byStage.slice(0,8))waiting.get(id)();await flush();
+ assert.equal(total.textContent,'','eight answers: no total, never a part of it');
+ waiting.get('essentials')();await flush();
+ assert.equal(total.textContent,'36 listening on all stations','0 + 1 + … + 8, counted as the header counts, in its word');
+ e.setLanguage('de');await flush();assert.equal(total.textContent,'36 hören auf allen Sendern');
+ const one=setup({journey:true});await flush();await airOpen(one,id=>airAt(t0,id,{listeners:3,available:id!=='fontanna'}));
+ assert.equal(one.elements['music-content'].children[1].textContent,'','one station that cannot count: no total');
+ const zero=setup({journey:true});await flush();await airOpen(zero,id=>airAt(t0,id,{listeners:0}));
+ assert.equal(zero.elements['music-content'].children[1].textContent,'','all at zero: no total');
+ const failed=setup({journey:true});await flush();await airOpen(failed,id=>id==='closing'?null:airAt(t0,id,{listeners:2}));
+ assert.equal(failed.elements['music-content'].children[1].textContent,'','one station failed: no total');
+ for(const odd of ['3',2.5,-1]){const c=setup({journey:true});await flush();await airOpen(c,id=>airAt(t0,id,{listeners:id==='fontanna'?odd:2}));
+  assert.equal(c.elements['music-content'].children[1].textContent,'',`a count of ${JSON.stringify(odd)}: not a count, so no total`);}
+});
+
+test('a station without a track or with an error says so in its row, and all failing offers Try again',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now;
+ await airOpen(e,()=>new Promise(()=>{}));
+ assert.deepEqual(airRows(e).map(airRead)[5],['','Fontanna','Loading track…',null,null],'before an answer: the station and Loading track…, no time and no link');
+ e.air=id=>id==='fontanna'?{...airAt(t0,id),track:null}:id==='ambiance'?null:airAt(t0,id,{left:85000});e.document.hidden=true;e.document.emit('visibilitychange');e.document.hidden=false;e.document.emit('visibilitychange');await flush();
+ assert.deepEqual([airRead(airRows(e)[5]),airRead(airRows(e)[6]),e.elements['music-status'].textContent],[['','Fontanna','No track announced',null,null],['','Ambiance','No track announced',null,null],''],'no track, or a failed answer: the station and No track announced; the others show');
+ assert.deepEqual(airWaits(e).filter(d=>d===60000),[60000,60000],'each asks again in 1 min');
+ let from=e.airRequests.length;e.fire(60000);e.fire(60000);await flush();
+ assert.deepEqual([airAsks(e,from),airWaits(e).filter(d=>d===120000).length>=2],[['ambiance','fontanna'],true],'then every 2 min');
+ e.air=id=>airAt(t0,id);e.fire(120000);e.fire(120000);await flush();
+ assert.equal(airRead(airRows(e)[5])[1],'Title fontanna','a track again fills the row');
+ // A station that never answers gives up after 6 s, says so and waits 1 min; the others do not wait for it.
+ const h=setup({journey:true});await flush();await airOpen(h,id=>id==='etage-zero'?new Promise(()=>{}):airAt(t0,id));
+ const sixes=()=>[...h.timers.values()].filter(t=>t.delay===6000).length;
+ assert.deepEqual([airRead(airRows(h)[4]),airRead(airRows(h)[3])[1],sixes()],[['','Etage 0','Loading track…',null,null],'Title palac-feel',1],'it loads while the others show, under one 6 s limit');
+ const before=airWaits(h).filter(d=>d===60000).length;h.fire(6000);await flush();
+ assert.deepEqual([airRead(airRows(h)[4]),airWaits(h).filter(d=>d===60000).length-before],[['','Etage 0','No track announced',null,null],1],'after 6 s: No track announced, asked again in 1 min');
+ // An answer for another station, or with a field that is not text, is not drawn, as the page's own poll reads it.
+ const w=setup({journey:true});await flush();
+ await airOpen(w,id=>id==='fontanna'?{...airAt(t0,id),stage:{id:'ambiance'}}:id==='closing'?{...airAt(t0,id),track:{...airAt(t0,id).track,title:42}}:id==='ambiance'?{...airAt(t0,id),track:{...airAt(t0,id).track,artist:null}}:airAt(t0,id));
+ assert.deepEqual([5,6,7].map(i=>airRead(airRows(w)[i])),[['','Fontanna','No track announced',null,null],['','Ambiance','No track announced',null,null],['','Closing','No track announced',null,null]],'another station\'s answer, a numeric title, an artist that is not text: No track announced');
+ // Every station failing says so in the status, with Try again; once one answers, the status goes.
+ const f=setup({journey:true});await flush();await airOpen(f,()=>null);const status=f.elements['music-status'];
+ const shown=x=>[x.elements['music-content'].children[0].hidden,x.elements['music-content'].children[1].hidden,...airRows(x).map(a=>a.hidden)];
+ assert.deepEqual([said(status),shown(f)],['What plays now could not load. Try again',Array(11).fill(true)],'only the error and Try again, as History says it: the heading, the total and the rows step aside');
+ f.setLanguage('de');await flush();assert.equal(said(status),'Was gerade läuft, konnte nicht geladen werden. Erneut versuchen');f.setLanguage('en');await flush();
+ const retry=status.children[1];retry.focus();from=f.airRequests.length;f.air=id=>airAt(t0,id);retry.emit('click');await flush();
+ assert.deepEqual([airAsks(f,from),said(status),f.document.activeElement===currentStage(f),shown(f)],[[...byStage].sort(),'',true,Array(11).fill(false)],'Try again asks all nine; its focus goes to All stations in the row, and the same rows come back');
+ const one=setup({journey:true});await flush();await airOpen(one,id=>id==='closing'?null:airAt(t0,id));
+ assert.deepEqual([said(one.elements['music-status']),shown(one).every(h=>!h)],['',true],'one station failing keeps the view, its row says so');
+});
+
+test('History\'s old addresses are unchanged, and a day after radio is dropped',async()=>{
+ const e=setup({journey:true});await flush();e.historyReply=answer(played(5));e.air=id=>airAt(clock.now,id);
+ for(const [typed,place,scope] of [['#history','#history/palac-feel','palac-feel'],['#history/bermuda-day','#history/bermuda-day','bermuda-day'],['#history/bermuda-day/2026-03-28','#history/bermuda-day/2026-03-28','bermuda-day'],['#history/radio/2026-03-28','#history/radio',null],['#history/radio','#history/radio',null]]){
+  const asked=e.historyRequests.length;routeTo(e,typed);await flush();
+  assert.deepEqual([e.location.hash,e.historyRequests.length>asked,e.elements['history-day-label'].hidden,e.elements['history-day-label'].attrs['data-off']===''],[place,Boolean(scope),false,!scope],typed);
+  if(scope)assert.equal(new URL(e.historyRequests.at(-1).url,'http://radio').pathname,'/api/radio/'+scope+'/history');
+ }
+ assert.equal(stageLink(e,'fontanna').getAttribute('href'),'#history/fontanna','the day dropped from All stations goes: its stations link to today, the live list');
+ routeTo(e,'#history/bermuda-day/2026-03-28');await flush();
+ assert.deepEqual([stageLink(e,'radio').getAttribute('href'),stageLink(e,'fontanna').getAttribute('href'),e.elements['history-day'].value],['#history/radio','#history/fontanna/2026-03-28','2026-03-28'],'from a day, All stations links without it, the stations with it');
+ assert.deepEqual(airWaits(e),[],'leaving All stations keeps no timer');
+ routeTo(e,'#history/radio');await flush();assert.equal(airWaits(e).length,9);
+ e.elements['explorer-close'].emit('click');await flush();assert.deepEqual([e.elements.explorer.open,airWaits(e)],[false,[]],'nor does closing the explorer');
+ const from=e.airRequests.length;e.document.hidden=true;e.document.emit('visibilitychange');e.document.hidden=false;e.document.emit('visibilitychange');await flush();
+ assert.deepEqual([airAsks(e,from),airWaits(e)],[['palac-feel'],[]],'closed, a tab shown again asks no station: the one request is the page\'s own poll');
+});
+
+test('rows stay in place and keep focus when they refresh',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now;let title='Title bermuda-day',track=true;
+ await airOpen(e,id=>{const d=airAt(t0,id,{left:id==='bermuda-day'?90000:300000,track:id!=='bermuda-day'||track});if(d.track&&id==='bermuda-day')d.track.title=title;return d;});
+ const rows=airRows(e),row=rows[0];e.elements.explorer.scrollTop=300;row.focus();
+ title='Next one';clock.now=t0+95000;e.fire(95000);await flush();
+ assert.deepEqual([sameRows(airRows(e),rows),row.children[1].children[0].textContent,e.document.activeElement===row,e.elements.explorer.scrollTop],[true,'Next one',true,300],'the same node, its new words, its focus and the scroll');
+ // A row that loses its link hands focus to the current station in the row.
+ track=false;e.fire(20000);await flush();
+ assert.deepEqual([airRead(row),e.document.activeElement===currentStage(e)],[['','Under the Sun','No track announced',null,null],true],'never to the page');
+ // Another station tuned moves Now in place, and the view asks nothing: the one request is the page's own poll.
+ const from=e.airRequests.length;e.key('ArrowRight');await flush();
+ assert.deepEqual([airRows(e).filter(a=>a.attrs['aria-current']).map(a=>a.children[1].children[0].textContent),airRows(e)[4].children[0].textContent,airRows(e)[3].children[0].textContent,airAsks(e,from),sameRows(airRows(e),rows)],
+  [['Title etage-zero'],'Now',new Date(t0-60000).toLocaleTimeString('en',{timeStyle:'short'}),['etage-zero'],true],'Now moves to Etage 0, Lost in Feelings shows its time again');
+});
+
+test('back from a record to #history/radio asks all nine stations again and restarts their timers',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now;e.discovery=url=>entity(url.split('/').pop(),'track');
+ await airOpen(e,id=>airAt(t0,id));const rows=airRows(e),row=rows[2];e.elements.explorer.scrollTop=200;
+ follow(e,row);await flush();
+ assert.deepEqual([e.location.hash,airWaits(e)],['#explore/plex_72',[]],'a record stops the view: no timer');
+ const from=e.airRequests.length;e.elements.explorer.scrollTop=0;routeTo(e,'#history/radio');await flush();
+ assert.deepEqual([sameRows(airRows(e),rows),e.document.activeElement===row,e.elements.explorer.scrollTop,airAsks(e,from),airWaits(e).length],[true,true,200,[...byStage].sort(),9],'the same rows, focus and place, and every station asked again with its timer');
+});
+
+
+test('On air now asks each station once per arrival, also by a browser move, and Try again reads Loading until each answers',async()=>{
+ // A typed address or Forward restores twice, on popstate and on hashchange: nine requests, none dropped.
+ const e=setup({journey:true});await flush();const t0=clock.now;e.air=id=>airAt(t0,id);e.visit('#history/radio');await flush();
+ assert.deepEqual([airAsks(e),e.airRequests.filter(r=>r.signal.aborted).length,airRows(e).length],[[...byStage].sort(),0,9],'one request a station');
+ // From a station's History to On air now by the address bar: the same.
+ const g=setup({journey:true});await flush();g.air=id=>airAt(t0,id);routeTo(g,'#history/fontanna');await flush();
+ const from=g.airRequests.length;g.visit('#history/radio');await flush();
+ assert.deepEqual([airAsks(g,from),g.airRequests.slice(from).filter(r=>r.signal.aborted).length],[[...byStage].sort(),0]);
+ // After every station failed, Try again brings the rows back on the first answer; the stations still asked read Loading.
+ const f=setup({journey:true});await flush();await airOpen(f,()=>null);
+ const waiting=new Map();f.air=id=>new Promise(resolve=>waiting.set(id,()=>resolve(airAt(t0,id))));
+ f.elements['music-status'].children[1].emit('click');await flush();
+ assert.equal(airRows(f).every(a=>a.hidden),true,'while none answered, the error stays');
+ waiting.get('fontanna')();await flush();
+ assert.deepEqual([airRows(f).every(a=>!a.hidden),airRead(airRows(f)[5])[1],airRead(airRows(f)[6])],[true,'Title fontanna',['','Ambiance','Loading track…',null,null]],'Fontanna answered; Ambiance is still asked, and says so');
+});
+
+test('On air now: a miss after a track waits 1 min again, a track with no end 2 min, and a row never shows what it has not',async()=>{
+ const e=setup({journey:true});await flush();const t0=clock.now;e.elements.explorer.scrollTop=300;
+ // The tuned station names no track; Closing's id is no track; Fontanna's start is no time.
+ const odd=id=>id==='palac-feel'?{...airAt(t0,id),track:null}:id==='closing'?{...airAt(t0,id),track:{...airAt(t0,id,{left:85000}).track,id:'x y'}}:id==='fontanna'?{...airAt(t0,id),track:{...airAt(t0,id).track,startedAt:'x'}}:airAt(t0,id,{left:85000});
+ await airOpen(e,odd);
+ assert.equal(e.elements.explorer.scrollTop,0,'a first entry starts at its top');
+ assert.deepEqual([airRead(airRows(e)[3]),airRead(airRows(e)[7]).slice(3),airRead(airRows(e)[5])[0]],[['','Lost in Feelings','No track announced',null,null],[null,null],''],'no Now on the tuned station without a track; no link for an id that is no track; no time for a start that is none');
+ assert.deepEqual([airWaits(e).filter(d=>d===120000).length,airWaits(e).filter(d=>d===60000).length],[1,1],'the track with no end asks again in 2 min, the station with no track in 1 min');
+ // A miss, a track, then a miss again: 1 min each time, since a track ends the count of misses.
+ const f=setup({journey:true});await flush();const t1=clock.now;let phase='miss';
+ await airOpen(f,id=>id==='ambiance'&&phase==='miss'?null:airAt(t1,id,{left:85000}));
+ const waits=delay=>airWaits(f).filter(d=>d===delay).length;
+ assert.deepEqual([waits(60000),waits(90000),waits(120000)],[1,8,0]);
+ phase='track';f.fire(60000);await flush();assert.deepEqual([airRead(airRows(f)[6])[1],waits(90000)],['Title ambiance',9]);
+ phase='miss';clock.now=t1+90000;
+ try{for(let i=0;i<9;i++)f.fire(90000);await flush();
+  assert.deepEqual([airRead(airRows(f)[6])[2],waits(60000),waits(120000)],['No track announced',1,0],'1 min, not 2');
+ }finally{clock.now=t1;}
 });

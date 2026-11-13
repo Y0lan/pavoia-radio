@@ -76,6 +76,7 @@
     definitions:'Each track counts once per playlist. Each artist counts once per track, featured artists and remixers included. A track can be on several stations.',playIsStart:'A play is a start on the stream, not a full listen.',checkedAt:'Playlist checked at {time}',knownArtist:'Artist known for {n} of {total} tracks',knownLabel:'Label known for {n} of {total} tracks',knownYear:'Year known for {n} of {total} tracks',
     statLineAll:'{tracks} tracks by {artists} on {labels}, {hours} hours of music',artistsLink:'{n} artists',labelsLink:'{n} labels',allArtists:'All {n} artists',allLabels:'All {n} labels',
     changesTitle:'Added and removed',changeAdded:'added',changeRemoved:'removed',changesMore:'Show earlier changes',changesSince:'Changes are recorded since {date}.',
+    airNow:'On air now',airTotal:'{n} listening on all stations',airLoading:'Loading track…',airNoTrack:'No track announced',airError:'What plays now could not load.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
     indexTab:'Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
     markArtists:'{mark}, {n} artists',markArtist1:'{mark}, 1 artist',markLabels:'{mark}, {n} labels',markLabel1:'{mark}, 1 label',symbols:'Numbers and symbols',band:'{n} tracks or more',band1:'One track',
@@ -86,6 +87,7 @@
     definitions:'Jeder Track zählt einmal pro Playlist. Jeder Künstler zählt einmal pro Track, Featurings und Remixer eingeschlossen. Ein Track kann auf mehreren Sendern laufen.',playIsStart:'Eine Wiedergabe ist ein Start im Stream, kein ganzes Anhören.',checkedAt:'Playlist geprüft um {time}',knownArtist:'Künstler bekannt für {n} von {total} Tracks',knownLabel:'Label bekannt für {n} von {total} Tracks',knownYear:'Jahr bekannt für {n} von {total} Tracks',
     statLineAll:'{tracks} Tracks von {artists} auf {labels}, {hours} Stunden Musik',artistsLink:'{n} Künstlern',labelsLink:'{n} Labels',allArtists:'Alle {n} Künstler',allLabels:'Alle {n} Labels',
     changesTitle:'Hinzugefügt und entfernt',changeAdded:'hinzugefügt',changeRemoved:'entfernt',changesMore:'Frühere Änderungen anzeigen',changesSince:'Änderungen werden seit {date} erfasst.',
+    airNow:'Gerade läuft',airTotal:'{n} hören auf allen Sendern',airLoading:'Titel wird geladen…',airNoTrack:'Kein Titel gemeldet',airError:'Was gerade läuft, konnte nicht geladen werden.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
     indexTab:'Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
     markArtists:'{mark}, {n} Künstler',markArtist1:'{mark}, 1 Künstler',markLabels:'{mark}, {n} Labels',markLabel1:'{mark}, 1 Label',symbols:'Zahlen und Zeichen',band:'{n} Tracks oder mehr',band1:'Ein Track',
@@ -666,7 +668,7 @@
   // restore() then closes the dialog; until then, work stops and moves wait. Any other (a shared link,
   // a reload, a restored session, a typed URL) closes in place, since the entry under it may not be
   // this page. A plain dialog fires no cancel event, so Escape is caught below.
-  const halt=()=>{clearTimeout(typing);hop?.abort();hop=null;musicRequest?.abort();musicRequest=null;naming?.abort();};
+  const halt=()=>{clearTimeout(typing);hop?.abort();hop=null;musicRequest?.abort();musicRequest=null;naming?.abort();stopAir();};
   const close=()=>{
     if(!dialog.open||closing)return;
     halt();
@@ -716,8 +718,9 @@
   const formats = new Map(), number = value => {const lang=radio.getState().language;if(!formats.has(lang))formats.set(lang,new Intl.NumberFormat(lang));return formats.get(lang).format(value);};
   // The local date as a date field writes it.
   const today = () => new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
-  // History's address: a stage, and a day only when it is one before today; today is the live list.
-  const historyAt = (stage,day) => '#history/'+stage+(day&&day<today()?'/'+day:'');
+  // History's address: a stage, and a day only when it is one before today; today is the live list. All stations, On air
+  // now, has no day.
+  const historyAt = (stage,day) => '#history/'+stage+(stage!=='radio'&&day&&day<today()?'/'+day:'');
   // The Index's address: a side, a stage unless it is All stages, then Most tracks, the filter and the mark the list was
   // scrolled to when there are.
   const indexAt = ({kind,scope,by,q,at}) => {const query=String(new URLSearchParams([...by==='tracks'?[['by','tracks']]:[],...q?[['q',q]]:[],...at?[['at',at]]:[]]));return '#index/'+kind+(scope&&scope!=='radio'?'/'+scope:'')+(query?'?'+query:'');};
@@ -745,9 +748,9 @@
   // While History shows the newest tracks of the stage on air, its first row follows the radio's play: the
   // start time tells a track played twice in a row from one play.
   const onAir = () => {const s=radio.getState();return s.dataFresh&&s.track&&musicScope===s.stage&&!musicDay?[s.stage,s.track.id,s.track.startedAt].join(':'):'';};
-  // The station row, in the radio rail's style: the stations in the order on screen, and in Statistics and the Index all
-  // of them together before. Each station is its name, and in the Index how many names it holds. The first station of
-  // each group of the radio's way opens on a thin line, as does the first after All stations, a group of its own; the
+  // The station row, in the radio rail's style: the stations in the order on screen, and all of them together before, in
+  // History On air now. Each station is its name, and in the Index how many names it holds. The first station of each
+  // group of the radio's way opens on a thin line, as does the first after All stations, a group of its own; the
   // children stay links. The current one is marked; History's links keep the day picked, and the Index's its side, order
   // and filter. On a phone the row scrolls sideways from the current station, faded where stations wait. Focus in it
   // moves to the current station, never to the page.
@@ -757,7 +760,7 @@
     if(a===current||a.offsetLeft<left||a.offsetLeft+a.offsetWidth>left+stageRow.clientWidth)stageRow.scrollLeft=a.offsetLeft-(stageRow.clientWidth-a.offsetWidth)/2;fade(stageRow);};
   function fillRow() {
     const held=stageRow.contains(document.activeElement),stations=radio.stations;stageRow.removeAttribute('data-lit');
-    if(view==='statistics'||view==='index')stations.unshift({id:'radio'});
+    stations.unshift({id:'radio'});
     stageRow.replaceChildren(...stations.map(({id,group},i)=>{
       const a=node('a');a.append(node('span','',scopeName(id)));if(view==='index'){a.append(node('small'));a.dataset.stage=id;}
       if(i&&group!==stations[i-1].group)a.dataset.groupStart='';
@@ -777,6 +780,8 @@
       else{const row=opened(clicked)?clicked:rowUnderBar();musicPlace=row&&{key:content.dataset.key,row,y:row.getBoundingClientRect().top-dialog.getBoundingClientRect().top,focus:row===clicked};}
     }
     clicked=null;
+    // On air now keeps its requests when a second restore() of one browser move finds it still shown.
+    if(!(view==='history'&&next==='history'&&musicScope==='radio'))stopAir();
     view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();paging?.abort();paging=null;
     $('music-view').hidden=next==='explore';$('music-view').dataset.view=next;$('index-head').hidden=$('index-rail').hidden=next!=='index';$('discovery-search').hidden=next!=='explore';
     $('discovery-status').hidden=next!=='explore';
@@ -785,7 +790,10 @@
     }
     if(next!=='explore'){
       hop?.abort();hop=null;selected=null;$('discovery-results').hidden=true;hideRecord();mapWatch?.disconnect();
-      $('history-day-label').hidden=next!=='history';if($('history-day').max!==today())$('history-day').max=today();if(next!=='history')$('history-more').hidden=true;fillRow();
+      // On air now, History's All stations, has no day and no earlier tracks. Its Day field is off, not gone: on a wide
+      // screen it keeps its box, so the row of stations stands where it stands on a station.
+      const live=next==='history'&&musicScope==='radio';
+      $('history-day-label').hidden=next!=='history';$('history-day-label').toggleAttribute('data-off',live);if($('history-day').max!==today())$('history-day').max=today();if(next!=='history'||live)$('history-more').hidden=true;fillRow();
     }
   }
   async function readJSON(path,signal) {
@@ -1208,6 +1216,7 @@
   });
   // follow: the radio asked for this first page, as a new track came on air or another stage was tuned.
   async function loadMusic(more=false,follow=false) {
+    if(view==='history'&&musicScope==='radio')return drawOnAir();
     musicRequest?.abort();paging?.abort();paging=null;const controller=new AbortController();musicRequest=controller;
     // The names of a side are about 680 KB, longer to come on a slow phone than History's 50 rows.
     const timeout=setTimeout(()=>controller.abort(),view==='index'?30000:12000),scope=musicScope,kind=musicKind,mode=view,day=musicDay,key=musicKey(),content=$('music-content'),button=$('history-more'),field=$('history-day');
@@ -1350,12 +1359,98 @@
   $('history-more').addEventListener('click',()=>{if(!musicRequest)loadMusic(true);});
   // Touch screens keep their keyboard down until the listener asks for it.
   const finePointer=matchMedia('(pointer:fine)');
+  // On air now, History's All stations: a row per station in the order on screen, what it plays over its artist and its
+  // name, linked to its record. Each station is asked on its own, and again 5 s after its track ends, 20 s to 2 min apart;
+  // one that names no track or fails waits 1 min, then 2. Only while the view shows in a visible tab: leaving it or hiding
+  // the tab drops the requests and the timers, and coming back asks all nine at once. An answer rewrites its row in place,
+  // so rows keep their node, their place and their focus. The station tuned is Now, in red, as History's track on air.
+  // The total of audio connections shows only when all nine said theirs, and never as 0: a part would read as fewer.
+  let air=null;
+  const airShown=()=>Boolean(air)&&dialog.open&&!closing&&view==='history'&&musicScope==='radio'&&!document.hidden&&$('music-content').contains(air.heading);
+  const airRuns=()=>[...air.stations.values()].some(s=>s.timer||s.asking);
+  function stopAir() {
+    if(!air)return;
+    for(const s of air.stations.values()){clearTimeout(s.timer);s.timer=null;const c=s.asking;s.asking=null;c?.abort();}
+  }
+  function airRow(id,s) {
+    const t=s.data?.track,start=Date.parse(t?.startedAt),now=Boolean(t)&&id===radio.getState().stage,a=s.row,href=t&&entityID('plex_'+t.id)?'#explore/plex_'+t.id:null;
+    s.name.textContent=t?t.title:stationName(id);
+    // The station is the fact of the row: a long artist ends in an ellipsis before it, never over it.
+    if(t)s.line.replaceChildren(...t.artist?[node('span','',t.artist)]:[],node('span','',(t.artist?' · ':'')+stationName(id)));else s.line.textContent=word(s.data===undefined||s.data===null&&s.asking?'airLoading':'airNoTrack');
+    s.time.textContent=now?word('now'):t&&Number.isFinite(start)?shortTime(t.startedAt):'';
+    if(t&&Number.isFinite(start))s.time.dateTime=t.startedAt;else s.time.removeAttribute('datetime');
+    if(now)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current');
+    // A row that loses its link hands its focus to the current station in the row, never to the page.
+    if(href)a.href=href;else{if(document.activeElement===a)stageRow.querySelector('[aria-current]')?.focus();a.removeAttribute('href');}
+  }
+  // The total, and, when every station failed, only the error and Try again, as History says it: the heading, the total
+  // and the rows step aside, keeping their nodes for the next answer. Try again that goes hands its focus to the row.
+  function airSum() {
+    const all=[...air.stations.values()],status=$('music-status'),n=all.every(s=>s.data?.audience?.available===true)?all.reduce((sum,s)=>sum+s.data.audience.listeners,0):0,failed=all.every(s=>s.data===null);
+    air.total.textContent=n?word('airTotal').replace('{n}',number(n)):'';
+    for(const part of [air.heading,air.total,...all.map(s=>s.row)])part.hidden=failed;
+    // Try again stays the same button while it asks, so its focus stays too.
+    if(failed){const [say,again]=status.children;if(again?.localName==='button'){say.textContent=word('airError')+' ';again.textContent=word('retry');}else status.replaceChildren(node('span','',word('airError')+' '),action(word('retry'),refreshAir));}
+    else if(status.children.length||status.textContent){if(status.contains(document.activeElement))stageRow.querySelector('[aria-current]')?.focus();status.textContent='';}
+  }
+  // Every word of the view, as in another language.
+  function airWords() {air.heading.textContent=word('airNow');for(const [id,s] of air.stations)airRow(id,s);airSum();}
+  async function askAir(id) {
+    const s=air.stations.get(id),c=new AbortController(),timeout=setTimeout(()=>c.abort(),6000);
+    clearTimeout(s.timer);s.timer=null;s.asking?.abort();s.asking=c;
+    let data=null;
+    // Each answer as the page's own poll reads it, and its count only when it is one.
+    try{
+      const res=await fetch('/api/radio/'+id,{cache:'no-store',signal:c.signal});if(!res.ok)throw new Error('status');
+      data=await res.json();
+      if(!data||data.stage?.id!==id||!data.audience||!('track' in data))throw new Error('schema');
+      if(data.track!==null&&(typeof data.track?.id!=='string'||typeof data.track.title!=='string'||typeof data.track.artist!=='string'))throw new Error('track');
+      if(data.audience.available===true&&!(Number.isInteger(data.audience.listeners)&&data.audience.listeners>=0))data={...data,audience:{available:false}};
+    }catch{data=null;}finally{clearTimeout(timeout);}
+    if(s.asking!==c)return;
+    s.asking=null;s.data=data;airRow(id,s);airSum();
+    const t=data?.track,end=Date.parse(t?.startedAt)+t?.durationMs;
+    const wait=t?(Number.isFinite(end)?Math.min(Math.max(end-Date.now()+5000,20000),120000):120000):s.misses++?120000:60000;
+    if(t)s.misses=0;
+    if(airShown())s.timer=setTimeout(()=>askAir(id),wait);
+  }
+  // Every station at once: on arrival, back from a record, a tab shown again, or Try again.
+  function refreshAir() {
+    if(!airShown())return;
+    for(const id of air.stations.keys())askAir(id);
+    airWords();
+  }
+  // Another station tuned moves Now in place, with no request.
+  function markAir() {
+    if(!air||view!=='history'||musicScope!=='radio')return;
+    const stage=radio.getState().stage;for(const [id,s] of air.stations)if((s.row.getAttribute('aria-current')!==null)!==(Boolean(s.data?.track)&&id===stage))airRow(id,s);
+  }
+  // The view drawn: its rows again in another language, with no request, or new rows asking every station. A first
+  // entry starts at its top; a link that went with the last place parks focus on the current station in the row.
+  function drawOnAir() {
+    musicRequest?.abort();musicRequest=null;paging?.abort();paging=null;
+    const content=$('music-content'),status=$('music-status'),key=musicKey(),again=air&&content.dataset.key?.startsWith('history:radio:')&&content.contains(air.heading);
+    content.removeAttribute('aria-busy');$('history-more').hidden=true;historyPage=null;shownStage=null;
+    if(again){content.dataset.key=key;airWords();if(!airRuns())refreshAir();return;}
+    stopAir();
+    const parked=[content,status,$('index-note'),$('entity-inspector')].some(n=>n.contains(document.activeElement));if(parked)dialog.focus({preventScroll:true});
+    air={heading:node('h3','history-day'),total:node('p','collection-note'),stations:new Map(radio.stations.map(({id})=>{
+      const row=node('a','row'),time=node('time'),text=node('span','row-text'),name=node('span','row-name'),line=node('span','row-line');
+      text.append(name,line);row.append(time,text);return [id,{row,time,name,line,data:undefined,misses:0,timer:null,asking:null}];
+    }))};
+    content.replaceChildren(air.heading,air.total,...[...air.stations.values()].map(s=>s.row));content.dataset.key=key;
+    $('index-note').textContent='';status.textContent='';dialog.scrollTop=0;
+    if(parked&&document.activeElement===dialog)stageRow.querySelector('[aria-current]')?.focus();
+    airWords();refreshAir();
+  }
+  // A hidden tab asks nothing; shown again, it asks every station at once.
+  document.addEventListener('visibilitychange',()=>{if(document.hidden)stopAir();else refreshAir();});
   // A new track on air, or another stage tuned, redraws History's first page in place while it follows the radio.
   // A lost answer redraws nothing, nor does a half-typed day over a picked one: the list shows what it is for.
   // A list with earlier pages follows nothing, but past midnight its days are named anew in place: each heading
   // takes the day of the row under it, and the rows, the pages and the place stay.
   function followRadio(){
-    if(!dialog.open||closing||view!=='history'||musicRequest||!historyPage||$('music-content').dataset.key!==musicKey())return;
+    if(!dialog.open||closing||view!=='history'||musicScope==='radio'||musicRequest||!historyPage||$('music-content').dataset.key!==musicKey())return;
     if(historyPage.more){if(stale()){const rows=[...$('music-content').children];rows.forEach((n,i)=>{if(n.localName==='h3')n.textContent=dayName(new Date(rows[i+1].children[0].dateTime));});historyPage.drawn=today();}return;}
     if(radio.getState().dataFresh&&(stale()||onAir()!==historyPage.live))loadMusic(false,true);
   }
@@ -1382,10 +1477,10 @@
     // is All stages, which holds every playlist. A day that is not a real one before today is none, an unknown side is
     // Artists, and other parameters go: the address is rewritten to say so, and the tab keeps it.
     if(section!=='explore'){
-      const statistics=section==='statistics',index=section==='index',at=index?second:first,known=[...radio.stations.map(s=>s.id),...statistics?['radio']:[]].includes(at);
+      const statistics=section==='statistics',index=section==='index',at=index?second:first,known=[...radio.stations.map(s=>s.id),...index?[]:['radio']].includes(at);
       musicScope=known?at:index||statistics&&first==='library'?'radio':radio.getState().stage;
       musicKind=index?first==='labels'?'labels':'artists':'';
-      musicDay=section==='history'&&pastDay(second||'')?second:'';
+      musicDay=section==='history'&&musicScope!=='radio'&&pastDay(second||'')?second:'';
       indexBy=index?query.get('by')==='tracks'?'tracks':'name':'';
       indexQuery=index?(query.get('q')||'').slice(0,200):'';
       // The Index keeps the mark it was scrolled to only when it is one of the order shown.
@@ -1412,8 +1507,9 @@
       // Only the rows the place was taken from: History's place never scrolls a list drawn since.
       if(musicPlace?.key===musicKey()){dialog.scrollTop=musicPlace.top;if($('music-content').contains(musicPlace.row))musicPlace.row.focus({preventScroll:true});}
       musicPlace=null;
-      // A track that came on air while a record was open, or a new day, shows now, not at the next radio answer.
-      return followRadio();
+      // A track that came on air while a record was open, or a new day, shows now, not at the next radio answer. On air now
+      // asks every station again, which restarts their timers, unless it is asking or waiting already.
+      return musicScope==='radio'?air&&!airRuns()&&refreshAir():followRadio();
     }
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
@@ -1435,7 +1531,7 @@
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
     // A record that has left the air loses its red dot in place; nothing else on the page moves.
     if(selected&&selected.id!==enriched?.entity.id)$('entity-inspector').querySelector('.on-air')?.remove();
-    stageAir();followRadio();
+    stageAir();followRadio();markAir();
     if(landing&&!closing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
   currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
 })();

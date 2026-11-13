@@ -307,7 +307,7 @@ async page => {
   const gapOf=view=>view==='index'?16:32;
   const feelingRow='Under the Sun, Fontanna, | As Night Begins, Night in Motion, Etage 0, Lost in Feelings, Closing, | Ambiance, Essentials';
   const stageRow='Under the Sun, As Night Begins, | Night in Motion, Lost in Feelings, | Etage 0, | Fontanna, | Ambiance, | Closing, Essentials';
-  const rows={history:{feeling:feelingRow,stage:stageRow},statistics:{feeling:'All stations, | '+feelingRow,stage:'All stations, | '+stageRow}};rows.index=rows.statistics;
+  const rows={statistics:{feeling:'All stations, | '+feelingRow,stage:'All stations, | '+stageRow}};rows.history=rows.index=rows.statistics;
   await visit(1440,900);await explore(page,'history');
   // The ring of a station in the row, as the keyboard shows it.
   await page.keyboard.press('Shift');await page.locator('#stage-row a[data-group-start]').first().focus();

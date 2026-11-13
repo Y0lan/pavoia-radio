@@ -2,6 +2,10 @@ async page => {
   const assert=(ok,message)=>{if(!ok)throw new Error(message);};
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const origin=new URL(page.url()).origin;
+  // This test plays the stream: it runs only on the fake preview, whose /stream/** is a local tone, never on serve.py,
+  // which relays the stream to the radio and would count it as a listener.
+  const mode=await (await page.request.get(origin+'/__mode?set=ok')).text();
+  assert(mode==='ok','Not the fake preview: stopping before any stream request');
   await page.goto(origin+'/');
   await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
   assert(await page.locator('#bus-link').evaluate(n=>n===n.parentElement.lastElementChild),'Bus must remain last');
@@ -67,6 +71,52 @@ async page => {
   await page.unroute('**/api/radio/fontanna/history?**');
   await page.getByRole('button',{name:'Try again',exact:true}).click();
   await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===50);
+  // On air now, History's All stations: what the nine stations play, from fixtures that hold one long title and one long
+  // artist, and the total of their audio connections. No Day field, no earlier tracks, and no overflow at any width.
+  // `failing` names the stations whose next answer fails.
+  const ids=await page.evaluate(()=>window.Pavoia.stations.map(s=>s.id));
+  const onAir=url=>/^\/api\/radio\/[a-z-]+$/.test(url.pathname);let failing=[];
+  await page.route(onAir,route=>{
+    const id=new URL(route.request().url()).pathname.split('/').pop(),i=ids.indexOf(id),now=Date.now();
+    if(failing.includes(id))return route.fulfill({status:503,contentType:'text/plain',body:'unavailable'});
+    const title=id==='fontanna'?'A title far too long for one line of a phone, in its extended original club mix':'Track '+(i+1);
+    const artist=id==='closing'?'Rodriguez Jr. & Liset Alea feat. a long list of featured remixers':'Artist '+(i+1);
+    return route.fulfill({contentType:'application/json',body:JSON.stringify({stage:{id,name:id},track:{id:String(900000+i),title,artist,startedAt:new Date(now-60000).toISOString(),durationMs:600000},audience:{listeners:i,measuredAt:new Date(now).toISOString(),available:true},streamUrl:'/stream/'+id+'.mp3'})});
+  });
+  // The tab hidden and shown again asks every station at once.
+  const reask=()=>page.evaluate(()=>{for(const hidden of [true,false]){Object.defineProperty(document,'hidden',{configurable:true,get:()=>hidden});document.dispatchEvent(new Event('visibilitychange'));}delete document.hidden;});
+  const firstTop=()=>page.locator('#music-content > a.row').first().evaluate(n=>Math.round(n.getBoundingClientRect().top));
+  await page.locator('#stage-row a[href="#history/radio"]').click();
+  await page.waitForFunction(()=>location.hash==='#history/radio'&&document.querySelectorAll('#music-content > a.row[href]').length===9);
+  assert(await page.locator('#music-content > h3').innerText()==='On air now','On air now heading missing');
+  assert(await page.locator('#music-content > p.collection-note').innerText()==='36 listening on all stations','The total of audio connections is wrong');
+  assert(await page.locator('#music-content > a.row[aria-current]').count()===1,'Now marks more than the tuned station');
+  assert(await page.locator('#history-day-label').isHidden()&&await page.locator('#history-more').isHidden(),'All stations shows a day or earlier tracks');
+  for(const width of [320,390,760,1440]){
+    await page.setViewportSize({width,height:width===1440?1000:844});
+    assert(await page.locator('#explorer').evaluate(n=>n.scrollWidth<=n.clientWidth+1),'On air now overflow '+width);
+    assert(await page.locator('#music-content > a.row .row-name').evaluateAll(names=>names.every(n=>getComputedStyle(n).whiteSpace==='nowrap'&&getComputedStyle(n).textOverflow==='ellipsis')),'A title wraps at '+width);
+    // A long artist ends in an ellipsis before the station, which shows whole on every row.
+    assert(await page.locator('#music-content > a.row .row-line').evaluateAll(lines=>lines.every(l=>{const s=l.lastElementChild,b=l.getBoundingClientRect(),r=s.getBoundingClientRect();return r.left>=b.left-0.5&&r.right<=b.right+0.5&&s.scrollWidth<=s.clientWidth+1;})),'A station is cut off its row at '+width);
+    await page.screenshot({path:'output/playwright/music-on-air-'+width+'.png'});
+  }
+  // The total goes when one station fails and comes back with it, and the nine rows stay where they are.
+  await page.setViewportSize({width:1440,height:900});await page.locator('#explorer').evaluate(n=>{n.scrollTop=0;});
+  const top=await firstTop();failing=['fontanna'];await reask();
+  await page.waitForFunction(()=>!document.querySelector('#music-content > p.collection-note').textContent);
+  assert(await firstTop()===top,'The rows moved when the total went');
+  failing=[];await reask();await page.waitForFunction(()=>document.querySelector('#music-content > p.collection-note').textContent);
+  assert(await firstTop()===top,'The rows moved when the total came back');
+  // Every station failing says it once, with Try again, as History does; Try again brings the same rows back.
+  const rowsBefore=await page.locator('#music-content > a.row').evaluateAll(rows=>{window.__airRows=rows;return rows.length;});
+  failing=ids;await reask();await page.getByRole('button',{name:'Try again',exact:true}).waitFor();
+  assert(await page.locator('#music-content > :not([hidden])').count()===0&&await page.locator('#music-status').innerText()==='What plays now could not load. Try again','All failing shows more than the error and Try again');
+  await page.screenshot({path:'output/playwright/music-on-air-allfail-1440.png'});
+  failing=[];await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await page.waitForFunction(n=>document.querySelectorAll('#music-content > a.row[href]:not([hidden])').length===n&&!document.getElementById('music-status').textContent,rowsBefore);
+  assert(await page.locator('#music-content > a.row').evaluateAll(rows=>rows.every((r,i)=>r===window.__airRows[i])),'Try again drew new rows');
+  await page.unroute(onAir);
+  assert(await page.locator('#audio').getAttribute('src')===source&&await page.locator('#audio').evaluate(a=>!a.paused),'On air now stopped the radio');
   await page.locator('#explorer-close').click();
   await page.locator('#language [value=de]').dispatchEvent('click');
   await page.locator('#go-deeper').click();
@@ -78,5 +128,5 @@ async page => {
   await page.locator('#language [value=en]').dispatchEvent('click');
   await page.locator('#play').click();
   assert(errors.length===0,errors.join('; '));
-  return {stations:9,historyPagination:true,period:true,entityNavigation:true,retry:true,statistics:true,mobile:true,languages:['en','de'],playbackPreserved:true,errors};
+  return {stations:9,onAirNow:true,historyPagination:true,period:true,entityNavigation:true,retry:true,statistics:true,mobile:true,languages:['en','de'],playbackPreserved:true,errors};
 }
