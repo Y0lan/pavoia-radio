@@ -1,12 +1,17 @@
-// Playwright CLI run-code callback for the open candidate or public radio.
+// Playwright CLI run-code callback for the open candidate. It plays, so it runs only on the fake preview, whose
+// /stream/** is a local tone that never reaches the radio (python3 /var/tmp/yolan/ultimate/player/fakeserve.py <port>):
+// its first request asks the fake for its normal mode and stops unless the answer is "ok".
 async page => {
   const assert = (ok, message) => { if (!ok) throw new Error(message); };
+  const mode = await (await page.request.get(new URL('/__mode?set=ok', page.url()).href)).text();
+  assert(mode === 'ok', 'not the fake preview, stopping before any play: ' + mode.slice(0, 80));
   const errors = [], busRequests = [];
   page.on('pageerror', error => errors.push(error.message));
   page.on('request', request => {
     if (/\/(api\/radio|stream)\/bus(?:[./?]|$)/.test(request.url())) busRequests.push(request.url());
   });
-  await page.goto(new URL('/', page.url()).href);
+  // From a known station: the radio would otherwise open on the station this browser played last.
+  await page.goto(new URL('/?station=palac-feel', page.url()).href);
   await page.setViewportSize({width:1440, height:1000});
   await page.locator('#language [value=en]').dispatchEvent('click');
   const icon = page.getByRole('link', { name: 'The Bus', exact: true });

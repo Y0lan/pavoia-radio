@@ -20,8 +20,9 @@ async page => {
   const phone=async(width,height,lang='en')=>{const context=await browser.newContext({viewport:{width,height},isMobile:true,hasTouch:true});contexts.push(context);
     const p=await context.newPage();await guard(p);await p.goto(origin+'/');await ready(p);if(lang!=='en')await set(p,lang);return p;};
   const ready=async p=>{await until(p,()=>window.Pavoia?.getState,null,'the page did not start');await p.evaluate(()=>document.fonts.ready);};
-  // A first visit: nothing stored, so the page lists by stage, in English.
-  const visit=async(width,height)=>{await page.setViewportSize({width,height});await page.goto(origin+'/');await page.evaluate(()=>localStorage.clear());await page.reload();await ready(page);};
+  // A first visit: nothing stored and no station link, so the page lists by stage, in English, on Lost in Feelings. A
+  // reload would keep the ?station the radio wrote into the address, so the visit opens / again.
+  const visit=async(width,height)=>{await page.setViewportSize({width,height});await page.goto(origin+'/');await page.evaluate(()=>localStorage.clear());await page.goto(origin+'/');await ready(page);};
   // The language and the way as a script presses them, wherever the switch stands.
   const set=async(p,lang,way)=>{if(lang)await p.locator('#language [value='+lang+']').dispatchEvent('click');if(way)await p.locator('#ways [value='+way+']').dispatchEvent('click');};
   const stage=p=>p.evaluate(()=>window.Pavoia.getState().stage);
@@ -35,13 +36,14 @@ async page => {
   const first=await page.evaluate(()=>{const groups=[...document.querySelectorAll('#moods > .mood-group')],fact=document.getElementById('mood-stage');
     return {pressed:[...document.querySelectorAll('#ways button')].map(b=>b.value+'='+b.getAttribute('aria-pressed')).join(' '),words:groups.map(g=>g.querySelector('.group-name').innerText),
       over:groups.every(g=>g.querySelector('.group-name').getBoundingClientRect().bottom<=g.querySelector('.group-moods').getBoundingClientRect().top),
-      fact:fact.innerText,above:fact.getBoundingClientRect().bottom<=document.getElementById('mood-name').getBoundingClientRect().top,title:document.getElementById('mood-name').innerText,keys:Object.keys(localStorage)};});
+      fact:fact.innerText,above:fact.getBoundingClientRect().bottom<=document.getElementById('mood-name').getBoundingClientRect().top,title:document.getElementById('mood-name').innerText,keys:Object.keys(localStorage),address:location.pathname+location.search};});
   assert(first.pressed==='feeling=false stage=true','2: By stage is pressed: '+first.pressed);
   assert(first.words.join('|')==='BERMUDA|PAŁAC|ETAGE 0|FONTANNA|AMBIANCE|THE BUS|SELECTED BY GAENDE'&&first.over,'2: every stage named over its stations: '+JSON.stringify(first));
   assert(first.fact==='PAŁAC STAGE'&&first.above&&first.title==='Lost in Feelings','2: the fact over the title: '+JSON.stringify(first));
   assert(first.keys.length===0,'2: a first visit stores nothing: '+first.keys);
+  assert(first.address==='/?station=palac-feel','2: a first visit names its station in the address: '+first.address);
   await silent(page,'a first visit');
-  report.push(`2: By stage pressed, ${first.words.join(', ')}, ${first.fact} over ${first.title}, ${first.keys.length} keys stored`);
+  report.push(`2: By stage pressed, ${first.words.join(', ')}, ${first.fact} over ${first.title}, ${first.keys.length} keys stored, address ${first.address}`);
 
   // 3, 4 and 5. At 1440 and 1366 px the switch and every group share one bottom, with room to spare; at 1100 px both ways
   // take two rows of whole groups that start on the gutter; and the title stands still when the way changes. 70a6e4e put

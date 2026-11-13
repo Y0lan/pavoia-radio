@@ -153,7 +153,16 @@ const stageSuffix = mood => { const name = festivalOf(mood).name; return name &&
 const albumOf = mood => [plain(mood), stageSuffix(mood)].filter(Boolean).join(' · ');
 const audio = $('audio');
 const button = $('play');
-let currentMood = moods[3];
+// A station link (/?station=fontanna) opens its station, then the listener's last station, then Lost in Feelings, as the
+// page HTML does. Only the nine ids count, exactly. Nothing plays, and startup stores nothing.
+const moodOf = id => moods.find(mood => mood.stage === id) || null;
+let remembered = null;
+try { remembered = localStorage.getItem('pavoia-station'); } catch { /* Storage is optional. */ }
+let currentMood = moodOf(new URLSearchParams(location.search).get('station')) || moodOf(remembered) || moods[3];
+// A change of station or a play remembers it for the next visit.
+function rememberStation() {
+  try { localStorage.setItem('pavoia-station', currentMood.stage); } catch { /* Storage is optional. */ }
+}
 let track = null;
 let wanted = false;
 let generation = 0;
@@ -172,7 +181,7 @@ const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const mobileLayout = matchMedia('(max-width: 760px)');
 // Below 900 px the header has no room for the word after the count.
 const narrowHeader = matchMedia('(max-width: 900px)');
-let photoRequest = '', photoVersion = 0, photoAnimation, sceneID = '';
+let photoRequest = '', photoVersion = 0, photoAnimation, photoShown = false, sceneID = '';
 const sceneText = document.querySelector('.bottom');
 const nextPhoto = new Image();
 nextPhoto.fetchPriority = 'low';
@@ -202,11 +211,13 @@ async function showPhoto(photo) {
       incoming.id = 'photo';
       previous.classList.add('photo-back');
       incoming.classList.remove('photo-back');
-      if (!reducedMotion.matches && !document.hidden && previous.complete && previous.naturalWidth) {
+      // The page's own photo is Lost in Feelings: a link or a remembered station cuts to its photo, with no dissolve.
+      if (photoShown && !reducedMotion.matches && !document.hidden && previous.complete && previous.naturalWidth) {
         photoAnimation = incoming.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 360, easing: 'cubic-bezier(.22, 1, .36, 1)' });
         photoAnimation.finished.then(() => { if (version === photoVersion) previous.hidden = true; }).catch(() => {});
       } else previous.hidden = true;
     }
+    photoShown = true;
     document.documentElement.style.setProperty('--focus', photo.focus);
     $('photo-count').textContent = `${index + 1} / ${count}`;
     if (following && !navigator.connection?.saveData && !document.hidden) nextPhoto.src = following.src;
@@ -467,8 +478,17 @@ function tabTitle() {
     : location.hash === '#bus' ? 'The Bus' : plain(currentMood);
   document.title = `${name} · Pavoia Radio`;
 }
+// The address names the station shown, in place, so a copied address opens it: a station never adds a history entry,
+// and the hash stays the Bus's and the explorer's. Safari throws after too many replaceState calls; the page goes on.
+function writeAddress() {
+  const query = new URLSearchParams(location.search);
+  if (query.get('station') === currentMood.stage) return;
+  query.set('station', currentMood.stage);
+  try { history.replaceState(history.state, '', `${location.pathname}?${query}${location.hash}`); } catch { /* The address may lag. */ }
+}
 window.addEventListener('hashchange', renderScene);
-window.addEventListener('popstate', renderScene);
+// Back and Forward never change the station, which would cut the music: the entry they land on names the current one.
+window.addEventListener('popstate', () => { writeAddress(); renderScene(); });
 
 function leaveBus() {
   if (location.hash !== '#bus') return;
@@ -595,6 +615,7 @@ function play() {
   wanted = true;
   lost = false;
   retries = 0;
+  rememberStation();
   connect();
 }
 
@@ -721,6 +742,8 @@ function selectMood(id) {
   pollController = null;
   audienceController?.abort();audienceController=null;audienceData=null;audienceStage=null;
   currentMood = next;
+  writeAddress();
+  rememberStation();
   radioData=null; dataFresh=false; loading=Boolean(next.stage);
   if (!next.stage) wanted = false;
   render();
@@ -732,6 +755,7 @@ function selectMood(id) {
 $('moods').addEventListener('change', event => selectMood(event.target.value));
 
 document.addEventListener('visibilitychange', () => { if (!document.hidden) {poll();pollListeners(true);} else {audienceController?.abort();} });
+writeAddress();
 arrangeStations();
 localise();
 render();

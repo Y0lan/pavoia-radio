@@ -45,7 +45,7 @@ const ordered=()=>blocks(web('style.css').replace(/\/\*[\s\S]*?\*\//g,'')).flatM
 const lastAt=(media,selector)=>ordered().findLastIndex(([m,list])=>m===media&&list.split(/,\s*/).includes(selector));
 const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date(clock.now).toISOString()}});
 
-function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=null,storage={getItem:()=>null,setItem(){}},journey=false,media=[]}={}) {
+function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search='',state=null,storage={getItem:()=>null,setItem(){}},journey=false,media=[]}={}) {
   const imageRequests=[];
   class Element {
     constructor(){this.dataset={};this.events={};this.children=[];this.attrs={};this.textContent='';this.complete=true;this.naturalWidth=100;this.classList={add(){},remove(){},toggle(){}};this.style={setProperty(key,value){this[key]=value;}};}
@@ -116,20 +116,23 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',state=
   class MediaMetadata{constructor(value){Object.assign(this,value);}}
   const window=new Element();
   window.MediaMetadata=MediaMetadata;window.dispatchEvent=event=>window.emit(event.type,event);
-  // Session history as a browser keeps it: entries with their state and a position. Assigning the hash adds
-  // an entry, as a link does; tests fire its popstate and hashchange themselves, or through env.visit().
-  let current=hash,at=0;const entries=[{state,hash}];
+  // Session history as a browser keeps it: entries with their state, query and hash, and a position. Assigning the hash
+  // adds an entry, as a link does; tests fire its popstate and hashchange themselves, or through env.visit().
+  let current=hash,query=search,at=0;const entries=[{state,hash,search}];
   const urlHash=url=>url.includes('#')?url.slice(url.indexOf('#')):'';
-  const location={pathname:'/',search:'',get hash(){return current;},set hash(value){current=value&&!value.startsWith('#')?'#'+value:value;entries.splice(++at,Infinity,{state:null,hash:current});}};
+  // A URL with only a hash keeps the query, as a browser resolves it; one with a path takes its own query, or none.
+  const urlSearch=url=>{const path=url.split('#')[0];return !path?query:path.includes('?')?path.slice(path.indexOf('?')):'';};
+  const location={pathname:'/',get search(){return query;},get hash(){return current;},set hash(value){current=value&&!value.startsWith('#')?'#'+value:value;entries.splice(++at,Infinity,{state:null,hash:current,search:query});}};
+  const move=url=>{if(url!==undefined){query=urlSearch(url);current=urlHash(url);}};
   const history={get state(){return entries[at].state;},
-    pushState(state,_title,url){if(url!==undefined)current=urlHash(url);entries.splice(++at,Infinity,{state,hash:current});},
-    replaceState(state,_title,url){if(url!==undefined)current=urlHash(url);entries[at]={state,hash:current};},
-    go(delta){if(!delta)throw new Error('history.go(0) reloads the page');if(!entries[at+delta])return;at+=delta;current=entries[at].hash;window.emit('popstate');},
+    pushState(state,_title,url){move(url);entries.splice(++at,Infinity,{state,hash:current,search:query});},
+    replaceState(state,_title,url){move(url);entries[at]={state,hash:current,search:query};},
+    go(delta){if(!delta)throw new Error('history.go(0) reloads the page');if(!entries[at+delta])return;at+=delta;({hash:current,search:query}=entries[at]);window.emit('popstate');},
     back(){this.go(-1);}};
   // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
   const queries=new Map();
   const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],namesRequests:[],response:status('First'),
-    entries:()=>entries.map(entry=>entry.hash),position:()=>at,evict(n){entries.splice(0,n);at-=n;},
+    entries:()=>entries.map(entry=>entry.hash),urls:()=>entries.map(entry=>location.pathname+entry.search+entry.hash),url:()=>location.pathname+query+current,position:()=>at,evict(n){entries.splice(0,n);at-=n;},
     visit(target){location.hash=target;window.emit('popstate');window.emit('hashchange');},
     click:()=>elements.play.emit('click'),
     setLanguage:value=>elements.language.emit('click',{target:{value}}),
@@ -692,6 +695,13 @@ test('title and description arrive together, on the shared curve',async()=>{
  assert.deepEqual(plain(fades),[{duration:360,easing:'cubic-bezier(.22, 1, .36, 1)'}],'the photo crossfade uses the same curve');
 });
 
+test('a link or a remembered station cuts to its photo, and a change after that fades',async()=>{
+ const e=setup({search:'?station=etage-zero'}),fades=[];
+ for(const id of ['photo','photo-buffer'])e.elements[id].animate=(frames,options)=>{fades.push(options);return {cancel(){},finished:Promise.resolve()};};
+ await flush();assert.equal(fades.length,0,'the opening photo replaces the page photo with no dissolve');
+ e.change('03');await flush();assert.equal(fades.length,1,'a station change fades as before');
+});
+
 test('Essentials reads like every station, and the Bus closes the stages by stage and the rail by feeling',async()=>{
  const e=setup();await flush();const moods=e.elements.moods,bus=e.elements['bus-link'];
  const groups=()=>moods.children.slice(1),holder=node=>groups().find(group=>group.descendants().includes(node));
@@ -776,10 +786,27 @@ test('the counter carries the swipe arrows, shows numbers and says the stage in 
  assert.match(cssRules('(max-width:374px)').get('.station-position svg'),/display:none/,'narrow phones drop the arrows, so the controls stay on one line');
 });
 
-test('every visit opens on Lost in Feelings, whatever stage was chosen before',async()=>{
- const saved={},storage={getItem:key=>saved[key] ?? null,setItem(key,value){saved[key]=value;}};
- const e=setup({storage});await flush();e.change('03');assert.equal(e.window.Pavoia.getState().stage,'palac-dance');
- const back=setup({storage});await flush();assert.equal(back.window.Pavoia.getState().stage,'palac-feel','the page HTML shows Lost in Feelings first, so the radio starts there too');
+test('a first visit opens on Lost in Feelings, a returning listener on the last station, and a link on its own station',async()=>{
+ // The station, the position, the address and the entry count after startup, with a stored station and a query.
+ const open=async(stored,search='',hash='')=>{const e=setup({search,hash,storage:{getItem:key=>key==='pavoia-station'?stored:null,setItem(){}}});await flush();
+  return [e.window.Pavoia.getState().stage,e.elements['station-text'].textContent,e.url(),e.entries().length];};
+ assert.deepEqual(await open(null),['palac-feel','4 / 9','/?station=palac-feel',1],'a first visit: Lost in Feelings, as the page HTML shows, and the address names it in place');
+ assert.deepEqual(await open('fontanna'),['fontanna','6 / 9','/?station=fontanna',1],'a returning listener: the last station');
+ assert.deepEqual(await open(null,'?station=etage-zero'),['etage-zero','5 / 9','/?station=etage-zero',1],'a link: its own station');
+ assert.deepEqual(await open('fontanna','?station=closing'),['closing','8 / 9','/?station=closing',1],'a link wins over memory');
+ assert.deepEqual(await open('fontanna','?station=nope&n=2'),['fontanna','6 / 9','/?station=fontanna&n=2',1],'an unknown link falls back to memory, and its value is rewritten in place');
+ assert.deepEqual(await open(null,'?n=1'),['palac-feel','4 / 9','/?n=1&station=palac-feel',1],'other parameters stay, and the station comes last');
+ assert.deepEqual(await open(null,'?station=fontanna','#bus'),['fontanna','6 / 9','/?station=fontanna#bus',1],'the hash keeps its meaning: the Bus, with the linked station behind it');
+ for(const value of ['bus','04','toString','__proto__','','Fontanna','FONTANNA',' fontanna','fontanna/']){
+  assert.deepEqual(await open('fontanna','?station='+encodeURIComponent(value)),['fontanna','6 / 9','/?station=fontanna',1],`the link "${value}" is not a station`);
+  assert.deepEqual(await open(value),['palac-feel','4 / 9','/?station=palac-feel',1],`the stored "${value}" is not a station`);
+ }
+ const denied=()=>{throw new Error('Storage denied');};
+ for(const [search,stage] of [['','palac-feel'],['?station=etage-zero','etage-zero']]){
+  const e=setup({search,storage:{getItem:denied,setItem:denied}});await flush();
+  assert.deepEqual([e.window.Pavoia.getState().stage,e.url()],[stage,'/?station='+stage],'a storage that throws: the link works, and without one the radio opens on Lost in Feelings');
+  e.change('09');e.click();assert.deepEqual([e.window.Pavoia.getState().stage,e.url(),e.audio.src],['closing','/?station=closing','/stream/closing.mp3'],'and a change and a play still work');
+ }
 });
 
 test('a stage\'s first photo shows under that stage alone',async()=>{
@@ -829,7 +856,7 @@ test('By feeling orders the rail, the arrows, the media keys and the position, a
  assert.equal(saved['pavoia-way'],'feeling','the press is kept');
  const again=setup({storage});await flush();
  assert.deepEqual([stationIds(again),again.elements.ways.children.map(b=>b.attrs['aria-pressed'])],[byFeeling,['true','false']],'a later visit lists by feeling');
- assert.equal(again.elements['station-text'].textContent,'6 / 9');
+ assert.deepEqual([again.window.Pavoia.getState().stage,again.elements['station-text'].textContent],['essentials','9 / 9'],'and opens on the last station, counted by feeling');
 });
 
 test('a way changes no station, no photo and no playback',async()=>{
@@ -1054,6 +1081,78 @@ test('a shared explorer link closes in place, onto the radio page',async()=>{
  assert.deepEqual([e.entries(),e.elements.explorer.open,e.history.state.explorer],[['#explore/art_0123456789ab'],true,true],'no entry is made up under it, which Chromium would skip on Back');
  e.elements['explorer-close'].emit('click');await flush();
  assert.deepEqual([e.location.hash,e.entries(),e.elements.explorer.open],['',[''],false],'✕ lands on the radio, not off the site');
+});
+
+// A link per station: the address is /?station=<id>, written in place; the hash stays the Bus's and the explorer's.
+test('a station change by the rail, the arrows, the media keys or the explorer keeps the history length and writes ?station',async()=>{
+ const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage;
+ const steps=[['the rail',()=>e.change('06'),'etage-zero'],['ArrowRight',()=>e.key('ArrowRight'),'fontanna'],['ArrowLeft',()=>e.key('ArrowLeft'),'etage-zero'],
+  ['nexttrack',()=>e.actions.nexttrack(),'fontanna'],['previoustrack',()=>e.actions.previoustrack(),'etage-zero'],['tune',()=>e.window.Pavoia.tune('closing'),'closing']];
+ for(const [what,act,expected] of steps){act();assert.deepEqual([stage(),e.urls(),e.position()],[expected,['/?station='+expected],0],what+' rewrites the one entry');}
+ for(let i=0;i<10;i++){e.key('ArrowRight');assert.deepEqual([e.urls(),e.url()],[['/?station='+stage()],'/?station='+stage()],'ten arrows, one entry that names the station each time');}
+ const x=setup({journey:true});await flush();
+ x.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#history'})},preventDefault(){}});await flush();
+ const opened=x.urls();assert.equal(opened.length,2,'opening the explorer adds its one entry');
+ x.window.Pavoia.tune('fontanna');await flush();
+ assert.deepEqual([x.window.Pavoia.getState().stage,x.urls().length,x.position(),x.location.search,x.urls()[0]],['fontanna',2,1,'?station=fontanna','/?station=palac-feel'],'inside the explorer, the explorer\'s entry names the new station, and the page entry waits for Back');
+ assert.equal(x.location.hash,opened[1].slice(opened[1].indexOf('#')),'and its place stays');
+});
+
+test('leaving the Bus adds one entry, and Back shows the current station with no audio call',async()=>{
+ const e=setup({search:'?station=fontanna'});await flush();e.click();e.playing();
+ e.location.hash='#bus';e.window.emit('hashchange');await flush();
+ assert.deepEqual(e.urls(),['/?station=fontanna','/?station=fontanna#bus'],'the Bus link adds one entry, as today');
+ e.change('09');await flush();e.playing();
+ assert.deepEqual([e.urls(),e.document.body.getAttribute('data-bus')],[['/?station=fontanna','/?station=fontanna#bus','/?station=closing'],null],'a station picked on the Bus adds one entry, as today, named after it');
+ const calls=e.audio.calls.length,src=e.audio.src;
+ e.history.back();await flush();
+ assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.document.body.getAttribute('data-bus'),e.audio.calls.length,e.audio.src,e.audio.paused],['/?station=closing#bus','closing','',calls,src,false],'Back shows the Bus over the current station, and the music goes on untouched');
+ e.history.back();await flush();
+ assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.audio.calls.length,e.audio.paused],['/?station=closing','closing',calls,false],'Back again: the current station, never the old one');
+ e.history.go(2);await flush();assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.urls().length],['/?station=closing','closing',3],'Forward the same');
+});
+
+test('closing the explorer, owned or shared, lands on ?station=<current> with an empty hash',async()=>{
+ const e=setup({journey:true,search:'?station=fontanna'});await flush();
+ e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#statistics'})},preventDefault(){}});await flush();
+ e.window.Pavoia.tune('closing');await flush();
+ e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([e.elements.explorer.open,e.url(),e.location.hash,e.position()],[false,'/?station=closing','',0],'✕ goes back to the page entry, which names the station tuned inside');
+ const shared=setup({journey:true,search:'?station=fontanna',hash:'#explore/art_0123456789ab'});await flush();
+ shared.window.Pavoia.tune('closing');await flush();
+ shared.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([shared.elements.explorer.open,shared.url(),shared.urls()],[false,'/?station=closing',['/?station=closing']],'a shared explorer link closes in place, on the station tuned inside');
+});
+
+test('a link or a remembered station plays nothing',async()=>{
+ for(const [search,stored,hash] of [['?station=etage-zero',null,''],['','fontanna',''],['?station=closing','fontanna','#bus'],['?station=ambiance',null,'#history']]){
+  const e=setup({search,hash,storage:{getItem:key=>key==='pavoia-station'?stored:null,setItem(){}}});await flush();await e.poll();await flush();
+  const s=e.window.Pavoia.getState();
+  assert.deepEqual([e.audio.calls.length,e.audio.src,s.wanted,s.playbackState,e.elements.play.getAttribute('aria-label')],[0,undefined,false,'paused','Play'],`${search||stored} ${hash}: paused, no source, no play call`);
+ }
+});
+
+test('startup stores nothing; a change and a play store the station',async()=>{
+ const {saved,storage}=remembered();saved['pavoia-station']='fontanna';
+ const link=setup({search:'?station=closing',storage});await flush();await link.poll();
+ assert.deepEqual(saved,{'pavoia-station':'fontanna'},'opening a friend\'s link keeps your own station');
+ link.change('09');assert.deepEqual(saved,{'pavoia-station':'fontanna'},'and so does choosing the station already shown');
+ link.click();assert.equal(saved['pavoia-station'],'closing','a play of the link remembers it');
+ link.click();link.change('09');assert.equal(saved['pavoia-station'],'closing');
+ const fresh=remembered(),first=setup({storage:fresh.storage});await flush();await first.poll();
+ assert.deepEqual(fresh.saved,{},'a first visit stores nothing');
+ first.change('03');assert.equal(fresh.saved['pavoia-station'],'palac-dance','a change remembers the station without a play');
+ first.key('ArrowRight');assert.equal(fresh.saved['pavoia-station'],'palac-feel','so do the arrows');
+ const back=setup({storage:fresh.storage});await flush();assert.equal(back.window.Pavoia.getState().stage,'palac-feel','the next visit opens there');
+});
+
+test('a replaceState that throws changes nothing else',async()=>{
+ const {saved,storage}=remembered(),e=setup({storage});await flush();
+ e.history.replaceState=()=>{throw new Error('SecurityError: too many calls to the History API');};
+ e.click();e.change('03');e.playing();
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.audio.src,e.audio.paused,e.elements['station-text'].textContent,saved['pavoia-station'],e.url()],['palac-dance','/stream/palac-dance.mp3',false,'3 / 9','palac-dance','/?station=palac-feel'],'the station, the stream, the position and the memory change; only the address lags');
+ e.key('ArrowRight');e.location.hash='#bus';e.window.emit('popstate');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.document.body.getAttribute('data-bus')],['palac-feel',''],'the arrows step, and Back or a link still draws its scene');
 });
 
 test('every way into the explorer lands on music: the record on air, or one line when nothing is',async()=>{
