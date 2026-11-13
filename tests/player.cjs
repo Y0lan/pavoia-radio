@@ -132,7 +132,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     back(){this.go(-1);}};
   // Media queries listed in `media` match; a test flips one with env.queries.get(query).change(matches).
   const queries=new Map();
-  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],namesRequests:[],response:status('First'),
+  const env={Element,intervals,observers:[],clock,elements,audio,actions,timers,mediaSession,document,window,location,history,imageRequests,queries,requests:[],discoveryRequests:[],historyRequests:[],namesRequests:[],changesRequests:[],response:status('First'),
     entries:()=>entries.map(entry=>entry.hash),urls:()=>entries.map(entry=>location.pathname+entry.search+entry.hash),url:()=>location.pathname+query+current,position:()=>at,evict(n){entries.splice(0,n);at-=n;},
     visit(target){location.hash=target;window.emit('popstate');window.emit('hashchange');},
     click:()=>elements.play.emit('click'),
@@ -160,8 +160,10 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     // Computed styles as a test sets them on an element (el.computed), and no custom property.
     getComputedStyle:el=>({getPropertyValue:()=>'',...el.computed}),
     // env.discovery is one reply for every discovery path, or a function of the path; env.historyReply, once set, answers History the same way;
-    // env.names, once set, holds the names document of each kind, or is a function of the path and the signal.
-    fetch:(url,{signal})=>url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) :
+    // env.names, once set, holds the names document of each kind, or is a function of the path and the signal; env.changes,
+    // once set, answers each page of a station's changes as a function of the path.
+    fetch:(url,{signal})=>url.includes('/changes?')&&env.changes ? (env.changesRequests.push({url,signal}),Promise.resolve(env.changes(url,signal)).then(data=>({ok:Boolean(data),json:async()=>data}))) :
+      url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.startsWith('/api/library/names?')&&env.names ? (env.namesRequests.push({url,signal}),Promise.resolve(typeof env.names==='function'?env.names(url,signal):env.names[new URL(url,'http://radio').searchParams.get('kind')]).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.includes('/history?')&&env.historyReply ? (env.historyRequests.push({url,signal}),Promise.resolve(env.historyReply(url)).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
       env.requests.push({url,signal,resolve,reject});
@@ -1707,7 +1709,7 @@ test('About holds the biography, the tags and the links; On the radio lists its 
  assert.deepEqual([about.localName,cls(about),about.attrs['aria-labelledby'],about.children[0].id,about.children.map(n=>n.localName+'.'+(cls(n)||''))],['section','record-about','r-about','r-about',['h4.','div.entity-bio','p.entity-tags','p.entity-links']],'About {title}, then the biography, the tags and the links');
  assert.deepEqual([about.children[0].textContent,about.children[2].textContent],['About Recondite','techno, ambient'],'tags in words, no bookkeeping tag');
  assert.deepEqual([textOf(radio.children[0]),byClass(radio,'row').map(a=>[a.getAttribute('href'),...a.children.slice(1).map(textOf)])],['On the radio 3',[['#explore/trk_000000000001','Track 1Lost in Feelings','7:04'],['#explore/trk_000000000002','Track 2Lost in Feelings','7:04'],['#explore/trk_000000000003','Track 3Essentials','7:04']]],'each track, where it plays, and how long');
- assert.match(cssRules('(min-width:761px)').get('.regions > :is(.record-about, .release-years)'),/grid-column:1 \/ -2/,'side by side on a wide screen: On the radio in the last column of the regions, About across the ones before it');
+ assert.match(cssRules('(min-width:761px)').get('.regions > :is(.record-about, .release-years, .changes)'),/grid-column:1 \/ -2/,'side by side on a wide screen: On the radio in the last column of the regions, About across the ones before it');
  assert.ok(!web('style.css').includes('record-more'),'no second grid, whose columns would miss those of the regions');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
  assert.deepEqual(byClass(inspector(e),'regions')[0].children.slice(-2).map(n=>textOf(n.children[0])),['Über Recondite','Im Radio 3']);
@@ -2308,9 +2310,10 @@ test('a stage in Statistics is a place: its photo, name and numbers, then its to
  assert.match(cssRules().get('.years-axis'),/position:relative;/);assert.match(cssRules().get('.years-peak'),/position:absolute; top:0; transform:translateX\(-50%\)/,'centred where the script puts it');
  assert.deepEqual(rows(regions[4]),[['#explore/plex_207593','I Choose YouCHANEY','4×'],['#explore/plex_119020','Au revoir ParisRodriguez Jr.','3×'],[null,'No idSomeone','3×'],['#explore/plex_4','FourA','3×'],['#explore/plex_5','FiveB','3×']],'five at most, no picture, the plays as the fact');
  const details=byClass(content,'stage-notes')[0];
- assert.deepEqual([details.localName,details.children.map(textOf)],['details',['How these numbers are counted','Each track counts once per playlist. Artists are counted as credited, collaborations included. A track can be on several stations.','A play is a start on the stream, not a full listen.','Playlist checked at '+new Date(Date.now()).toLocaleTimeString('en',{timeStyle:'short'}),'Label known for 993 of 1,113 tracks','Year known for 1,105 of 1,113 tracks']],'the method in one closed panel: a coverage sentence only below the track count');
+ assert.deepEqual([details.localName,details.children.map(textOf)],['details',['How these numbers are counted','Each track counts once per playlist. Each artist counts once per track, featured artists and remixers included. A track can be on several stations.','A play is a start on the stream, not a full listen.','Playlist checked at '+new Date(Date.now()).toLocaleTimeString('en',{timeStyle:'short'}),'Label known for 993 of 1,113 tracks','Year known for 1,105 of 1,113 tracks']],'the method in one closed panel: a coverage sentence only below the track count');
  assert.ok(byClass(content,'collection-note').every(n=>details.contains(n)),'no other note shows');
  e.setLanguage('de');await flush();
+ assert.equal(textOf(byClass(content,'stage-notes')[0].children[1]),'Jeder Track zählt einmal pro Playlist. Jeder Künstler zählt einmal pro Track, Featurings und Remixer eingeschlossen. Ein Track kann auf mehreren Sendern laufen.');
  assert.deepEqual([byClass(content,'entity-heading')[0].children[1].children.slice(0,3).map(textOf),byClass(content,'region').map(r=>textOf(r.children[0]))],[['Bühne Bermuda','Under the Sun','1.113 Tracks von 860 Künstlern, 122 Stunden Musik'],['Die meisten Tracks von 860','Die meisten Tracks bei','Teilt Tracks mit 2','Erscheinungsjahre','Am häufigsten gespielt seit '+new Date('2026-10-06T23:27:25Z').toLocaleDateString('de',{day:'numeric',month:'short'})]]);
  const journey=web('journey.js'),css=web('style.css'),strings=journey.slice(journey.indexOf('const copy'),journey.indexOf('const word'));
  for(const gone of ['selection','artistCredits','hours','topArtists','genres','overlap','stageSizes','coverage','missingMetadata','snapshot','broadcasts','differentTracks','unplayed','frequent','broadcastNote','recordingSince','broadcastError','noPlays','plays','topNote','statisticsNote','noOverlap','radioSelection','library','wholeLibrary'])assert.doesNotMatch(strings,new RegExp('(?<![\\w$])'+gone+':'),gone+' is gone');
@@ -2318,7 +2321,7 @@ test('a stage in Statistics is a place: its photo, name and numbers, then its to
 });
 
 test('Most played shows only counts that differ, plays that fail say so in their place, and All stages has no plays',async()=>{
- const e=setup({journey:true,deferFetch:true});await flush();e.discovery={items:[]};const content=e.elements['music-content'];
+ const e=setup({journey:true,deferFetch:true});await flush();e.discovery={items:[]};e.names={};e.changes=()=>null;const content=e.elements['music-content'];
  const reply=(path,data)=>e.requests.findLast(r=>r.url.includes(path)).resolve(data?{ok:true,json:async()=>data}:{ok:false});
  routeTo(e,'#statistics/bermuda-day');reply('/statistics?',stageStats());reply('/music',null);await flush();
  assert.deepEqual([textOf(byClass(content,'entity-heading')[0].children[1].children[3]),byClass(content,'stage-switch').length,byClass(content,'region').map(r=>textOf(r.children[0])).at(-1)],['Plays could not load.',1,'Release years'],'the rest of the place still shows');
@@ -2433,52 +2436,182 @@ test('a History address names a real day the Day field can hold, from 1970 to ye
 });
 
 test('the first three artists and labels of a stage get their picture and their record in place, unless the listener saves data',async()=>{
- const media='/api/discovery/media/'+'a'.repeat(40);
+ const media='/api/discovery/media/'+'a'.repeat(40),dPicture='/api/discovery/media/'+'d'.repeat(40);
  for(const saveData of [false,true]){
   const e=setup({journey:true,saveData});await flush();
   e.discovery=url=>({items:new URL(url,'http://x').searchParams.get('q')==='Frivolous'?[{id:'art_0000000000c1',type:'artist',title:'Frivolous',image:media}]:[]});
-  const content=await stagePlace(e,'#statistics/bermuda-day'),asked=e.discoveryRequests.filter(r=>r.url.includes('/search?')).map(r=>new URL(r.url,'http://x').searchParams.get('q')),row=name=>byClass(content,'row').find(a=>textOf(a).startsWith(name));
+  // Jasper Tygner and Diynamic Music come with their own records, as the statistics give the top names now.
+  const own={topArtists:stageStats().topArtists.map(a=>a.name==='Jasper Tygner'?{...a,id:'art_0000000000d1',image:dPicture}:a),labels:[{name:'Diynamic Music',count:57,id:'lab_0000000000d2'},{name:'All Day I Dream',count:21}]};
+  const content=await stagePlace(e,'#statistics/bermuda-day',own),asked=e.discoveryRequests.filter(r=>r.url.includes('/search?')).map(r=>new URL(r.url,'http://x').searchParams.get('q')),row=name=>byClass(content,'row').find(a=>textOf(a).startsWith(name));
   if(saveData){assert.deepEqual(asked,[],'Save-Data: no search, every name keeps its initial');continue;}
-  assert.deepEqual(asked,['Jasper Tygner','Frivolous','Stimming','Diynamic Music','All Day I Dream'],'three artists, Various Artists left out, and the labels there are');
-  assert.deepEqual([row('Frivolous').getAttribute('href'),byClass(row('Frivolous'),'picture')[0].children[0].src,row('Jasper').getAttribute('href'),byClass(row('Jasper'),'picture')[0].dataset.initial],['#explore/art_0000000000c1',media,'#explore/artist/Jasper%20Tygner','J'],'a match fills its picture and its link in place; a miss keeps its name and its initial');
+  assert.deepEqual(asked,['Frivolous','Stimming','All Day I Dream'],'the first three artists, Various Artists left out, and the labels there are, but never a name with its own record');
+  assert.deepEqual([row('Frivolous').getAttribute('href'),byClass(row('Frivolous'),'picture')[0].children[0].src,row('Stimming').getAttribute('href'),byClass(row('Stimming'),'picture')[0].dataset.initial,row('Jasper').getAttribute('href'),byClass(row('Jasper'),'picture')[0].children[0].src,row('Diynamic').getAttribute('href')],
+   ['#explore/art_0000000000c1',media,'#explore/artist/Stimming','S','#explore/art_0000000000d1',dPicture,'#explore/lab_0000000000d2'],'a match fills its picture and its link in place; a miss keeps its name and its initial; a name with its record links there with its picture');
   routeTo(e,'#statistics/fontanna');await flush();
-  assert.equal(e.discoveryRequests.filter(r=>r.url.includes('/search?')).length,5,'names already asked, found or not, ask nothing again');
+  assert.equal(e.discoveryRequests.filter(r=>r.url.includes('/search?')).length,3,'names already asked, found or not, ask nothing again');
   e.discovery=()=>new Promise(()=>{});e.response={...status('First'),...stageStats({scope:'etage-zero',topArtists:[{name:'New One',count:3}],labels:[]}),...stageMusic()};routeTo(e,'#statistics/etage-zero');await flush();
   const late=e.discoveryRequests.at(-1);routeTo(e,'#history');await flush();
   assert.deepEqual([new URL(late.url,'http://x').searchParams.get('q'),late.signal.aborted],['New One',true],'leaving the view drops the searches still out');
  }
 });
 
-// Step "every name": the inventory keeps every artist and label of the playlists, so a place lists them all. Until the
-// server runs it, the lists hold 12 names, and the place stays as it was.
+// Step "every name": the inventory keeps every artist and label of the playlists, and the labels document holds them
+// all. With it, a place leads its counts into the Index; without it (404 or 503 until the server serves it), the place
+// stays as it was.
 const everyName=(over={})=>{
  const topArtists=[{name:'Jasper Tygner',count:300},{name:'Various Artists',count:299},{name:'Âme',count:298},...Array.from({length:247},(_,i)=>({name:'Act '+(i+1),count:i<240?297-i:1}))];
  return stageStats({topArtists,artists:topArtists.length,labels:Array.from({length:130},(_,i)=>({name:'Label '+(i+1),count:130-i})),...over});
 };
-test('with every name kept, a stage links its artists and labels in its numbers, and its regions keep their top names',async()=>{
- const e=setup({journey:true});await flush();e.discovery={items:[]};
+// A labels document of n labels, the first `on` of them on Under the Sun and the rest on Fontanna.
+const labelDoc=(n,on)=>({kind:'labels',updatedAt:'2026-10-20T00:00:00Z',total:n,items:Array.from({length:n},(_,i)=>({name:'Label '+(i+1),count:n-i,stages:i<on?{'bermuda-day':n-i}:{fontanna:n-i}}))});
+test('with the labels document, a stage links its artists and labels in its numbers, and its regions keep their top names',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};e.names={labels:labelDoc(140,130)};
  let content=await stagePlace(e,'#statistics/bermuda-day',everyName());
  const line=()=>byClass(content,'entity-heading')[0].children[1].children[2],regions=()=>byClass(content,'region');
- assert.deepEqual([textOf(line()),line().children.filter(n=>n.localName==='a').map(a=>[a.textContent,a.getAttribute('href')])],['1,113 tracks by 250 artists on 130 labels, 122 hours of music',[['250 artists','#statistics/bermuda-day/artists'],['130 labels','#statistics/bermuda-day/labels']]],'the artists and the labels are links in the sentence');
+ assert.deepEqual([textOf(line()),line().children.filter(n=>n.localName==='a').map(a=>[a.textContent,a.getAttribute('href')])],['1,113 tracks by 250 artists on 130 labels, 122 hours of music',[['250 artists','#index/artists/bermuda-day?by=tracks'],['130 labels','#index/labels/bermuda-day?by=tracks']]],'the artists and the labels are links in the sentence');
  const after=r=>r.children.at(-1);
  assert.deepEqual(regions().slice(0,2).map(r=>[textOf(r.children[0]),byClass(r,'row').length,after(r).localName,cls(after(r)),after(r).textContent,after(r).getAttribute('href')]),
-  [['Most tracks by 250',6,'a','text-button','All 250 artists','#statistics/bermuda-day/artists'],['Most tracks on 130',6,'a','text-button','All 130 labels','#statistics/bermuda-day/labels']],'six names, then a link to every one of them instead of Show all; the heading counts stay, and the labels have one now');
+  [['Most tracks by 250',6,'a','text-button','All 250 artists','#index/artists/bermuda-day?by=tracks'],['Most tracks on 130',6,'a','text-button','All 130 labels','#index/labels/bermuda-day?by=tracks']],'six names, then a link to every one of them instead of Show all; the heading counts stay, and the labels have one now');
  assert.deepEqual(e.discoveryRequests.filter(r=>r.url.includes('/search?')).map(r=>new URL(r.url,'http://x').searchParams.get('q')),['Jasper Tygner','Âme','Act 1','Label 1','Label 2','Label 3'],'pictures for the top three of each, as before');
  e.setLanguage('de');await flush();
  assert.deepEqual([textOf(line()),after(regions()[0]).textContent,after(regions()[1]).textContent],['1.113 Tracks von 250 Künstlern auf 130 Labels, 122 Stunden Musik','Alle 250 Künstler','Alle 130 Labels']);
- e.setLanguage('en');await flush();
- // The server still cutting its lists at 12: the place looks as it did, Show all counting the names it has.
- content=await stagePlace(e,'#statistics/fontanna',{scope:'fontanna',topArtists:everyName().topArtists.slice(0,20)});
- assert.deepEqual([line().children,textOf(after(regions()[0])),after(regions()[0]).localName],[['1,113 tracks by 860 artists, 122 hours of music'],'Show all 12','button'],'one plain sentence, one text as before so it shapes the same, and the first 12 names only');
+ // Without the labels document the place looks as it did with 12 names, however many names the statistics hold.
+ const plain=setup({journey:true});await flush();plain.discovery={items:[]};plain.names={};
+ content=await stagePlace(plain,'#statistics/fontanna',everyName({scope:'fontanna'}));
+ assert.deepEqual([line().children,textOf(after(regions()[0])),after(regions()[0]).localName,textOf(regions()[1].children[0])],[['1,113 tracks by 250 artists, 122 hours of music'],'Show all 12','button','Most tracks on'],'one plain sentence, one text as before so it shapes the same, the first 12 names only, and no label count');
  // On the map a region holds its first 12 names, not the 14 a side can show.
- const m=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(m);await flush();m.discovery={items:[]};
+ const m=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(m);await flush();m.discovery={items:[]};m.names={labels:labelDoc(140,130)};
  const map=byClass(await stagePlace(m,'#statistics/bermuda-day',everyName()),'neighbourhood')[0];
  assert.deepEqual(byClass(map,'region').slice(0,2).map(r=>[byClass(r,'row').length,byClass(r,'text-button').length]),[[12,0],[12,0]],'the map keeps its look: no link under its names');
  // The longer sentence would take a second line in the middle of the map and push its button onto the caption.
- const mapLine=()=>byClass(byClass(m.elements['music-content'],'entity-heading')[0],'entity-line')[0],counts=()=>byClass(m.elements['music-content'],'region').slice(0,2).map(r=>{const a=r.children[0].descendants().find(n=>n.localName==='a');return [textOf(r.children[0]),a?.getAttribute('href'),a?.attrs['aria-label']];});
- assert.deepEqual([mapLine().children,counts()],[['1,113 tracks by 250 artists, 122 hours of music'],[['Most tracks by 250','#statistics/bermuda-day/artists','All 250 artists'],['Most tracks on 130','#statistics/bermuda-day/labels','All 130 labels']]],'on the map the line stays one plain sentence, and the counts over the regions link to the lists');
- await stagePlace(m,'#statistics/fontanna',{scope:'fontanna'});
- assert.deepEqual(counts(),[['Most tracks by 860',undefined,undefined],['Most tracks on',undefined,undefined]],'with 12 names only, the counts are plain, as before');
+ const mapLine=e=>byClass(byClass(e.elements['music-content'],'entity-heading')[0],'entity-line')[0],counts=e=>byClass(e.elements['music-content'],'region').slice(0,2).map(r=>{const a=r.children[0].descendants().find(n=>n.localName==='a');return [textOf(r.children[0]),a?.getAttribute('href'),a?.attrs['aria-label']];});
+ assert.deepEqual([mapLine(m).children,counts(m)],[['1,113 tracks by 250 artists, 122 hours of music'],[['Most tracks by 250','#index/artists/bermuda-day?by=tracks','All 250 artists'],['Most tracks on 130','#index/labels/bermuda-day?by=tracks','All 130 labels']]],'on the map the line stays one plain sentence, and the counts over the regions link to the Index');
+ const m2=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(m2);await flush();m2.discovery={items:[]};m2.names={};
+ await stagePlace(m2,'#statistics/bermuda-day',everyName());
+ assert.deepEqual(counts(m2),[['Most tracks by 250',undefined,undefined],['Most tracks on',undefined,undefined]],'without the labels document, the counts are plain, as before');
+});
+
+test('the labels document turns the counts into links to the Index, most tracks first, and its absence changes nothing',async()=>{
+ // The statistics as the server gives them: the first 12 artists and labels of a station whose 1158 artists they count.
+ const real=setup({journey:true});await flush();real.discovery={items:[]};real.names={labels:labelDoc(400,341)};
+ const top=n=>Array.from({length:12},(_,i)=>({name:n+' '+(i+1),count:40-i}));
+ let content=await stagePlace(real,'#statistics/bermuda-day',{artists:1158,topArtists:top('Act'),labels:top('Label')});
+ const links=()=>content.descendants().filter(n=>n.localName==='a'&&/^#index\//.test(n.getAttribute('href')||'')).map(a=>[a.textContent,a.getAttribute('href')]);
+ assert.deepEqual(links(),[['1,158 artists','#index/artists/bermuda-day?by=tracks'],['341 labels','#index/labels/bermuda-day?by=tracks'],['All 1,158 artists','#index/artists/bermuda-day?by=tracks'],['All 341 labels','#index/labels/bermuda-day?by=tracks']],
+  'a place whose statistics hold 12 of its 1158 artists still leads all of them into the Index, and counts its labels from the document');
+ const e=setup({journey:true});await flush();e.discovery={items:[]};e.names={labels:labelDoc(140,131)};
+ content=await stagePlace(e,'#statistics/bermuda-day',everyName());
+ assert.deepEqual(links(),[['250 artists','#index/artists/bermuda-day?by=tracks'],['131 labels','#index/labels/bermuda-day?by=tracks'],['All 250 artists','#index/artists/bermuda-day?by=tracks'],['All 131 labels','#index/labels/bermuda-day?by=tracks']],
+  'the artists counted by the statistics, the labels of the document on this station, each into the Index on this station, most tracks first');
+ assert.ok(!content.descendants().some(n=>/^#statistics\/[^/]+\/(?:artists|labels)$/.test(n.getAttribute?.('href')||'')),'no link to the old lists of names');
+ const kept=e.entries().length;follow(e,content.descendants().find(n=>n.textContent==='All 250 artists'));await flush();
+ assert.deepEqual([e.location.hash,e.entries().length,e.document.querySelectorAll('.explorer-nav a')[2].getAttribute('href')],['#index/artists/bermuda-day?by=tracks',kept,'#statistics/bermuda-day'],'the Index replaces the explorer\'s one entry, and the Statistics tab returns to the place');
+ e.response={...status('First'),...everyName({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();content=e.elements['music-content'];
+ assert.deepEqual([links(),e.namesRequests.map(r=>r.url).filter(url=>url.endsWith('=labels'))],[[['250 artists','#index/artists?by=tracks'],['140 labels','#index/labels?by=tracks'],['All 250 artists','#index/artists?by=tracks'],['All 140 labels','#index/labels?by=tracks']],['/api/library/names?kind=labels']],
+  'All stations counts every label of the document and leads into the Index on all stations; the document loads once per page');
+ for(const missing of [()=>null,()=>({kind:'labels'})]){
+  const n=setup({journey:true});await flush();n.discovery={items:[]};n.names=missing;
+  content=await stagePlace(n,'#statistics/bermuda-day',everyName());
+  assert.deepEqual([links(),textOf(byClass(content,'entity-heading')[0].children[1].children[2]),byClass(content,'region').slice(0,2).map(r=>textOf(r.children[0])),textOf(byClass(content,'region')[0].children.at(-1)),n.elements['music-status'].textContent,n.namesRequests.length],
+   [[],'1,113 tracks by 250 artists, 122 hours of music',['Most tracks by 250','Most tracks on'],'Show all 12','',1],'a document that fails or cannot be read leaves the place as it was, with no error');
+ }
+});
+
+test('a place left after the labels document came, before its changes did, leaves the document for the next place',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};e.names={labels:labelDoc(140,131)};
+ e.changes=url=>url.includes('/fontanna/')?new Promise(()=>{}):null;
+ const labelsAsked=()=>e.namesRequests.filter(r=>r.url.endsWith('=labels')).length;
+ await stagePlace(e,'#statistics/fontanna',everyName({scope:'fontanna'}));
+ assert.deepEqual([labelsAsked(),byClass(e.elements['music-content'],'entity-heading').length],[1,0],'the labels document came; the place waits for its changes');
+ for(const id of ['essentials','closing']){e.response={...status('First'),...everyName({scope:id}),...stageMusic()};follow(e,stageLink(e,id));await flush();}
+ const content=e.elements['music-content'],links=content.descendants().filter(n=>n.localName==='a'&&/^#index\//.test(n.getAttribute('href')||'')).map(a=>a.getAttribute('href'));
+ assert.deepEqual([labelsAsked(),links[0],links.length],[1,'#index/artists/closing?by=tracks',4],'one labels document per page load, kept through the places after');
+});
+
+// A station's changes: n records over syncs of `per`, newest first, sequence n down to 1, one observedAt per sync, a day
+// apart, every third one removed.
+const changeFeed=(n,per,newest)=>Array.from({length:n},(_,i)=>({sequence:String(n-i),kind:i%3===2?'removed':'added',id:String(9000+n-i),title:'Change '+(n-i),artist:'Artist '+(n-i),album:'Album',observedAt:new Date(newest-Math.floor(i/per)*86400000).toISOString()}));
+// A page as the server answers it, from limit and before, with next only when more records wait.
+const changePage=(records,since='2026-10-07T00:15:13Z')=>url=>{const q=new URL(url,'http://radio').searchParams,limit=Number(q.get('limit')||30),before=Number(q.get('before')||Infinity),rest=records.filter(r=>Number(r.sequence)<before),out=rest.slice(0,limit);
+ return {trackingSince:since,changes:out,next:rest.length>limit?out.at(-1).sequence:null};};
+const changeRegion=e=>byClass(e.elements['music-content'],'region').find(r=>r.attrs['aria-labelledby']==='r-changes');
+const notesOf=e=>byClass(byClass(e.elements['music-content'],'stage-notes')[0],'collection-note').map(textOf);
+test('Added and removed lists the newest ten changes, pages in place, and hides when empty or failing',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};
+ const records=changeFeed(23,9,clock.now);let reply=null;e.changes=changePage(records);
+ const content=await stagePlace(e,'#statistics/bermuda-day'),since=sinceDay('2026-10-06T23:27:25Z');let region=changeRegion(e);
+ const rows=()=>byClass(region,'row'),read=a=>[a.getAttribute('href'),a.children[0].localName,a.children[0].dateTime,...a.children.map(textOf)];
+ assert.deepEqual([byClass(content,'region').map(r=>textOf(r.children[0])).slice(-2),region.children[0].id,e.changesRequests.map(r=>r.url)],[['Most played since '+since,'Added and removed'],'r-changes',['/api/radio/bermuda-day/changes?limit=10']],'one request for the first ten, and the region after Most played, labelled by its heading');
+ assert.deepEqual([rows().length,read(rows()[0]),read(rows()[2]).at(-1),read(rows()[9])],[10,['#explore/plex_9023','time',records[0].observedAt,new Date(records[0].observedAt).toLocaleTimeString('en',{timeStyle:'short'}),'Change 23Artist 23','added'],'removed',
+  ['#explore/plex_9014','time',records[9].observedAt,sinceDay(records[9].observedAt),'Change 14Artist 14','added']],'each row: the time today or the day before, the title over its artist, and what happened; it opens its track');
+ const more=region.children.at(-1),first=rows();
+ assert.deepEqual([more.localName,cls(more),more.textContent,notesOf(e).includes('Changes are recorded since '+sinceDay('2026-10-07T00:15:13Z')+'.')],['button','text-button','Show earlier changes',true]);
+ e.changes=url=>new Promise(resolve=>{reply=ok=>resolve(ok?changePage(records)(url):null);});
+ more.focus();more.emit('click');await flush();
+ assert.deepEqual([more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.document.activeElement===more,new URL(e.changesRequests.at(-1).url,'http://radio').searchParams.get('before')],['Loading…','true','true',true,'14'],'busy in place, still focused, asking from the oldest change shown');
+ const sent=e.changesRequests.length;more.emit('click');assert.equal(e.changesRequests.length,sent,'a second press while it loads asks for nothing');
+ reply(true);await flush();
+ assert.deepEqual([rows().length,sameRows(rows().slice(0,10),first),more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.document.activeElement===more],[20,true,'Show earlier changes',null,null,true],'ten more under the rows shown, and focus stays on the button');
+ more.emit('click');await flush();reply(false);await flush();
+ assert.deepEqual([more.textContent,rows().length,more.getAttribute('aria-disabled'),e.document.activeElement===more],['Try again',20,null,true],'a failure says so on the button and keeps the rows');
+ more.emit('click');await flush();assert.equal(new URL(e.changesRequests.at(-1).url,'http://radio').searchParams.get('before'),'4','Try again asks for the same changes');
+ reply(true);await flush();
+ assert.deepEqual([rows().length,region.children.includes(more),e.document.activeElement===rows()[20],read(rows()[22]).slice(0,2)],[23,false,true,['#explore/plex_9001','time']],'the last page takes the button away, and focus moves to the first change it showed');
+ e.changes=changePage(records);e.setLanguage('de');await flush();region=changeRegion(e);
+ assert.deepEqual([textOf(region.children[0]),byClass(region,'row-fact').slice(0,3).map(textOf),region.children.at(-1).textContent,notesOf(e).find(t=>t.startsWith('Änderungen'))],
+  ['Hinzugefügt und entfernt',['hinzugefügt','hinzugefügt','entfernt'],'Frühere Änderungen anzeigen','Änderungen werden seit '+new Date('2026-10-07T00:15:13Z').toLocaleDateString('de',{day:'numeric',month:'short'})+' erfasst.']);
+ e.setLanguage('en');await flush();
+ for(const [place,answer,line,why] of [['#statistics/fontanna',()=>({trackingSince:'2026-10-07T00:15:13Z',changes:[],next:null}),true,'no change yet: no region, and the date the radio began to watch'],['#statistics/etage-zero',()=>({trackingSince:null,changes:[],next:null}),false,'not watched yet: nothing'],
+  ['#statistics/closing',()=>null,false,'a feed that fails: no region, and the rest of the place'],['#statistics/ambiance',()=>({trackingSince:'2026-10-07T00:15:13Z',changes:'none'}),false,'a feed that cannot be read: the same']]){
+  e.changes=answer;e.response={...status('First'),...stageStats({scope:place.split('/')[1]}),...stageMusic()};routeTo(e,place);await flush();
+  assert.deepEqual([changeRegion(e),byClass(content,'region').map(r=>textOf(r.children[0])).at(-1),notesOf(e).some(t=>t.startsWith('Changes are recorded since')),e.elements['music-status'].textContent],[undefined,'Most played since '+since,line,''],why);
+ }
+ // Only records that read as a change show, and only a next that names a sequence after a page with changes; a date that
+ // is not one is no date.
+ const good=changeFeed(2,2,clock.now),bad=[{...good[0],kind:'renamed',title:'Renamed'},{...good[0],title:undefined},{...good[0],title:'No time',observedAt:'x'}];
+ e.changes=()=>({trackingSince:'2026-10-07T00:15:13Z',changes:[good[0],...bad,good[1]],next:'abc'});e.response={...status('First'),...stageStats({scope:'palac-feel'}),...stageMusic()};routeTo(e,'#statistics/palac-feel');await flush();
+ region=changeRegion(e);
+ assert.deepEqual([byClass(region,'row-name').map(n=>n.textContent),region.children.at(-1).localName],[['Change 2','Change 1'],'ol'],'a record of another kind, without a title or without a time does not show, and a next that is no sequence offers no earlier changes');
+ e.changes=()=>({trackingSince:'soon',changes:[],next:'5'});e.response={...status('First'),...stageStats({scope:'essentials'}),...stageMusic()};routeTo(e,'#statistics/essentials');await flush();
+ assert.deepEqual([changeRegion(e),notesOf(e).some(t=>t.startsWith('Changes are recorded since')),e.elements['music-status'].textContent],[undefined,false,''],'an empty page with a next shows nothing, and a date that is not one names no date');
+ // On All stations, an empty page with a next holds no other station back.
+ e.changes=url=>url.includes('/ambiance/')?{trackingSince:'2026-10-07T00:15:13Z',changes:[],next:'5'}:url.includes('/fontanna/')?changePage(good)(url):null;
+ e.response={...status('First'),...stageStats({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();region=changeRegion(e);
+ assert.deepEqual([byClass(region,'row-name').map(n=>n.textContent),region.children.at(-1).localName,e.elements['music-status'].textContent],[['Change 2','Change 1'],'ol',''],'the other stations\' changes show, with no earlier changes to ask for');
+ // A later page whose times read newer than the rows shown, as after a clock set back, still appends in the feed's order.
+ const skewed=changeFeed(12,12,clock.now-7200000).map((c,i)=>i>=10?{...c,observedAt:new Date(clock.now).toISOString()}:c);
+ e.changes=changePage(skewed);e.response={...status('First'),...stageStats({scope:'palac-dance'}),...stageMusic()};routeTo(e,'#statistics/palac-dance');await flush();
+ region=changeRegion(e);region.children.at(-1).emit('click');await flush();
+ assert.deepEqual(byClass(region,'row-name').map(n=>n.textContent),Array.from({length:12},(_,i)=>'Change '+(12-i)),'every change once, newest sequence first');
+});
+
+test('All stations merges the nine feeds by time, and pages only the stations that have more',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};
+ const t1=clock.now-3600000,t2=t1-86400000,t3=t2-86400000,rec=(stage,seq,t,kind='added')=>({sequence:String(seq),kind,id:String(seq),title:stage+' '+seq,artist:'Artist',album:'',observedAt:new Date(t).toISOString()});
+ // Essentials, last on screen, has more than a page; Under the Sun, first, ties with it a day ago and has an older change;
+ // Fontanna ties with it an hour ago, after a newer change of its own.
+ let feeds={essentials:[...[15,14,13,12,11].map(s=>rec('essentials',s,t1)),...[10,9,8,7,6,5,4,3,2,1].map(s=>rec('essentials',s,t2))],'bermuda-day':[rec('bermuda-day',3,t2),rec('bermuda-day',2,t2,'removed'),rec('bermuda-day',1,t3)],fontanna:[rec('fontanna',2,t1+60000),rec('fontanna',1,t1)]};
+ let failing='';const stageOfUrl=url=>url.split('/')[3];
+ e.changes=url=>stageOfUrl(url)===failing?null:changePage(feeds[stageOfUrl(url)]||[],stageOfUrl(url)==='fontanna'?'2026-10-15T04:48:36Z':'2026-10-07T00:15:13Z')(url);
+ e.response={...status('First'),...stageStats({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();
+ let region=changeRegion(e);const titles=()=>byClass(region,'row').map(a=>byClass(a,'row-name')[0].textContent);
+ const order=[...e.window.Pavoia.stations].map(s=>s.id),first=['fontanna 2','fontanna 1','essentials 15','essentials 14','essentials 13','essentials 12','essentials 11','bermuda-day 3','bermuda-day 2','essentials 10','essentials 9','essentials 8','essentials 7','essentials 6'];
+ assert.deepEqual([e.changesRequests.map(r=>r.url),titles(),byClass(byClass(region,'row')[0],'row-line')[0].textContent,byClass(byClass(region,'row')[8],'row-fact')[0].textContent],
+  [order.map(id=>'/api/radio/'+id+'/changes?limit=10'),first,'Fontanna · Artist','removed'],'one first page per station, its station first on each row; newest first, ties in the order on screen, and no change older than the oldest one loaded of a station with more');
+ assert.equal(cls(region),'region changes','the region reads across the columns before the last one, as Release years does');
+ assert.ok(notesOf(e).includes('Changes are recorded since '+sinceDay('2026-10-15T04:48:36Z')+'.'),'since the last station began to be watched');
+ const shown=byClass(region,'row'),more=region.children.at(-1);more.focus();more.emit('click');await flush();
+ assert.deepEqual([e.changesRequests.slice(9).map(r=>r.url),titles(),sameRows(byClass(region,'row').slice(0,14),shown),region.children.includes(more),e.document.activeElement===byClass(region,'row')[14]],
+  [['/api/radio/essentials/changes?limit=10&before=6'],[...first,'essentials 5','essentials 4','essentials 3','essentials 2','essentials 1','bermuda-day 1'],true,false,true],'only the station with more asks again; its changes append, then the older one it held back');
+ failing='closing';follow(e,stageLink(e,'fontanna'));await flush();follow(e,stageLink(e,'radio'));await flush();region=changeRegion(e);
+ assert.deepEqual([titles(),notesOf(e).some(t=>t.startsWith('Changes are recorded since'))],[first,false],'a station that fails leaves the others merged, and no date');
+ // Under the Sun, first on screen, has more changes of the sync Essentials ties with: Essentials waits until they are in.
+ failing='';feeds={'bermuda-day':Array.from({length:12},(_,i)=>rec('bermuda-day',12-i,t2)),essentials:[rec('essentials',2,t2),rec('essentials',1,t2)]};
+ follow(e,stageLink(e,'fontanna'));await flush();follow(e,stageLink(e,'radio'));await flush();region=changeRegion(e);
+ const day=Array.from({length:12},(_,i)=>'bermuda-day '+(12-i));
+ assert.deepEqual(titles(),day.slice(0,10),'a tie with a station earlier on screen that has more waits for it');
+ region.children.at(-1).emit('click');await flush();
+ assert.deepEqual(titles(),[...day,'essentials 2','essentials 1'],'then follows it');
 });
 
 // The Index: every artist and label of the playlists, from the names documents, A to Z or most tracks first.
@@ -3533,4 +3666,42 @@ test('a mark of the address leads once: on a reload, on a list already drawn, an
  await load(f,'#index/artists?q=maceo&at=M');assert.equal(f.location.hash,'#index/artists?q=maceo&at=M','M has one');
  await load(f,'#index/artists?q=maceo&at=Z');
  assert.deepEqual([f.location.hash,f.elements['index-tab'].getAttribute('href'),f.entries().length>0],['#index/artists?q=maceo','#index/artists?q=maceo',true],'and on the drawn list Z goes too');
+});
+
+test('the labels document and the changes hold a station place 2 s past its numbers at most',async()=>{
+ const graces=e=>[...e.timers.values()].filter(t=>t.delay===2000).length,drawn=e=>byClass(e.elements['music-content'],'entity-heading').length;
+ const indexLinks=e=>e.elements['music-content'].descendants().filter(n=>n.localName==='a'&&/^#index\//.test(n.getAttribute('href')||'')).length;
+ // The labels document does not come: the place waits 2 s for it, then shows without its links, with its changes.
+ const e=setup({journey:true});await flush();e.discovery={items:[]};e.changes=changePage(changeFeed(3,3,clock.now));
+ let labels=null;e.names=()=>new Promise(resolve=>{labels=resolve;});
+ await stagePlace(e,'#statistics/bermuda-day');
+ assert.deepEqual([drawn(e),graces(e)],[0,1],'its numbers came: the place waits, for 2 s');
+ e.fire(2000);await flush();
+ assert.deepEqual([drawn(e),indexLinks(e),byClass(changeRegion(e),'row').length,graces(e),e.elements['music-status'].textContent],[1,0,3,0,''],'then it shows: no link to the Index, its changes, and no error');
+ // The document still comes, and the next place has it with no second request.
+ labels(labelDoc(140,131));await flush();
+ e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};follow(e,stageLink(e,'fontanna'));await flush();
+ assert.deepEqual([e.namesRequests.length,indexLinks(e)>0,graces(e)],[1,true,0],'one labels document, used by the place after; a place with every answer leaves no timer');
+ // The changes do not come: the same wait, then the place without that region.
+ const f=setup({journey:true});await flush();f.discovery={items:[]};f.names={labels:labelDoc(140,131)};f.changes=()=>new Promise(()=>{});
+ await stagePlace(f,'#statistics/bermuda-day');assert.equal(drawn(f),0);
+ f.fire(2000);await flush();
+ assert.deepEqual([drawn(f),indexLinks(f)>0,changeRegion(f)===undefined],[1,true,true],'the links of the labels document, and no Added and removed');
+});
+
+test('the last page of changes hands focus to the first row that opens a track, and a page left while it loads is dropped',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};
+ // Sequence 2 has an id that is no track: its row is no link.
+ const records=changeFeed(12,12,clock.now).map(r=>r.sequence==='2'?{...r,id:'x y'}:r);e.changes=changePage(records);
+ await stagePlace(e,'#statistics/bermuda-day');const region=changeRegion(e),more=region.children.at(-1);
+ more.focus();more.emit('click');await flush();
+ const rows=byClass(region,'row');
+ assert.deepEqual([rows.length,rows[10].getAttribute('href'),rows[11].getAttribute('href'),e.document.activeElement===rows[11]],[12,null,'#explore/plex_9001',true],'the first new row is no link, so focus goes to the next one');
+ // A page still out when the listener leaves is aborted.
+ const f=setup({journey:true});await flush();f.discovery={items:[]};f.changes=changePage(changeFeed(23,9,clock.now));
+ await stagePlace(f,'#statistics/bermuda-day');const button=changeRegion(f).children.at(-1);
+ f.changes=()=>new Promise(()=>{});button.emit('click');await flush();const page=f.changesRequests.at(-1);
+ assert.deepEqual([new URL(page.url,'http://radio').searchParams.get('before'),page.signal.aborted],['14',false]);
+ routeTo(f,'#history');await flush();
+ assert.equal(page.signal.aborted,true,'leaving Statistics drops the page');
 });

@@ -337,6 +337,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 #explorer .text-button:is(:hover, :focus-visible) { color:var(--cream); text-decoration:underline; text-underline-offset:3px; }
 /* A text link in its place, such as All 860 artists, keeps a button's 44px target. */
 #explorer a.text-button { display:inline-flex; align-items:center; min-height:44px; }
+/* Show earlier changes, while its pages load, as Show earlier tracks. */
+#explorer .text-button[aria-disabled=true] { opacity:.45; cursor:default; }
 /* Fields: 16px keeps iOS from zooming. */
 #explorer input { height:44px; padding:0 var(--s3); font:16px Inter,sans-serif; color:var(--cream); background:transparent; border:1px solid var(--line); border-radius:0; }
 #explorer input:is(:hover, :focus) { border-color:var(--muted); }
@@ -412,8 +414,8 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .region h4 small a:is(:hover, :focus-visible) { color:var(--cream); }
 .region ol { margin:0; padding:0; list-style:none; }
 /* About and On the radio close the record in the same grid, side by side on a wide screen: On the radio takes the
-   last column, About the ones before it. */
-@media (min-width:761px) { .regions > :is(.record-about, .release-years) { grid-column:1 / -2; } }
+   last column, About the ones before it. A station's Release years and its Added and removed read as About does. */
+@media (min-width:761px) { .regions > :is(.record-about, .release-years, .changes) { grid-column:1 / -2; } }
 /* One row for every list in the explorer: a 40px picture, a time or nothing, then a name over its second line,
    and a fact on the right. No border, no background; a pointer or the keyboard underlines the name. */
 .row { display:grid; grid-template-columns:40px minmax(0,1fr) auto; align-items:center; gap:var(--s3); min-height:56px; padding-block:var(--s2); }

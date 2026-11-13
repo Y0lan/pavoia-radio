@@ -73,8 +73,9 @@
   Object.assign(copy.en, {exploreTab:'Roots',history:'History',statistics:'Statistics',historyDay:'Day',older:'Show earlier tracks',loadingMore:'Loading…',now:'Now',allStages:'All stations',noHistory:'Nothing has played on this station yet.',noDay:'Nothing played on this station that day.',historyError:'The history could not load.',musicLoading:'Loading the music…',musicError:'These records could not load.',retry:'Try again',releases:'Releases',years:'Release years',labels:'Labels',
     statLine:'{tracks} tracks by {artists} artists, {hours} hours of music',playsSince:'{plays} plays since {date}',plays30:'{plays} plays in the last 30 days',allPlayed:'every track has played',notPlayed:'{n} not played yet',seeWhatPlayed:'See what played',playsError:'Plays could not load.',switchStage:'Switch to this station',
     mostTracksBy:'Most tracks by',mostTracksOn:'Most tracks on',sharesWith:'Shares tracks with',stages:'Stations',tracksOn:'{tracks} on {stage}',tracksInCommon:'{tracks} in common',mostPlayedSince:'Most played since {date}',mostPlayed30:'Most played in the last 30 days',howCounted:'How these numbers are counted',
-    definitions:'Each track counts once per playlist. Artists are counted as credited, collaborations included. A track can be on several stations.',playIsStart:'A play is a start on the stream, not a full listen.',checkedAt:'Playlist checked at {time}',knownArtist:'Artist known for {n} of {total} tracks',knownLabel:'Label known for {n} of {total} tracks',knownYear:'Year known for {n} of {total} tracks',
+    definitions:'Each track counts once per playlist. Each artist counts once per track, featured artists and remixers included. A track can be on several stations.',playIsStart:'A play is a start on the stream, not a full listen.',checkedAt:'Playlist checked at {time}',knownArtist:'Artist known for {n} of {total} tracks',knownLabel:'Label known for {n} of {total} tracks',knownYear:'Year known for {n} of {total} tracks',
     statLineAll:'{tracks} tracks by {artists} on {labels}, {hours} hours of music',artistsLink:'{n} artists',labelsLink:'{n} labels',allArtists:'All {n} artists',allLabels:'All {n} labels',
+    changesTitle:'Added and removed',changeAdded:'added',changeRemoved:'removed',changesMore:'Show earlier changes',changesSince:'Changes are recorded since {date}.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
     indexTab:'Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
     markArtists:'{mark}, {n} artists',markArtist1:'{mark}, 1 artist',markLabels:'{mark}, {n} labels',markLabel1:'{mark}, 1 label',symbols:'Numbers and symbols',band:'{n} tracks or more',band1:'One track',
@@ -82,8 +83,9 @@
   Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',historyDay:'Tag',older:'Frühere Tracks anzeigen',loadingMore:'Wird geladen…',now:'Jetzt',allStages:'Alle Sender',noHistory:'Auf diesem Sender lief noch nichts.',noDay:'An diesem Tag lief hier nichts.',historyError:'Der Verlauf konnte nicht geladen werden.',musicLoading:'Musik wird geladen…',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',releases:'Veröffentlichungen',years:'Erscheinungsjahre',labels:'Labels',
     statLine:'{tracks} Tracks von {artists} Künstlern, {hours} Stunden Musik',playsSince:'{plays} Wiedergaben seit {date}',plays30:'{plays} Wiedergaben in den letzten 30 Tagen',allPlayed:'jeder Track lief schon',notPlayed:'{n} noch nicht gespielt',seeWhatPlayed:'Sieh, was lief',playsError:'Die Wiedergaben konnten nicht geladen werden.',switchStage:'Zu diesem Sender wechseln',
     mostTracksBy:'Die meisten Tracks von',mostTracksOn:'Die meisten Tracks bei',sharesWith:'Teilt Tracks mit',stages:'Sender',tracksOn:'{tracks} auf {stage}',tracksInCommon:'{tracks} gemeinsam',mostPlayedSince:'Am häufigsten gespielt seit {date}',mostPlayed30:'Am häufigsten gespielt in den letzten 30 Tagen',howCounted:'So wird gezählt',
-    definitions:'Jeder Track zählt einmal pro Playlist. Künstler zählen wie angegeben, Zusammenarbeiten eingeschlossen. Ein Track kann auf mehreren Sendern laufen.',playIsStart:'Eine Wiedergabe ist ein Start im Stream, kein ganzes Anhören.',checkedAt:'Playlist geprüft um {time}',knownArtist:'Künstler bekannt für {n} von {total} Tracks',knownLabel:'Label bekannt für {n} von {total} Tracks',knownYear:'Jahr bekannt für {n} von {total} Tracks',
+    definitions:'Jeder Track zählt einmal pro Playlist. Jeder Künstler zählt einmal pro Track, Featurings und Remixer eingeschlossen. Ein Track kann auf mehreren Sendern laufen.',playIsStart:'Eine Wiedergabe ist ein Start im Stream, kein ganzes Anhören.',checkedAt:'Playlist geprüft um {time}',knownArtist:'Künstler bekannt für {n} von {total} Tracks',knownLabel:'Label bekannt für {n} von {total} Tracks',knownYear:'Jahr bekannt für {n} von {total} Tracks',
     statLineAll:'{tracks} Tracks von {artists} auf {labels}, {hours} Stunden Musik',artistsLink:'{n} Künstlern',labelsLink:'{n} Labels',allArtists:'Alle {n} Künstler',allLabels:'Alle {n} Labels',
+    changesTitle:'Hinzugefügt und entfernt',changeAdded:'hinzugefügt',changeRemoved:'entfernt',changesMore:'Frühere Änderungen anzeigen',changesSince:'Änderungen werden seit {date} erfasst.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
     indexTab:'Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
     markArtists:'{mark}, {n} Künstler',markArtist1:'{mark}, 1 Künstler',markLabels:'{mark}, {n} Labels',markLabel1:'{mark}, 1 Label',symbols:'Zahlen und Zeichen',band:'{n} Tracks oder mehr',band1:'Ein Track',
@@ -701,13 +703,15 @@
     if(!/^#explore(?:\?|$)/.test(location.hash))return;
     searchPage('');hop?.abort();hop=null;shownQuery='';hideResults();$('discovery-status').textContent='';
   });
-  let view='explore',musicRequest=null,historyPage=null,musicPlace=null,clicked=null,musicScope='',musicKind='',musicDay='',indexBy='',indexQuery='',shownStage=null,naming=null;
+  let view='explore',musicRequest=null,historyPage=null,musicPlace=null,clicked=null,musicScope='',musicKind='',musicDay='',indexBy='',indexQuery='',shownStage=null,naming=null,paging=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
   // A place in Statistics by name: a station, or all stations together, which hold the whole collection.
   const scopeName = id => id==='radio'?word('allStages'):stationName(id);
   const shortTime = value => new Date(value).toLocaleTimeString(radio.getState().language, {timeStyle:'short'});
   // A day by its month and number: Oct 7.
   const shortDay = value => new Date(value).toLocaleDateString(radio.getState().language, {day:'numeric',month:'short'});
+  // The time of a moment today, its day before.
+  const timeOrDay = value => new Date(value).toDateString()===new Date(Date.now()).toDateString()?shortTime(value):shortDay(value);
   // One number format per language: the Index writes thousands of counts in one draw.
   const formats = new Map(), number = value => {const lang=radio.getState().language;if(!formats.has(lang))formats.set(lang,new Intl.NumberFormat(lang));return formats.get(lang).format(value);};
   // The local date as a date field writes it.
@@ -773,7 +777,7 @@
       else{const row=opened(clicked)?clicked:rowUnderBar();musicPlace=row&&{key:content.dataset.key,row,y:row.getBoundingClientRect().top-dialog.getBoundingClientRect().top,focus:row===clicked};}
     }
     clicked=null;
-    view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();
+    view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();paging?.abort();paging=null;
     $('music-view').hidden=next==='explore';$('music-view').dataset.view=next;$('index-head').hidden=$('index-rail').hidden=next!=='index';$('discovery-search').hidden=next!=='explore';
     $('discovery-status').hidden=next!=='explore';
     for(const link of document.querySelectorAll('.explorer-nav a')) {
@@ -818,26 +822,76 @@
   const tracks = n => word(n===1?'tracks1':'tracksN').replace('{n}',number(n));
   // An artist or a label opens its record: at once when it comes with its id or this visit already found it, else by its
   // name. Its picture comes with it, or with the record found.
-  const credit = (type,{name,id,image}) => {const known=named.get(type+':'+name),own=entityID(id)&&id.startsWith(type==='artist'?'art_':'lab_');
+  const ownID = (type,id) => entityID(id)&&id.startsWith(type==='artist'?'art_':'lab_');
+  const credit = (type,{name,id,image}) => {const known=named.get(type+':'+name),own=ownID(type,id);
     return {id:type+':'+name,type,title:name,image:image||known?.image,href:!someone(name)?null:own?'#explore/'+id:known?'#explore/'+known.id:'#explore/'+type+'/'+encodeURIComponent(name)};};
   // The listener's words with some {parts} as nodes, such as links in a sentence.
   const sentence = (text,parts) => text.split(/(\{\w+\})/).map((p,i)=>i%2?parts[p.slice(1,-1)]:p).filter(p=>p!=='');
-  // Until the server keeps every name, the numbers hold the first 12 only, and the place links to no list.
-  const complete=data=>data.topArtists.length===data.artists;
+  // A page of a station's changes, newest first: each record that reads as one, and the next page only after one.
+  const changesOf = (stage,signal,before='') => readJSON('/api/radio/'+stage+'/changes?limit=10'+(before?'&before='+before:''),signal).then(data=>{
+    if(!Array.isArray(data?.changes))throw new Error('schema');
+    const items=data.changes.filter(c=>['added','removed'].includes(c?.kind)&&typeof c.title==='string'&&typeof c.artist==='string'&&!isNaN(Date.parse(c.observedAt))).map(c=>({...c,stage}));
+    return {stage,items,next:items.length&&/^\d{1,19}$/.test(data.next||'')?data.next:null,since:typeof data.trackingSince==='string'&&!isNaN(Date.parse(data.trackingSince))?data.trackingSince:null};
+  });
+  // The changes shown: the stations' feeds, each in its own order, merged newest first, ties in the order on screen. A
+  // change shows only once no station with earlier pages could still add one before it, so a page that comes appends.
+  const shownChanges = ({feeds}) => {
+    const heads=feeds.map(()=>0),at=c=>Date.parse(c.observedAt),out=[];
+    for(;;){
+      let best=-1;feeds.forEach((f,k)=>{if(heads[k]<f.items.length&&(best<0||at(f.items[heads[k]])>at(feeds[best].items[heads[best]])))best=k;});
+      if(best<0)return out;
+      const c=feeds[best].items[heads[best]];
+      if(feeds.some((f,k)=>f.next&&heads[k]===f.items.length&&(at(f.items.at(-1))>at(c)||at(f.items.at(-1))===at(c)&&k<best)))return out;
+      out.push(c);heads[best]++;
+    }
+  };
+  // A change reads the time of the sync that saw it, or its day before today, the track over its artist, on All stations
+  // after its station, which a short line keeps whole, and whether it came or went. It opens its track.
+  const changeRow = (c,station) => {
+    const li=node('li'),a=node('a','row'),when=node('time','',timeOrDay(c.observedAt)),text=node('span','row-text');when.dateTime=c.observedAt;
+    if(entityID('plex_'+c.id))a.href='#explore/plex_'+c.id;
+    text.append(node('span','row-name',c.title),node('span','row-line',(station?[c.artist]:[stationName(c.stage),c.artist]).filter(Boolean).join(' · ')));
+    a.append(when,text,node('span','row-fact',word(c.kind==='added'?'changeAdded':'changeRemoved')));li.append(a);return li;
+  };
+  // Show earlier changes says what it does next, and that it is disabled while its pages load: aria-disabled keeps focus on it.
+  const sayChanges = changes => {const b=changes.more;if(!b)return;b.textContent=word(changes.busy?'loadingMore':changes.failed?'retry':'changesMore');
+    if(changes.busy){b.setAttribute('aria-disabled','true');b.setAttribute('aria-busy','true');}else{b.removeAttribute('aria-disabled');b.removeAttribute('aria-busy');}};
+  // The next page of every station that has one, appended in place under the rows shown. A failure keeps the rows and says
+  // Try again on the button, which asks for the same pages. The button goes with the last page, its focus to the first
+  // row it showed that opens a track, or to the place's name. Leaving the place drops the request.
+  async function earlierChanges(changes) {
+    if(changes.busy)return;
+    const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000);paging=c;changes.busy=true;changes.failed=false;sayChanges(changes);
+    let pages=null;
+    try{pages=await Promise.all(changes.feeds.filter(f=>f.next).map(f=>changesOf(f.stage,c.signal,f.next).then(p=>[f,p])));}catch{/* The button says Try again. */}finally{clearTimeout(timeout);}
+    if(paging!==c||shownStage?.[3]!==changes)return;
+    paging=null;changes.busy=false;changes.failed=!pages;
+    if(pages){
+      const from=shownChanges(changes).length,held=document.activeElement===changes.more;
+      for(const [f,p] of pages){f.items.push(...p.items);f.next=p.next;}
+      const rows=shownChanges(changes).slice(from).map(r=>changeRow(r,changes.station));changes.list.append(...rows);
+      if(!changes.feeds.some(f=>f.next)){changes.more.remove();changes.more=null;if(held)(rows.map(r=>r.children[0]).find(a=>a.getAttribute('href'))||recordTitle).focus({preventScroll:true});}
+    }
+    sayChanges(changes);
+  }
   // A station in Statistics is a place on the map of a record: its photo, its name under its stage and its numbers in the
   // middle, the artists and labels with the most tracks on it and the stations it shares tracks with around them, each
-  // opening its own place. Under it: its release years, what it played most, and how all of it is counted.
-  function renderStage(data,music) {
+  // opening its own place. Under it: its release years, what it played most, what changed in its playlist, and how all
+  // of it is counted. The labels document, when it loads, counts its labels and leads its counts into the Index.
+  function renderStage(data,music,labels,changes) {
     const content=$('music-content'),scope=data.scope,station=radio.stations.find(s=>s.id===scope),title=scopeName(scope),map=mapOn()?node('div','neighbourhood'):null,grid=node('div','regions');
-    const heading=node('div','entity-heading'),about=node('div'),since=Date.parse(music?.earliest)>Date.parse(music?.from),every=complete(data);
-    shownStage=[data,music];mapWatch?.disconnect();content.replaceChildren();
+    const heading=node('div','entity-heading'),about=node('div'),since=Date.parse(music?.earliest)>Date.parse(music?.from),every=labels!==null;
+    // The statistics hold the first 12 labels only; the labels document holds them all.
+    const labelsOn=every?station?labels.filter(i=>i.stages[scope]).length:labels.length:0;
+    shownStage=[data,music,labels,changes];mapWatch?.disconnect();content.replaceChildren();
     recordTitle=node('h3','',title);recordTitle.tabIndex=-1;
     if(station)about.append(node('p','eyebrow',station.fact));
-    // With every name kept, its artists and its labels are links in the sentence to their lists. The map keeps the shorter
-    // sentence, which fits its middle on one line, and links them from the counts over its regions.
-    const list=(kind,key,n,cls)=>{const a=node('a',cls,word(key).replace('{n}',number(n)));a.href='#statistics/'+scope+'/'+kind;return a;},line=node('p','entity-line'),linked=every&&!map;
+    // With the labels document, its artists and its labels are links in the sentence to the Index on this station, most
+    // tracks first. The map keeps the shorter sentence, which fits its middle on one line, and links them from the counts
+    // over its regions.
+    const list=(kind,key,n,cls)=>{const a=node('a',cls,word(key).replace('{n}',number(n)));a.href=indexAt({kind,scope,by:'tracks'});return a;},line=node('p','entity-line'),linked=every&&!map;
     // One text node between links, as the plain line had: the words shape as they did.
-    line.append(...sentence(word(linked?'statLineAll':'statLine'),{tracks:number(data.tracks),hours:number(Math.round(data.durationMs/3600000)),artists:linked?list('artists','artistsLink',data.artists):number(data.artists),labels:linked&&list('labels','labelsLink',data.labels.length)}));line.normalize();
+    line.append(...sentence(word(linked?'statLineAll':'statLine'),{tracks:number(data.tracks),hours:number(Math.round(data.durationMs/3600000)),artists:linked?list('artists','artistsLink',data.artists):number(data.artists),labels:linked&&list('labels','labelsLink',labelsOn)}));line.normalize();
     about.append(recordTitle,line);
     // A station's plays in a sentence that ends on a link to what played there; plays that failed to load say so in
     // their place, and the rest still shows.
@@ -852,7 +906,7 @@
     const names=(type,list)=>list.slice(0,12).map(item=>({...credit(type,item),line:station?word('tracksOn').replace('{tracks}',tracks(item.count)).replace('{stage}',title):tracks(item.count),fact:number(item.count)}));
     const stages=data.stages.map(({name,count})=>[radio.stations.find(s=>s.id===name),count]).filter(([s])=>s)
       .map(([s,count])=>({id:s.id,type:'stage',title:s.name,image:s.thumb,href:'#statistics/'+s.id,line:station?word('tracksInCommon').replace('{tracks}',tracks(count)):tracks(count),fact:number(count)}));
-    const regions=[['mostTracksBy',names('artist',data.topArtists),data.artists,every&&list('artists','allArtists',data.artists,'text-button')],['mostTracksOn',names('label',data.labels),every?data.labels.length:null,every&&list('labels','allLabels',data.labels.length,'text-button')],[station?'sharesWith':'stages',stages,stages.length]]
+    const regions=[['mostTracksBy',names('artist',data.topArtists),data.artists,every&&list('artists','allArtists',data.artists,'text-button')],['mostTracksOn',names('label',data.labels),every?labelsOn:null,every&&list('labels','allLabels',labelsOn,'text-button')],[station?'sharesWith':'stages',stages,stages.length]]
       .filter(([,items])=>items.length).map(([key,items,count,all])=>regionSection(key,items,'','r',Boolean(map),count,all||null));
     if(map){map.append(heading,...regions);content.append(map);}else{content.append(heading);grid.append(...regions);}
     if(wide.matches)drawMap(content,map,{type:'stage'});
@@ -869,8 +923,10 @@
       axis.append(node('span','',String(first)),top,node('span','',String(last)));notes.append(h,strip,axis);
     }
     // How it is all counted, closed until asked: the only notes of the view.
-    const checked=new Date(data.updatedAt).toDateString()===new Date(Date.now()).toDateString()?shortTime(data.updatedAt):shortDay(data.updatedAt);
-    details.append(node('summary','',word('howCounted')),...[word('definitions'),station&&word('playIsStart'),word('checkedAt').replace('{time}',checked),
+    // Changes count from the day the radio began to watch the playlist; on All stations from the last station to begin,
+    // and only when every station says.
+    const watched=changes&&(station?changes.feeds[0].since:changes.feeds.length===radio.stations.length&&changes.feeds.every(f=>f.since)&&changes.feeds.map(f=>f.since).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1));
+    details.append(node('summary','',word('howCounted')),...[word('definitions'),station&&word('playIsStart'),word('checkedAt').replace('{time}',timeOrDay(data.updatedAt)),watched&&word('changesSince').replace('{date}',shortDay(watched)),
       ...[['artists','knownArtist'],['labels','knownLabel'],['years','knownYear']].filter(([key])=>data.coverage?.[key]<data.tracks).map(([key,say])=>word(say).replace('{n}',number(data.coverage[key])).replace('{total}',number(data.tracks)))]
       .filter(Boolean).map(text=>node('p','collection-note',text)));
     notes.append(details);grid.append(notes);
@@ -882,14 +938,23 @@
       for(const item of top){const li=node('li'),row=node('a','row'),text=node('span','row-text');if(entityID('plex_'+item.id))row.href='#explore/plex_'+item.id;text.append(node('span','row-name',item.title),node('span','row-line',item.artist));row.append(text,node('span','row-fact',number(item.plays)+'×'));li.append(row);list.append(li);}
       played.append(h,list);grid.append(played);
     }
+    // Added and removed: the newest changes, and Show earlier changes while there are more. No change, no region.
+    const changed=changes?shownChanges(changes):[];
+    if(changed.length){
+      const section=node('section','region changes'),h=node('h4','',word('changesTitle')),list=node('ol');h.id='r-changes';section.setAttribute('aria-labelledby',h.id);
+      list.append(...changed.map(c=>changeRow(c,Boolean(station))));section.append(h,list);grid.append(section);
+      Object.assign(changes,{station:Boolean(station),list,more:changes.feeds.some(f=>f.next)?action('',()=>earlierChanges(changes),'text-button'):null});
+      if(changes.more){section.append(changes.more);sayChanges(changes);}
+    }
     content.append(grid);
-    // The first three artists and labels that open a record get its picture and its link in place, one search each, unless
-    // the listener saves data. Leaving the view drops the searches; the other names keep their initial.
+    // The first three artists and labels that come without a record of their own get its picture and its link in place,
+    // one search each, unless the listener saves data. Leaving the view drops the searches; the other names keep their
+    // initial.
     const rows=regions.flatMap(r=>[...r.querySelector('ol')?.children||[]]);
     if(navigator.connection?.saveData!==true){
       naming?.abort();const c=new AbortController();naming=c;
-      for(const [type,list] of [['artist',data.topArtists],['label',data.labels]])for(const {name} of list.filter(i=>someone(i.name)).slice(0,3)){
-        if(named.has(type+':'+name))continue;
+      for(const [type,list] of [['artist',data.topArtists],['label',data.labels]])for(const {name,id} of list.filter(i=>someone(i.name)).slice(0,3)){
+        if(named.has(type+':'+name)||ownID(type,id))continue;
         lookup(type,name,c.signal).then(hit=>{const li=rows.find(n=>n.dataset.id===type+':'+name);if(!hit||!li)return;const row=li.children[0];row.href='#explore/'+hit.id;image(row.children[0].children[0],hit.image,'');}).catch(()=>{});
       }
     }
@@ -906,7 +971,8 @@
   // The Index: every artist or label of the playlists, from its names document, fetched once per page load and kept. A
   // name is someone with a positive count of tracks; its id, its picture and its stages stay only when valid. Each one
   // files under the first letter of its folded key, so Âme is under A, Øostil under O, and "&ME" and "8Kays" under #. A
-  // request that fails or is dropped leaves the cache at once, so the next one asks again. A stage is valid when it is a
+  // request that fails, or is dropped before it answers, leaves the cache at once, so the next one asks again; a document
+  // that came stays, whatever its place does after. A stage is valid when it is a
   // station's id, whatever the order on screen.
   const nameDocs=new Map(),stationIds=new Set(radio.stations.map(s=>s.id));
   function namesOf(kind,signal) {
@@ -917,7 +983,7 @@
           return {name:i.name,count:i.count,id:entityID(i.id)&&i.id.startsWith(prefix)?i.id:undefined,image:imagePath(i.image)?i.image:undefined,key,letter:/^[a-z]/.test(key)?key[0].toUpperCase():'#',
             stages:Object.fromEntries(Object.entries(i.stages||{}).filter(([s,n])=>stationIds.has(s)&&Number.isInteger(n)&&n>0))};});
       }),drop=()=>{if(nameDocs.get(kind)===doc)nameDocs.delete(kind);};
-      nameDocs.set(kind,doc);doc.catch(drop);signal.addEventListener('abort',drop);
+      nameDocs.set(kind,doc);signal.addEventListener('abort',drop);doc.then(()=>signal.removeEventListener('abort',drop),drop);
     }
     return nameDocs.get(kind);
   }
@@ -1142,7 +1208,7 @@
   });
   // follow: the radio asked for this first page, as a new track came on air or another stage was tuned.
   async function loadMusic(more=false,follow=false) {
-    musicRequest?.abort();const controller=new AbortController();musicRequest=controller;
+    musicRequest?.abort();paging?.abort();paging=null;const controller=new AbortController();musicRequest=controller;
     // The names of a side are about 680 KB, longer to come on a slow phone than History's 50 rows.
     const timeout=setTimeout(()=>controller.abort(),view==='index'?30000:12000),scope=musicScope,kind=musicKind,mode=view,day=musicDay,key=musicKey(),content=$('music-content'),button=$('history-more'),field=$('history-day');
     // The current stage in the row takes focus that has nowhere left to be.
@@ -1244,12 +1310,21 @@
         // where the pointer is fine: never to the page. A touch screen keeps it on the explorer, with its keyboard down.
         if(parked&&!entered&&document.activeElement===dialog){const row=held&&indexRows.get(radio.getState().language).get(held);if(row&&content.contains(row))row.focus({preventScroll:true});else if(finePointer.matches)$('index-query').focus({preventScroll:true});}
       }else{
-        // A station's plays come with its numbers; plays that fail leave the numbers to show.
-        const [data,music]=await Promise.all([readJSON('/api/library/statistics?scope='+scope,controller.signal),radio.stations.some(s=>s.id===scope)?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null]);
+        // A station's plays and its changes come with its numbers, All stations' changes from every station, and the labels
+        // document with both; any of them that fails leaves the numbers to show. The labels document and the changes hold
+        // the place 2 s past its numbers at most: one that is later is left out of this place, and the document still
+        // comes for the next one.
+        const station=radio.stations.some(s=>s.id===scope);
+        const numbers=[readJSON('/api/library/statistics?scope='+scope,controller.signal),station?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null];
+        let grace=null;
+        const late=Promise.all(numbers).then(()=>new Promise(done=>{grace=setTimeout(()=>done(null),2000);}),()=>null),soon=extra=>Promise.race([extra.catch(()=>null),late]);
+        const [data,music,labels,...feeds]=await Promise.all([...numbers,soon(namesOf('labels',controller.signal)),...(station?[scope]:radio.stations.map(s=>s.id)).map(id=>soon(changesOf(id,controller.signal)))]);
+        clearTimeout(grace);
         if(musicRequest!==controller)return;
+        const answered=feeds.filter(Boolean);
         // A place starts at its top, as a record does.
         dialog.scrollTop=0;
-        renderStage(data,music);content.dataset.key=key;$('music-status').textContent='';
+        renderStage(data,music,labels,answered.length?{feeds:answered}:null);content.dataset.key=key;$('music-status').textContent='';
         // A stage place starts at its name, as a record starts at its title, unless the listener moved focus while it loaded.
         if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
       }
