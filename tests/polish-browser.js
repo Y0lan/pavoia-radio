@@ -5,7 +5,7 @@ async page => {
   page.on('pageerror', error => errors.push(error.message));
   const origin = new URL(page.url()).origin;
   // This check plays. It runs only on the fake preview, whose /stream/** is a local tone and never relayed, so it
-  // never counts as a listener: python3 /var/tmp/yolan/ultimate/player/fakeserve.py <port>.
+  // never counts as a listener: python3 design/stage-direction/fakeserve.py <port>.
   const mode = await (await page.request.get(origin + '/__mode?set=ok')).text();
   assert(mode === 'ok', 'Not the fake preview: this check plays, so it runs only where /stream/** is a local fake');
   // Install photo faults before sheet thumbnails can cache the same images.

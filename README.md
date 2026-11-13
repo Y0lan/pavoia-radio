@@ -100,9 +100,21 @@ python3 design/stage-direction/serve.py
 
 Open http://127.0.0.1:14521/. The preview serves `web/` and proxies known radio
 routes. Discovery also requires the local backend on loopback port 14522; see the
-continuation prompt for its cache paths. Playwright callbacks are in `design/stage-direction/check-browser.js`
-and `tests/journey-browser.js` and `tests/waveform-browser.js`. Run them through Playwright CLI from
-`output/playwright/`. They include short real audio connections in audience counts.
+continuation prompt for its cache paths.
+
+This preview relays `/stream/<id>.mp3` to the live radio, so a play on it is a real
+audio connection and counts in the audience. For a check that plays, use the fake preview:
+
+```sh
+python3 design/stage-direction/fakeserve.py
+```
+
+It is the same preview, but every stream is a local tone that never reaches the radio.
+The browser tests in `tests/` that press play ask it `GET /__mode?set=ok` first and stop
+anywhere else. Run the Playwright callbacks through Playwright CLI from `output/playwright/`.
+Two checks open real audio connections by design and are not part of a normal run:
+`design/stage-direction/check-browser.js`, a smoke check of production, and
+`tests/start-latency-browser.js`, which times the public stream.
 
 On Whatbox, from `~/pavoia-radio`:
 

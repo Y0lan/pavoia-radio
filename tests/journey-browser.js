@@ -1,7 +1,11 @@
-// Playwright CLI run-code callback. Local player preview and discovery cache must be running.
+// Playwright CLI run-code callback. The fake preview on port 14521 and the discovery cache must be running.
 async page => {
   const assert=(ok,message)=>{if(!ok)throw new Error(message);};
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  // This check plays, so it runs only on the fake preview (python3 design/stage-direction/fakeserve.py <port>), whose
+  // /stream/** is a local tone that never reaches the radio. It stops before any stream request anywhere else, so it
+  // never counts as a listener.
+  {const answer=await (await page.request.get(new URL('/__mode?set=ok','http://127.0.0.1:14521').href)).text();assert(answer==='ok','Not the fake preview: this check plays, so it stops before any stream request');}
   await page.route('**/journey.js',route=>route.fallback()); // Disable browser cache for this local code review.
   await page.goto('http://127.0.0.1:14521');
   await page.locator('#language [value=en]').dispatchEvent('click');

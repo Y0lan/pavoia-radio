@@ -1,7 +1,11 @@
-// Run against the local preview with Playwright CLI. Uses the real live stream.
+// Run against the fake preview on port 14521 with Playwright CLI: the waveform reads its local tone.
 async page => {
   const assert=(ok,message)=>{if(!ok)throw Error(message);};
   const errors=[]; page.on('pageerror',e=>errors.push(e.message));
+  // This check plays, so it runs only on the fake preview (python3 design/stage-direction/fakeserve.py <port>), whose
+  // /stream/** is a local tone that never reaches the radio. It stops before any stream request anywhere else, so it
+  // never counts as a listener.
+  {const answer=await (await page.request.get(new URL('/__mode?set=ok','http://127.0.0.1:14521').href)).text();assert(answer==='ok','Not the fake preview: this check plays, so it stops before any stream request');}
   await page.route('**/waveform.js',route=>route.fallback());
   await page.goto('http://127.0.0.1:14521');
   await page.waitForFunction(()=>!document.getElementById('go-deeper').disabled);

@@ -1,6 +1,10 @@
 async page => {
   const assert=(ok,message)=>{if(!ok)throw new Error(message);};
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
+  // This check plays, so it runs only on the fake preview (python3 design/stage-direction/fakeserve.py <port>), whose
+  // /stream/** is a local tone that never reaches the radio. It stops before any stream request anywhere else, so it
+  // never counts as a listener.
+  {const answer=await (await page.request.get(new URL('/__mode?set=ok',page.url()).href)).text();assert(answer==='ok','Not the fake preview: this check plays, so it stops before any stream request');}
   await page.goto(new URL('/',page.url()).href);
   await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
   await page.locator('#language [value=en]').dispatchEvent('click');

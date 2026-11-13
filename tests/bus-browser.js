@@ -1,5 +1,5 @@
 // Playwright CLI run-code callback for the open candidate. It plays, so it runs only on the fake preview, whose
-// /stream/** is a local tone that never reaches the radio (python3 /var/tmp/yolan/ultimate/player/fakeserve.py <port>):
+// /stream/** is a local tone that never reaches the radio (python3 design/stage-direction/fakeserve.py <port>):
 // its first request asks the fake for its normal mode and stops unless the answer is "ok".
 async page => {
   const assert = (ok, message) => { if (!ok) throw new Error(message); };

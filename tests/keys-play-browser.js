@@ -1,5 +1,5 @@
 // A number key on a playing radio: the station at that place on screen plays, and only one stream is open at a time.
-// This check plays, so it runs only on the fake preview (/var/tmp/yolan/ultimate/player/fakeserve.py), whose
+// This check plays, so it runs only on the fake preview (design/stage-direction/fakeserve.py), whose
 // /stream/** is a local tone that is never relayed: its first action asks /__mode?set=ok, and it stops unless the answer
 // is "ok". On serve.py or the live site that address is not "ok", so the check never counts as a listener.
 async page => {
