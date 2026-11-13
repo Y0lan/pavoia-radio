@@ -214,7 +214,6 @@ body:not([data-bus]) .mood-essentials:has(input:checked) .essentials-icon { fill
 .player:is([data-state="connecting"], [data-state="retrying"]) .play::after { opacity:1; animation:tuning 900ms linear infinite; }
 /* The ring clears the tuning arc, 3 to 4px out, and stays inside the 8px mobile gaps. */
 .play:focus-visible { outline-offset:6px; }
-.player[data-state="error"] .play { border-color:var(--red); }
 .play:hover { border-color:var(--cream); }
 body[data-playing] .play { background:var(--cream); color:var(--ink); }
 .play svg { grid-area:1 / 1; }

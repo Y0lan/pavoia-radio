@@ -239,10 +239,13 @@ test('gesture, pause/resume races and media controls release the source',async()
  e.audio.paused=true;e.audio.emit('pause');assert.equal(e.audio.src,undefined);
 });
 
-test('four bounded retries, blocking and cancellation',async()=>{
+test('a lost stream keeps trying on a bounded ladder, and a click pauses it; blocking and cancellation',async()=>{
  const e=setup();await flush();e.click();
- for(const delay of [1000,2000,4000,8000]){e.error();e.error();assert.equal(e.timers.size,1);e.fire(delay);}
- e.error();assert.equal(e.elements.player.dataset.state,'error');assert.equal(e.audio.src,undefined);assert.equal(e.timers.size,0);
+ for(const delay of [1000,2000,4000,8000,15000,15000,15000]){e.error();e.error();assert.equal(e.timers.size,1);assert.equal(e.elements['playback-status'].textContent,'Reconnecting…');e.fire(delay);}
+ assert.equal(e.elements['playback-status'].textContent,'Reconnecting…','each new try keeps saying Reconnecting, never Connecting');
+ e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Reconnecting…');
+ assert.equal(e.elements.play.getAttribute('aria-label'),'Pause');assert.equal(e.audio.src,'/stream/palac-feel.mp3');
+ e.click();assert.equal(e.elements.player.dataset.state,'paused');assert.equal(e.audio.src,undefined);assert.equal(e.timers.size,0);
  e.click();e.audio.calls.at(-1).reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
  assert.equal(e.elements['playback-status'].textContent,'Press play to start');assert.equal(e.timers.size,0);
  e.click();e.error();e.click();assert.equal(e.timers.size,0);assert.equal(e.audio.src,undefined);
@@ -494,7 +497,8 @@ test('a blocked autoplay is a neutral pause and only transient states show words
  assert.match(rules.get('#playback-status'),/clip-path:inset\(50%\)/,'paused and playing keep the status out of sight at every width');
  assert.match(reveal,/clip-path:none/,'a transient state shows its words');
  assert.match(rules.get('.player:not([data-status=paused],[data-status=playing]) #player-stage'),/display:none/,'and takes the stage name\'s place');
- assert.match(rules.get('.player[data-state="error"] .play'),/var\(--red\)/,'red stays for a real error');
+ assert.equal(rules.get('.player[data-state="error"] .play'),undefined,'no state ends the wanting but a pause or a blocked start');
+ assert.doesNotMatch(web('app.js'),/Stream lost|Stream unterbrochen|retry:'/,'the give-up words and its Try again are gone from the player');
 });
 
 test('the bar names the stage, the tab names the record and Play names its key',async()=>{
@@ -662,7 +666,7 @@ test('the stage column is one line of stations over one constant line of actions
  assert.match(rules.get('body[data-bus] :is(.record-sleeve, .painted-artist, #stage-spotify, .spotify-daily, #artwork-toggle)'),/display:none/,'the Bus swaps the playlist for the ticket');
  assert.match(rules.get('.place'),/min-height:2lh/,'a one-line description keeps the title where two lines put it');
  assert.match(cssRules('(max-width:760px)').get('.stage-spotify>span:not(.spotify-caption), .spotify-daily'),/display:none/,'phones keep the Playlist tile alone');
- for(const gone of ['bus-copy','bus-line','busLine','sleeve-empty','painted-artist-secondary','.secondary','showArtwork','standby','offline','audienceUnknown'])
+ for(const gone of ['bus-copy','bus-line','busLine','sleeve-empty','painted-artist-secondary','.secondary','showArtwork','standby',"offline:'Data","offline:'Daten",'audienceUnknown'])
   for(const name of ['index.html','app.js','journey.js','style.css'])assert.ok(!web(name).includes(gone),gone+' is gone from '+name);
 });
 
@@ -3044,4 +3048,67 @@ test('a name in focus keeps focus when the map lays out again, and the title tak
  assert.deepEqual([release.dataset.side,release.hidden,e.document.activeElement===row,row.focusOptions?.preventScroll],['right',false,true,true],'the right side is laid out last, yet its name gets focus back, without a scroll');
  const far=nodesOf(map).find(n=>n.dataset.id===id('art',201));far.children[0].closest=()=>far;far.children[0].focus();e.mapWidth=600;watch.fn();
  assert.deepEqual([far.hidden,e.document.activeElement===inspector(e).descendants().find(n=>n.localName==='h3')],[true,true],'a name the map drops hands focus to the title, never to the page');
+});
+
+test('the network back, a shown page and the lock screen try again at once, and start nothing by themselves',async()=>{
+ const e=setup();await flush();const waits=()=>[...e.timers.values()].map(t=>t.delay).filter(d=>d!==3000&&d!==6000);
+ e.window.emit('online');e.document.emit('visibilitychange');e.actions.pause();e.window.emit('offline');
+ await flush();assert.equal(e.audio.calls.length,0,'a first visit plays nothing');assert.deepEqual(waits(),[],'and waits for nothing');
+ e.click();e.playing();e.error();assert.deepEqual(waits(),[1000]);
+ assert.equal(e.mediaSession.playbackState,'playing','the lock screen offers pause while the radio tries');
+ e.fire(1000);e.error();assert.deepEqual(waits(),[2000]);
+ const calls=e.audio.calls.length;e.window.emit('online');
+ assert.equal(e.audio.calls.length,calls+1,'online connects now');assert.deepEqual(waits(),[20000],'the waiting try is gone');
+ e.error();assert.deepEqual(waits(),[1000],'and the ladder starts again');
+ e.document.emit('visibilitychange');assert.equal(e.audio.calls.length,calls+2,'a page shown again connects now');
+ e.error();e.actions.play();assert.equal(e.audio.calls.length,calls+3,'so does play on the lock screen');
+ e.playing();e.actions.play();e.window.emit('online');e.document.emit('visibilitychange');assert.equal(e.audio.calls.length,calls+3,'a playing radio is left alone');
+ e.audio.readyState=2;e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering…');
+ e.document.emit('visibilitychange');assert.equal(e.audio.calls.length,calls+3,'a stall waits for its watchdog when the page is shown');
+ e.window.emit('online');assert.equal(e.audio.calls.length,calls+4,'but a stall tries again once the network is back');
+ assert.equal(e.elements['playback-status'].textContent,'Reconnecting…','and says so');
+ e.error();e.document.hidden=true;e.document.emit('visibilitychange');assert.equal(e.audio.calls.length,calls+4,'hiding the page tries nothing');e.document.hidden=false;
+ e.click();e.window.emit('online');e.document.emit('visibilitychange');assert.equal(e.audio.calls.length,calls+4,'pause stays paused');assert.deepEqual(waits(),[]);
+ assert.equal(e.mediaSession.playbackState,'paused','and the lock screen offers play again');
+});
+
+test('without a network the player says so, in both languages, and keeps trying',async()=>{
+ const e=setup();await flush();e.click();e.playing();
+ e.run('navigator.onLine=false');e.window.emit('offline');assert.equal(e.elements['playback-status'].textContent,'Playing','a radio still playing its buffer says nothing yet');
+ e.error();assert.equal(e.elements['playback-status'].textContent,'Offline. Waiting for the network…');assert.equal(e.elements.player.dataset.state,'retrying');
+ e.fire(1000);assert.deepEqual([e.elements['playback-status'].textContent,e.elements.player.dataset.state],['Offline. Waiting for the network…','retrying'],'a new try keeps the offline words');
+ e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Offline. Waiting for the network…','and so does its waiting');
+ e.setLanguage('de');assert.equal(e.elements['playback-status'].textContent,'Offline. Warte auf das Netz…');
+ e.run('navigator.onLine=true');e.window.emit('online');assert.equal(e.elements['playback-status'].textContent,'Neu verbinden…');
+ e.error();e.run('navigator.onLine=false');e.window.emit('offline');assert.equal(e.elements['playback-status'].textContent,'Offline. Warte auf das Netz…','the words follow the network while it waits');
+ assert.deepEqual([...e.timers.values()].map(t=>t.delay).filter(d=>d!==3000&&d!==6000),[1000],'the ladder keeps running: a browser can call itself offline wrongly');
+});
+
+test('a preview pauses a reconnecting radio, and its end brings the radio back',async()=>{
+ const e=setup({journey:true});await flush();
+ e.discovery=()=>({entity:{id:'trk_0123456789ab',type:'track',title:'T',previewUrl:'/api/discovery/preview/trk_0123456789ab'},included:[]});
+ e.elements['preview-audio'].play=async()=>{};
+ e.click();e.playing();e.error();assert.equal(e.elements.player.dataset.state,'retrying');
+ e.visit('#explore/trk_0123456789ab');await flush();
+ const toggle=()=>e.elements['entity-inspector'].querySelector('.preview-toggle');
+ toggle().emit('click');await flush();
+ assert.deepEqual([e.window.Pavoia.getState().wanted,e.timers.size?[...e.timers.values()].map(t=>t.delay):[]],[false,[]],'one sound at a time: no try runs under the preview');
+ e.window.emit('online');assert.equal(e.audio.src,undefined,'nor comes back with the network');
+ toggle().emit('click');await flush();
+ assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.src,e.elements['playback-status'].textContent],[true,'/stream/palac-feel.mp3','Connecting…'],'the preview ends and the radio connects again');
+});
+
+test('a station change during a reconnect connects the new station from the first step of the ladder',async()=>{
+ const e=setup();await flush();const waits=()=>[...e.timers.values()].map(t=>t.delay).filter(d=>d!==3000&&d!==6000);
+ e.click();e.playing();e.error();e.fire(1000);e.error();assert.equal(e.elements['playback-status'].textContent,'Reconnecting…');
+ e.change('03');
+ assert.deepEqual([e.audio.src,e.elements.player.dataset.state,e.elements['playback-status'].textContent],['/stream/palac-dance.mp3','connecting','Connecting…'],'a new station is a first try');
+ e.error();assert.deepEqual([waits(),e.elements['playback-status'].textContent],[[1000],'Reconnecting…'],'and its ladder starts again');
+});
+
+test('a start the browser blocks during a reconnect stops trying and asks for play',async()=>{
+ const e=setup();await flush();e.click();e.playing();e.error();e.fire(1000);
+ e.audio.calls.at(-1).reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
+ assert.deepEqual([e.elements['playback-status'].textContent,e.window.Pavoia.getState().wanted,e.timers.size],['Press play to start',false,0]);
+ e.window.emit('online');e.document.emit('visibilitychange');assert.equal(e.audio.src,undefined);
 });

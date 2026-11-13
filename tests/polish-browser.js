@@ -4,6 +4,10 @@ async page => {
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const origin = new URL(page.url()).origin;
+  // This check plays. It runs only on the fake preview, whose /stream/** is a local tone and never relayed, so it
+  // never counts as a listener: python3 /var/tmp/yolan/ultimate/player/fakeserve.py <port>.
+  const mode = await (await page.request.get(origin + '/__mode?set=ok')).text();
+  assert(mode === 'ok', 'Not the fake preview: this check plays, so it runs only where /stream/** is a local fake');
   // Install photo faults before sheet thumbnails can cache the same images.
   let releaseImage;
   const imageGate = new Promise(resolve => { releaseImage = resolve; });
@@ -97,14 +101,17 @@ async page => {
   releaseStream();
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'retrying');
   assert(await page.locator('#playback-status').innerText() === 'Reconnecting…', 'Retry feedback missing');
-  await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'error', null, {timeout:25000});
-  assert(await page.locator('#play').getAttribute('aria-label') === 'Try again', 'Terminal error has no retry control');
+  // The old player gave up 15 s after the loss; this one keeps trying for as long as the listener wants to play.
+  await page.waitForTimeout(25000);
+  const lost = await page.evaluate(() => window.Pavoia.getState());
+  assert(lost.playbackState === 'retrying' && lost.wanted === true, 'The player gave up on a lost stream: ' + lost.playbackState);
+  assert(await page.locator('#play').getAttribute('aria-label') === 'Pause', 'Cannot pause a reconnecting player');
   await page.locator('#language [value=de]').dispatchEvent('click');
-  assert(await page.locator('#playback-status').innerText() === 'Stream unterbrochen. Play erneut drücken.', 'German error feedback missing');
+  assert(await page.locator('#playback-status').innerText() === 'Neu verbinden…', 'German reconnect feedback missing');
   assert((await page.locator('#playback-status').boundingBox()).width <= 320, 'German feedback overflows');
+  // The stream comes back: the next try plays it, with no click.
   await page.unroute('**/stream/fontanna.mp3', unavailable);
-  await page.locator('#play').click();
-  await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'playing');
+  await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'playing', null, {timeout:20000});
   await page.locator('#play').click();
   await page.locator('#language [value=en]').dispatchEvent('click');
   assert(errors.length === 0, errors.join('\n'));

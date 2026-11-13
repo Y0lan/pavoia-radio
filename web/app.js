@@ -73,8 +73,8 @@ const words = {
   letterOne:'Years spent finding tracks, keeping them close and collecting them in playlists named after the stages of Pavoia.',
   letterTwo:'This radio is a way to share them. To return to a little of that place between editions, and keep discovering music there.',
   love:'With love,', footer:'Pavoia Radio · A personal selection by Gaende', language:'Language', selectedBy:'Selected by Gaende',
-  play:'Play', pause:'Pause', space:'Space', retry:'Try again', paused:'Paused', connecting:'Connecting…', playing:'Playing', buffering:'Buffering…',
-  retrying:'Reconnecting…', blocked:'Press play to start', error:'Stream lost. Press play to retry.', untitled:'Untitled track', unknownArtist:'Unknown artist',
+  play:'Play', pause:'Pause', space:'Space', paused:'Paused', connecting:'Connecting…', playing:'Playing', buffering:'Buffering…',
+  retrying:'Reconnecting…', offline:'Offline. Waiting for the network…', blocked:'Press play to start', untitled:'Untitled track', unknownArtist:'Unknown artist',
   noTrack:'No track announced', notOnAir:'Not on air yet', loading:'Loading track…', onAir:'On air now', lastTrack:'Last known track',
   live:'Live', listening:'listening', audience:'listening to this station',
   cover:'Cover artwork', portrait:'Portrait of', home:'Pavoia Radio, home', player:'Player', changePhoto:'Next photo', of:'of', photoOnly:'Photo only',
@@ -85,8 +85,8 @@ const words = {
   letterOne:'Über Jahre gesammelt: Tracks, die bleiben. Vereint in Playlists, die die Namen der Bühnen von Pavoia tragen.',
   letterTwo:'Mit diesem Radio möchte ich sie teilen. Ein Stück dieses Ortes zwischen den Festivals wiederfinden und dort weiter Musik entdecken.',
   love:'Mit Liebe,', footer:'Pavoia Radio · Eine persönliche Auswahl von Gaende', language:'Sprache', selectedBy:'Ausgewählt von Gaende',
-  play:'Abspielen', pause:'Pause', space:'Leertaste', retry:'Erneut versuchen', paused:'Pausiert', connecting:'Verbinden…', playing:'Wiedergabe', buffering:'Puffern…',
-  retrying:'Neu verbinden…', blocked:'Zum Starten Play drücken', error:'Stream unterbrochen. Play erneut drücken.', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
+  play:'Abspielen', pause:'Pause', space:'Leertaste', paused:'Pausiert', connecting:'Verbinden…', playing:'Wiedergabe', buffering:'Puffern…',
+  retrying:'Neu verbinden…', offline:'Offline. Warte auf das Netz…', blocked:'Zum Starten Play drücken', untitled:'Titel unbekannt', unknownArtist:'Künstler unbekannt',
   noTrack:'Kein Titel gemeldet', notOnAir:'Noch nicht auf Sendung', loading:'Titel wird geladen…', onAir:'Gerade läuft', lastTrack:'Zuletzt gemeldeter Titel',
   live:'Live', listening:'hören', audience:'hören diesen Sender',
   cover:'Cover', portrait:'Porträt von', home:'Pavoia Radio, Startseite', player:'Player', changePhoto:'Nächstes Foto', of:'von', photoOnly:'Nur Foto',
@@ -158,13 +158,16 @@ let track = null;
 let wanted = false;
 let generation = 0;
 let retries = 0;
+// A stream lost while the listener wants it: it says Reconnecting until it plays again.
+let lost = false;
 let retryTimer;
 let watchdog;
 let healthyTimer;
 let removeListeners = () => {};
 let pollController;
 let audienceController, audienceData=null, audienceStage;
-const delays = [1000, 2000, 4000, 8000];
+// The wait before each new try after a loss; the last one repeats for as long as the listener wants to play.
+const delays = [1000, 2000, 4000, 8000, 15000];
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const mobileLayout = matchMedia('(max-width: 760px)');
 // Below 900 px the header has no room for the word after the count.
@@ -493,11 +496,11 @@ function state(value, status) {
   Object.assign(document.querySelector('.player').dataset, { state: value, status });
   document.body.toggleAttribute('data-playing', value === 'playing');
   document.body.toggleAttribute('data-wanted', wanted);
-  const label = wanted ? text('pause') : value === 'error' ? text('retry') : text('play');
+  const label = wanted ? text('pause') : text('play');
   button.setAttribute('aria-label', label);
   button.title = `${label} (${text('space')})`;
   $('playback-status').textContent = text(status);
-  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = value === 'playing' ? 'playing' : 'paused';
+  if ('mediaSession' in navigator) navigator.mediaSession.playbackState = wanted ? 'playing' : 'paused';
   tabTitle();
   announceRadio();
 }
@@ -516,6 +519,7 @@ function release() {
 function pause() {
   window.Pavoia?.cancelPreview?.();
   wanted = false;
+  lost = false;
   clearTimeout(retryTimer);
   release();
   state('paused', 'paused');
@@ -524,16 +528,20 @@ function pause() {
 function fail(token, blocked = false) {
   if (!wanted || token !== generation) return;
   release();
-  if (blocked || retries >= delays.length) {
+  if (blocked) {
     wanted = false;
-    if (blocked) state('paused', 'blocked');
-    else state('error', 'error');
+    lost = false;
+    state('paused', 'blocked');
     return;
   }
-  const delay = delays[retries++];
-  state('retrying', 'retrying');
+  lost = true;
+  const delay = delays[Math.min(retries++, delays.length - 1)];
+  state('retrying', pending());
   retryTimer = setTimeout(connect, delay);
 }
+
+// What a connection that is not yet playing says: a first try connects; after a loss it reconnects, or waits for the network.
+const pending = () => !lost ? 'connecting' : navigator.onLine === false ? 'offline' : 'retrying';
 
 function connect() {
   clearTimeout(retryTimer);
@@ -541,12 +549,13 @@ function connect() {
   if (!wanted) return;
   const token = generation;
   const current = () => wanted && token === generation;
-  state('connecting', 'connecting');
+  state(lost ? 'retrying' : 'connecting', pending());
   let started = false;
   const handlers = {
     playing: () => {
       if (!current() || audio.paused || audio.readyState < 3) return;
       started = true;
+      lost = false;
       clearTimeout(watchdog);
       watchdog = null;
       clearTimeout(healthyTimer);
@@ -556,7 +565,7 @@ function connect() {
     waiting: () => {
       if (!current()) return;
       clearTimeout(healthyTimer);
-      state('connecting', started ? 'buffering' : 'connecting');
+      state(lost ? 'retrying' : 'connecting', started ? 'buffering' : pending());
       if (watchdog == null) watchdog = setTimeout(() => fail(token), 20000);
     },
     stalled: () => { if (audio.readyState < 3) handlers.waiting(); },
@@ -581,11 +590,26 @@ function connect() {
 
 function play() {
   window.Pavoia?.cancelPreview?.();
-  if (wanted || !currentMood.stage) return;
+  if (!currentMood.stage) return;
+  if (wanted) return reconnectNow();
   wanted = true;
+  lost = false;
   retries = 0;
   connect();
 }
+
+// The network comes back, the page is shown again, or play is pressed on the lock screen: a lost stream tries again
+// at once instead of waiting out its delay. Back online, a stall in the middle of a track tries again too, since the
+// old connection rarely survives a change of network. Nothing here starts a radio the listener did not ask for.
+function reconnectNow(stalled = false) {
+  if (!wanted || !(lost || (stalled && playbackText === 'buffering'))) return;
+  lost = true;
+  retries = 0;
+  connect();
+}
+window.addEventListener('online', () => reconnectNow(true));
+window.addEventListener('offline', () => { if (wanted && lost) state(playbackState, pending()); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) reconnectNow(); });
 
 
 const toggle = () => wanted ? pause() : play();
@@ -692,6 +716,7 @@ function selectMood(id) {
   clearTimeout(retryTimer);
   release();
   retries = 0;
+  lost = false;
   if (pollController) pollController.abort();
   pollController = null;
   audienceController?.abort();audienceController=null;audienceData=null;audienceStage=null;
