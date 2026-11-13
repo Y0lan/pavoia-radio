@@ -77,6 +77,7 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
       const kind=/data-kind="([^"]+)"/.exec(selector)?.[1];return this.children.find(c=>c.dataset?.kind===kind)||null;
     }
     focus(options){document.activeElement=this;this.focusOptions=options;}
+    select(){this.selected=true;}
     scrollIntoView(options){this.scrolled=options;}
     showModal(){this.open=true;this.modal=true;}
     show(){this.open=true;this.modal=false;}
@@ -167,6 +168,8 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
       if(!deferFetch){if(env.response instanceof Error)reject(env.response);else env.complete(env.requests.length-1,env.response);}
     }),
     setTimeout:(fn,delay)=>{timers.set(++timerID,{fn,delay});return timerID;},clearTimeout:id=>timers.delete(id),
+    // A frame is a timer a test fires as env.fire('frame').
+    requestAnimationFrame:fn=>{timers.set(++timerID,{fn,delay:'frame'});return timerID;},
     setInterval:fn=>intervals.push(fn),
   };
   runInNewContext(source,context);
@@ -174,7 +177,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
   if(journey){elements['discovery-query'].value='';elements['history-day'].value='';elements['history-day'].validity={valid:true};elements['index-query'].value='';
     // The Index's head is static markup: its two sides and its two orders.
     for(const side of ['artists','labels'])elements['index-sides'].append(Object.assign(new Element(),{localName:'a',dataset:{side}}));
-    for(const by of ['name','tracks'])elements['index-order'].append(Object.assign(new Element(),{localName:'a',dataset:{by}}));runInContext(web('closeness.js'),context);runInContext(web('journey.js'),context);}
+    for(const by of ['name','tracks'])elements['index-order'].append(Object.assign(new Element(),{localName:'a',dataset:{by}}));
+    // The rail is static markup too: a nav that holds the marks.
+    elements['index-rail'].append(Object.assign(new Element(),{localName:'div',className:'rail-marks'}));runInContext(web('closeness.js'),context);runInContext(web('journey.js'),context);}
   return env;
 }
 
@@ -2523,6 +2528,8 @@ test('the Index has an address: a side, a stage, an order and a filter, and the 
  for(const [typed,place] of [['#index/labels','#index/labels'],['#index/tracks','#index/artists'],['#index/artists/radio','#index/artists'],['#index/artists/bus','#index/artists'],['#index/artists/library','#index/artists'],
   ['#index/labels/fontanna?by=tracks&q=ame&x=1','#index/labels/fontanna?by=tracks&q=ame'],['#index/artists?by=name','#index/artists'],['#index/artists?by=size&q=','#index/artists'],['#index/artists?q=a%20b','#index/artists?q=a+b'],
   ['#index/artists?q='+'a'.repeat(250),'#index/artists?q='+'a'.repeat(200)],
+  ['#index/artists?at=K','#index/artists?at=K'],['#index/artists?at=%23','#index/artists?at=%23'],['#index/artists?at=k','#index/artists'],['#index/labels/fontanna?at=K&by=tracks&q=ame','#index/labels/fontanna?by=tracks&q=ame'],
+  ['#index/artists?by=tracks&at=100%2B','#index/artists?by=tracks&at=100%2B'],['#index/artists?by=tracks&at=100','#index/artists?by=tracks'],['#index/artists/fontanna?q=fri&at=F','#index/artists/fontanna?q=fri&at=F'],
   ['#statistics/bermuda-day/artists','#index/artists/bermuda-day?by=tracks'],['#statistics/radio/labels','#index/labels?by=tracks'],['#statistics/library/artists','#index/artists?by=tracks'],['#statistics/bus/labels','#index/labels?by=tracks']]){
   routeTo(e,typed);await flush();assert.deepEqual([e.location.hash,tab.getAttribute('href'),e.entries().length],[place,place,kept],typed);
  }
@@ -3328,4 +3335,202 @@ test('the head names the manifest, the icons and one share preview; the manifest
   const url=new URL(value);assert.equal(url.protocol,'https:',key+' is absolute https');
   assert.ok(existsSync(resolve(__dirname,'../web/'+(url.pathname==='/'?'index.html':url.pathname.slice(1)))),key+' points to a file the site serves');
  }
+});
+
+// The Index, step 2: the rail, type-ahead, the mark in the address and the lit stations. The Index as a browser lays it
+// out: the explorer at the window's top, 700 px high, the stage bar sticking 72 px down and 61 px high, each section
+// 1000 px tall from 300 px down, its rows 56 px apart under a 16 px top, and rows scrolled under the bar 77 px below its
+// top; the list moves with the explorer's scroll.
+const laidIndex=e=>{
+  const explorer=e.elements.explorer,bar=e.elements['music-filters'];bar.computed={top:'72px'};bar.offsetHeight=61;Object.assign(explorer,{scrollTop:0,clientHeight:700,scrollHeight:9300,getBoundingClientRect:()=>({top:0,bottom:700})});
+  Object.defineProperty(e.Element.prototype,'computed',{configurable:true,writable:true,value:{scrollMarginTop:'77px'}});
+  Object.defineProperty(e.Element.prototype,'getBoundingClientRect',{configurable:true,value(){
+    const sections=e.elements['music-content'].children,k=sections.indexOf(this),li=this.parent,s=sections.indexOf(li?.parent?.parent);
+    const top=k>=0?300+k*1000:s>=0&&this.className==='row'?300+s*1000+16+li.parent.children.indexOf(li)*56:null;
+    return top===null?{left:0,top:0,right:0,bottom:0,width:0,height:0}:{top:top-explorer.scrollTop,bottom:top-explorer.scrollTop+(k>=0?1000:56)};
+  }});
+};
+const railOf=e=>e.elements['index-rail'].children[0];
+// The Index's parts sit inside the explorer, as in index.html, so focus on them is focus in the explorer.
+const nest=e=>{e.elements.explorer.append(e.elements['music-content'],e.elements['index-query'],e.elements['index-rail'],e.elements['stage-row']);return e;};
+const marksOn=e=>railOf(e).children.slice(1).map(b=>[textOf(b),b.disabled]);
+const currentMark=e=>railOf(e).children.filter(b=>b.attrs['aria-current']).map(b=>b.dataset.mark);
+const typed=(e,key,target=control('a'))=>e.key(key===' '?'Space':key==='/'?'Slash':'Key'+key.toUpperCase(),target,{key});
+
+test('the rail always has 27 letters or 7 bands, empty ones disabled and out of the Tab order',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();const rail=railOf(e),[find]=rail.children;
+ const present=['A','B','F','K','M','O','S','W','#'];
+ assert.deepEqual([e.elements['index-rail'].hidden,e.elements['index-rail'].attrs['aria-label'],marksOn(e)],[false,'Jump to a letter',[...'ABCDEFGHIJKLMNOPQRSTUVWXYZ#'].map(m=>[m,!present.includes(m)])],'27 marks, A to Z then #, those with no names disabled');
+ assert.ok(rail.children.every(b=>b.localName==='button'&&b.type==='button'&&b.tabIndex===-1),'every mark and the magnifier stay out of the Tab order');
+ assert.deepEqual([find.attrs['aria-label'],find.dataset.mark,byClass(find,'rail-icon').length,...['A','C','#'].map(m=>rail.children.find(b=>b.dataset.mark===m).attrs['aria-label'])],
+  ['Back to the filter',undefined,1,'A, 4 artists','C, no artists','Numbers and symbols, 2 artists'],'each mark is named for a screen reader, an empty one too');
+ const marks=rail.children.slice();follow(e,e.elements['index-sides'].children[1]);await flush();
+ assert.deepEqual([marksOn(e).filter(([,off])=>!off).map(([m])=>m),rail.children.every((b,i)=>b===marks[i]),rail.children.find(b=>b.dataset.mark==='C').attrs['aria-label']],[['D','K','M'],true,'C, no labels'],'the labels keep the same 27 buttons');
+ follow(e,e.elements['index-order'].children[1]);await flush();
+ assert.deepEqual([e.elements['index-rail'].attrs['aria-label'],marksOn(e).map(([m])=>m),marksOn(e).filter(([,off])=>off).map(([m])=>m)],['Jump to a track count',['100+','50+','20+','10+','5+','2+','1'],['100+','20+','5+','2+']],'Most tracks: always the 7 bands');
+ assert.equal(rail.children.find(b=>b.dataset.mark==='100+').attrs['aria-label'],'100 tracks or more, no labels');
+ follow(e,e.elements['index-sides'].children[0]);await flush();typeIndex(e,'zzzz');
+ assert.deepEqual([marksOn(e).length,marksOn(e).every(([,off])=>off),e.elements['index-rail'].hidden],[7,true,false],'a filter no name matches disables every mark');
+ e.setLanguage('de');await flush();assert.deepEqual([e.elements['index-rail'].attrs['aria-label'],rail.children[0].attrs['aria-label'],rail.children[1].attrs['aria-label'],e.elements['index-query'].title],
+  ['Zu einer Trackzahl springen','Zurück zum Filter','100 Tracks oder mehr, keine Künstler','Mit / filtern. In der Liste springst du mit den ersten Buchstaben zu einem Namen.'],'in German');
+ // While the names load the rail shows with every mark disabled; when they fail it goes, with the list.
+ const f=await indexed();let fail;f.names=()=>new Promise((_resolve,reject)=>{fail=reject;});routeTo(f,'#index/labels');await flush();
+ assert.deepEqual([f.elements['index-rail'].hidden,marksOn(f).length,marksOn(f).every(([,off])=>off)],[false,27,true],'loading');
+ fail(new Error('down'));await flush();assert.deepEqual([f.elements['index-rail'].hidden,textOf(f.elements['music-status'])],[true,'The names could not load. Try again'],'an error');
+ f.names={labels:labelNames()};f.elements['music-status'].children[1].emit('click');await flush();assert.deepEqual([f.elements['index-rail'].hidden,marksOn(f).filter(([,off])=>!off).length],[false,3],'Try again brings it back');
+ routeTo(f,'#history');await flush();assert.equal(f.elements['index-rail'].hidden,true,'only in the Index');
+});
+
+test('the rail jumps to a mark: under the stage bar, for a pointer to the nearest enabled one, and for a screen reader onto its first name',async()=>{
+ const e=await indexed();laidIndex(e);routeTo(e,'#index/artists');await flush();const rail=railOf(e),explorer=e.elements.explorer,mark=m=>rail.children.find(b=>b.dataset.mark===m);
+ // The marks as a browser lays them out: 20 px apart, the magnifier first at the top.
+ for(const [i,b] of rail.children.entries())b.getBoundingClientRect=()=>({top:140+i*20,bottom:160+i*20});
+ let captured=null;rail.setPointerCapture=id=>{captured=id;};
+ const down={button:0,pointerId:7,pointerType:'mouse',clientY:mark('M').getBoundingClientRect().top+10,target:{closest:()=>null},prevented:false,preventDefault(){this.prevented=true;}};
+ rail.emit('pointerdown',down);
+ assert.deepEqual([explorer.scrollTop,captured,down.prevented,currentMark(e),e.elements['index-scrub'].attrs['data-on']],[4167,7,true,['M'],undefined],'M\'s section, the fifth, starts at the stage bar\'s bottom, 133 px down; a mouse shows no letter');
+ rail.emit('pointermove',{clientY:mark('C').getBoundingClientRect().top+12});
+ assert.deepEqual([explorer.scrollTop,currentMark(e)],[1167,['B']],'held and moved to C, which has no names: B, the nearest enabled mark');
+ rail.emit('pointerup',{});rail.emit('pointermove',{clientY:mark('W').getBoundingClientRect().top});assert.equal(explorer.scrollTop,1167,'released, the pointer moves nothing');
+ const touch={button:0,pointerId:8,pointerType:'touch',clientY:mark('S').getBoundingClientRect().top+3,target:{closest:()=>null},preventDefault(){}},scrub=e.elements['index-scrub'];
+ let ticks=0;e.run('navigator.vibrate=()=>{}');e.run('globalThis.ticks=0;navigator.vibrate=ms=>{globalThis.ticks+=ms;}');
+ rail.emit('pointerdown',touch);rail.emit('pointermove',{clientY:touch.clientY+5});ticks=e.run('globalThis.ticks');
+ assert.deepEqual([explorer.scrollTop,scrub.textContent,scrub.style.top,scrub.attrs['data-on'],scrub.attrs['aria-hidden']??null,ticks],[6167,'S',(touch.clientY+5)+'px','',null,4],'a thumb sees the mark beside it, at its height within the mark, and feels one tick per new mark');
+ rail.emit('pointerup',{});assert.equal(scrub.attrs['data-on'],'','the letter stays a moment');e.fire(350);assert.equal(scrub.attrs['data-on'],undefined,'then fades');
+ rail.emit('pointerdown',{...touch,target:{closest:selector=>selector==='.rail-find'?rail.children[0]:null}});assert.equal(explorer.scrollTop,6167,'a press on the magnifier is a click, not a scrub');
+ rail.emit('click',{detail:1,target:{closest:()=>mark('K')}});assert.equal(explorer.scrollTop,6167,'a pointer\'s click adds nothing to its press');
+ rail.emit('click',{detail:0,target:{closest:()=>mark('K')}});
+ assert.deepEqual([explorer.scrollTop,e.document.activeElement===rowOf(e,'Kiasmos')],[3167,true],'a screen reader\'s activation jumps and focuses the section\'s first name');
+ rail.emit('click',{detail:1,target:{closest:()=>rail.children[0]}});
+ assert.deepEqual([explorer.scrollTop,e.document.activeElement===e.elements['index-query']],[0,true],'the magnifier goes back to the filter');
+});
+
+test('type-ahead focuses the first name for a prefix, or the next name, and Space still plays',async()=>{
+ const e=nest(await indexed());laidIndex(e);routeTo(e,'#index/artists');await flush();const explorer=e.elements.explorer,focused=()=>e.document.activeElement;
+ rowOf(e,'Act 9').focus();
+ const taken=['a','m'].map(k=>typed(e,k).prevented);
+ assert.deepEqual([taken,focused()===rowOf(e,'Âme'),explorer.scrollTop],[[true,true],true,0],'"am" is Âme, the first name shown that starts so, and a row in full view stays where it is');
+ typed(e,'e');typed(e,'l');assert.equal(focused(),rowOf(e,'Amelie Lens'),'the letters gather: "amel"');
+ e.fire(900);typed(e,'k');
+ assert.deepEqual([focused()===rowOf(e,'Kiasmos'),explorer.scrollTop],[true,3167],'900 ms later a new name starts; one out of view comes 16 px under the stage bar, as a kept row does');
+ e.fire(900);typed(e,'l');assert.equal(focused(),rowOf(e,'Maceo Plex'),'no name starts with L: the first that sorts after it');
+ e.fire(900);for(const k of 'xyz')typed(e,k);assert.equal(focused(),rowOf(e,'&ME'),'after Z come the numbers and symbols');
+ e.fire(900);typed(e,'ö');assert.equal(focused(),rowOf(e,'Øostil'),'a letter folds as the filter folds it');
+ const was=e.window.Pavoia.getState().wanted,space=e.key('Space',control('a'));
+ assert.deepEqual([space.prevented,e.window.Pavoia.getState().wanted===was,focused()===rowOf(e,'Øostil')],[true,false,true],'Space plays and pauses');
+ e.focus(control('button',{},true));const button=e.key('Space',control('button',{},true));
+ assert.equal(button.prevented,false,'and on a button the keyboard reached, Space is the button\'s: the type-ahead never takes it');
+ e.fire(900);typed(e,'k');typed(e,' ');
+ assert.equal(e.timers.size&&[...e.timers.values()].filter(t=>t.delay===900).length,1,'a space neither adds to the names nor waits');
+ follow(e,e.elements['index-order'].children[1]);await flush();rowOf(e,'Kiasmos').focus();e.fire(900);typed(e,'l');
+ assert.equal(focused(),rowOf(e,'Kiasmos'),'in Most tracks a prefix nobody has moves nothing');
+ e.fire(900);typed(e,'a');assert.equal(focused(),rowOf(e,'Act 10'),'and a prefix someone has finds the first of them in that order, most tracks first');
+ e.fire(900);routeTo(e,'#history');await flush();e.elements.explorer.focus();assert.equal(typed(e,'k').prevented,false,'History has no type-ahead');
+});
+
+test('/ focuses the filter',async()=>{
+ const e=nest(await indexed());laidIndex(e);routeTo(e,'#index/artists');await flush();const explorer=e.elements.explorer,field=e.elements['index-query'];
+ rowOf(e,'Kiasmos').focus();explorer.scrollTop=2400;field.selected=false;
+ const slash=typed(e,'/');
+ assert.deepEqual([slash.prevented,e.document.activeElement===field,field.selected,explorer.scrollTop],[true,true,true,0],'from a row: the list\'s top, and the field with its text selected');
+ const inField=keyIn(e,'/');assert.equal(inField.defaultPrevented,false,'in the field, / is a character');
+ rowOf(e,'Kiasmos').focus();explorer.scrollTop=2400;
+ assert.deepEqual([typed(e,'/',control('a')).prevented,e.key('Slash',control('a'),{key:'/',ctrlKey:true}).prevented],[true,false],'not with Ctrl');
+ e.key('Slash',control('a'),{key:'/',ctrlKey:true});assert.equal(e.document.activeElement===field,true);
+ e.elements['player'].focus();explorer.scrollTop=2400;field.selected=false;const outside=typed(e,'/',control('button'));
+ assert.deepEqual([outside.prevented,explorer.scrollTop,field.selected],[false,2400,false],'with focus outside the explorer, as on the player bar, / is not the Index\'s');
+});
+
+test('at= is written after scrolling stops, read back on a reload, and never part of the kept place',async()=>{
+ const e=await indexed();laidIndex(e);routeTo(e,'#index/artists');await flush();const explorer=e.elements.explorer,tab=e.elements['index-tab'],kept=e.entries().length,state=e.history.state;
+ const scrollTo=top=>{explorer.scrollTop=top;explorer.emit('scroll');explorer.emit('scroll');e.fire('frame');};
+ scrollTo(2500);
+ assert.deepEqual([currentMark(e),e.location.hash],[['F'],'#index/artists'],'the rail marks F, the section that crosses the bar; the address waits');
+ e.fire(250);
+ assert.deepEqual([e.location.hash,tab.getAttribute('href'),e.entries().length,e.history.state===state,e.url()],['#index/artists?at=F','#index/artists?at=F',kept,true,'/'+e.location.search+'#index/artists?at=F'],'250 ms after the list stops, in place, with the station query and the entry\'s state');
+ assert.match(e.location.search,/^\?station=/);
+ scrollTo(9300-700);e.fire(250);assert.deepEqual([currentMark(e),e.location.hash],[['#'],'#index/artists?at=%23'],'at the list\'s end, its last section');
+ scrollTo(100);e.fire(250);assert.deepEqual([currentMark(e),e.location.hash,tab.getAttribute('href')],[[],'#index/artists','#index/artists'],'no mark while the list\'s top is in view');
+ scrollTo(4200);e.fire(250);
+ assert.deepEqual([stageOf(e,'fontanna').getAttribute('href'),e.elements['index-order'].children[1].getAttribute('href'),e.elements['index-sides'].children[1].getAttribute('href')],['#index/artists/fontanna','#index/artists?by=tracks','#index/labels'],'the links of the head and the bar carry no mark');
+ // A record opened from the M section comes back to its row, not to the top of M: the kept place wins, with no request.
+ const asked=e.namesRequests.length,row=rowOf(e,'Maceo Plex');follow(e,row);await flush();
+ assert.equal(tab.getAttribute('href'),'#index/artists?at=M');
+ routeTo(e,tab.getAttribute('href'));await flush();
+ assert.deepEqual([e.location.hash,e.namesRequests.length-asked,explorer.scrollTop,e.document.activeElement===row],['#index/artists?at=M',0,4200,true],'the same rows, where they stood');
+ typeIndex(e,'a');assert.equal(e.location.hash,'#index/artists?q=a','the filter writes no mark');
+ // A reload, or a link shared, opens on its mark; one of another order is dropped.
+ const f=await indexed();laidIndex(f);await browse(f,'#index/artists/bermuda-day?at=K');
+ assert.deepEqual([f.location.hash,f.elements.explorer.scrollTop,currentMark(f)],['#index/artists/bermuda-day?at=K',3167,['K']],'K, the fourth section on Under the Sun, under the bar');
+ await browse(f,'#index/artists?by=tracks&at=K');assert.deepEqual([f.location.hash,f.elements['index-tab'].getAttribute('href')],['#index/artists?by=tracks','#index/artists?by=tracks'],'K is no band');
+ const g=await indexed();laidIndex(g);await browse(g,'#index/artists?by=tracks&at=10%2B');
+ assert.deepEqual([g.location.hash,g.elements.explorer.scrollTop],['#index/artists?by=tracks&at=10%2B',2167],'10+, the third band shown');
+});
+
+test('a focused or pointed row lights its stations in the bar',async()=>{
+ const e=await indexed();routeTo(e,'#index/artists');await flush();const list=e.elements['music-content'],bar=e.elements['stage-row'],row=rowOf(e,'Maceo Plex');
+ const lit=()=>[bar.attrs['data-lit']!==undefined,bar.children.filter(a=>a.attrs['data-lit']!==undefined).map(a=>a.dataset.stage)];
+ list.emit('focusin',{target:{closest:()=>row}});
+ assert.deepEqual(lit(),[true,['radio','bermuda-day','bermuda-evening','palac-dance']],'All stations and the stations of the name');
+ list.emit('focusout',{});assert.deepEqual(lit(),[false,[]],'focus gone, the bar is as before');
+ list.emit('pointerover',{pointerType:'touch',target:{closest:()=>row}});assert.deepEqual(lit(),[false,[]],'a touch lights nothing');
+ list.emit('pointerover',{pointerType:'mouse',target:{closest:()=>rowOf(e,'Kiasmos')}});assert.deepEqual(lit(),[true,['radio','bermuda-day']],'a mouse');
+ list.emit('pointerover',{pointerType:'mouse',target:{closest:()=>null}});assert.deepEqual(lit(),[false,[]],'between rows, nothing');
+ list.emit('pointerover',{pointerType:'mouse',target:{closest:()=>row}});list.emit('pointerleave',{});assert.deepEqual(lit(),[false,[]],'and out of the list');
+ list.emit('focusin',{target:{closest:()=>row}});follow(e,stageOf(e,'bermuda-day'));await flush();assert.deepEqual(lit(),[false,[]],'a new bar starts unlit');
+ e.historyReply=answer(played(3));routeTo(e,'#history');await flush();list.emit('focusin',{target:{closest:()=>list.descendants().find(n=>n.className==='row')}});
+ assert.deepEqual(lit(),[false,[]],'History\'s rows light nothing');
+ const css=cssRules();assert.match(css.get('#stage-row[data-lit] a:not([data-lit])'),/color:var\(--muted\)/);assert.match(css.get('#stage-row a'),/transition:color var\(--hover\) var\(--ease\)/);
+});
+
+test('type-ahead on a phone brings a row out from under its section\'s sticky heading',async()=>{
+ // On a phone the stage bar sticks at the explorer's top and each section's heading under it, so a row's scroll margin
+ // is 121 px: a row 89 px down is below the bar but under the heading, and is not in view.
+ const e=nest(await indexed());laidIndex(e);e.elements['music-filters'].computed={top:'0px'};
+ Object.defineProperty(e.Element.prototype,'computed',{configurable:true,writable:true,value:{scrollMarginTop:'121px'}});
+ routeTo(e,'#index/artists');await flush();const explorer=e.elements.explorer;
+ rowOf(e,'Act 9').focus();explorer.scrollTop=3227;typed(e,'k');
+ assert.deepEqual([e.document.activeElement===rowOf(e,'Kiasmos'),explorer.scrollTop,rowOf(e,'Kiasmos').getBoundingClientRect().top],[true,3195,121],'Kiasmos comes to 121 px, clear of the heading');
+ e.fire(900);typed(e,'k');assert.equal(explorer.scrollTop,3195,'once clear, it stays where it is');
+});
+
+test('in the Index, digits and letters go to the type-ahead and not to the page keys',async()=>{
+ const e=nest(await indexed({storage:{getItem:key=>key==='pavoia-volume'?'0.6':null,setItem(){}}}));routeTo(e,'#index/artists');await flush();
+ e.elements.keys.append(Object.assign(new e.Element(),{localName:'summary'}));
+ const now=()=>[e.window.Pavoia.getState().stage,e.audio.volume,Boolean(e.elements.keys.open)],before=now();
+ rowOf(e,'Kiasmos').focus();
+ const keys=[['Digit1','1'],['KeyM','m'],['KeyM','M'],['Slash','?'],['Digit8','8']].map(([code,key])=>e.key(code,control('a'),{key}).prevented);
+ assert.deepEqual([keys,now()],[[true,true,true,true,true],before],'with focus in the list: no station, no mute, no shortcuts');
+ e.fire(900);e.elements.explorer.focus();assert.deepEqual([e.key('Digit5',control('div'),{key:'5'}).prevented,now()],[true,before],'with focus on the explorer itself too');
+ e.elements.volume.focus();digit(e,5,{target:control('input',{type:'range'})});
+ assert.deepEqual(now(),['etage-zero',0.6,false],'with focus on the player bar, under the open explorer, 5 is the page\'s');
+});
+
+test('the type-ahead leaves every key that is not a character, and a key with Alt, Cmd, an input method or another taker',async()=>{
+ const e=nest(await indexed());laidIndex(e);routeTo(e,'#index/artists');await flush();const row=rowOf(e,'Act 9');
+ row.focus();
+ assert.deepEqual(['Tab','Enter','ArrowRight','ArrowDown','F5'].map(key=>e.key(key,control('a'),{key}).prevented),[false,false,false,false,false],'Tab, Enter, the arrows and the function keys keep their own actions');
+ const left=[{altKey:true},{metaKey:true},{isComposing:true}].map(extra=>e.key('KeyK',control('a'),{key:'k',...extra}).prevented);
+ const taken=e.key('KeyK',control('a'),{key:'k',defaultPrevented:true});
+ assert.deepEqual([left,taken.prevented,e.document.activeElement===row,[...e.timers.values()].filter(t=>t.delay===900).length],[[false,false,false],false,true,0],'none of them is prevented, moves focus or starts a name');
+ assert.deepEqual([typed(e,'k').prevented,e.document.activeElement===rowOf(e,'Kiasmos')],[true,true],'a plain k is still the type-ahead\'s');
+});
+
+test('a mark of the address leads once: on a reload, on a list already drawn, and never when it has no names here',async()=>{
+ const load=async(e,hash)=>{e.location.hash=hash;e.window.emit('popstate');await flush();};
+ // One restore(), as a real load makes: the jump after the names arrive is the only one there is.
+ const e=await indexed();laidIndex(e);await load(e,'#index/artists/bermuda-day?at=K');const explorer=e.elements.explorer,tab=e.elements['index-tab'],asked=e.namesRequests.length;
+ assert.deepEqual([e.location.hash,explorer.scrollTop,currentMark(e)],['#index/artists/bermuda-day?at=K',3167,['K']],'a load opens on K');
+ // The same list, another mark: no request, and the mark of the address leads.
+ await load(e,'#index/artists/bermuda-day?at=A');
+ assert.deepEqual([e.namesRequests.length-asked,explorer.scrollTop,currentMark(e)],[0,167,['A']],'the list already drawn moves to A');
+ // The mark is used once: a draw that follows, here another language, moves nothing.
+ explorer.scrollTop=40;e.setLanguage('de');await flush();
+ assert.equal(explorer.scrollTop,40,'a later draw does not jump again');
+ // A mark with no names in this list leaves the address and the tab, on a load and on a list already drawn.
+ const f=await indexed();laidIndex(f);await load(f,'#index/artists?q=maceo&at=K');
+ assert.deepEqual([f.location.hash,f.elements['index-tab'].getAttribute('href'),f.elements.explorer.scrollTop,currentMark(f)],['#index/artists?q=maceo','#index/artists?q=maceo',0,[]],'K has no name with "maceo": no mark, and the list at its top');
+ await load(f,'#index/artists?q=maceo&at=M');assert.equal(f.location.hash,'#index/artists?q=maceo&at=M','M has one');
+ await load(f,'#index/artists?q=maceo&at=Z');
+ assert.deepEqual([f.location.hash,f.elements['index-tab'].getAttribute('href'),f.entries().length>0],['#index/artists?q=maceo','#index/artists?q=maceo',true],'and on the drawn list Z goes too');
 });

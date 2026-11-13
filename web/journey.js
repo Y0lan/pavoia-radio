@@ -77,7 +77,8 @@
     statLineAll:'{tracks} tracks by {artists} on {labels}, {hours} hours of music',artistsLink:'{n} artists',labelsLink:'{n} labels',allArtists:'All {n} artists',allLabels:'All {n} labels',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
     indexTab:'Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
-    markArtists:'{mark}, {n} artists',markArtist1:'{mark}, 1 artist',markLabels:'{mark}, {n} labels',markLabel1:'{mark}, 1 label',symbols:'Numbers and symbols',band:'{n} tracks or more',band1:'One track'});
+    markArtists:'{mark}, {n} artists',markArtist1:'{mark}, 1 artist',markLabels:'{mark}, {n} labels',markLabel1:'{mark}, 1 label',symbols:'Numbers and symbols',band:'{n} tracks or more',band1:'One track',
+    markArtists0:'{mark}, no artists',markLabels0:'{mark}, no labels',railLetters:'Jump to a letter',railCounts:'Jump to a track count',railFind:'Back to the filter',filterHint:'Press / to filter. In the list, type a name to jump to it.'});
   Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',historyDay:'Tag',older:'Frühere Tracks anzeigen',loadingMore:'Wird geladen…',now:'Jetzt',allStages:'Alle Sender',noHistory:'Auf diesem Sender lief noch nichts.',noDay:'An diesem Tag lief hier nichts.',historyError:'Der Verlauf konnte nicht geladen werden.',musicLoading:'Musik wird geladen…',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',releases:'Veröffentlichungen',years:'Erscheinungsjahre',labels:'Labels',
     statLine:'{tracks} Tracks von {artists} Künstlern, {hours} Stunden Musik',playsSince:'{plays} Wiedergaben seit {date}',plays30:'{plays} Wiedergaben in den letzten 30 Tagen',allPlayed:'jeder Track lief schon',notPlayed:'{n} noch nicht gespielt',seeWhatPlayed:'Sieh, was lief',playsError:'Die Wiedergaben konnten nicht geladen werden.',switchStage:'Zu diesem Sender wechseln',
     mostTracksBy:'Die meisten Tracks von',mostTracksOn:'Die meisten Tracks bei',sharesWith:'Teilt Tracks mit',stages:'Sender',tracksOn:'{tracks} auf {stage}',tracksInCommon:'{tracks} gemeinsam',mostPlayedSince:'Am häufigsten gespielt seit {date}',mostPlayed30:'Am häufigsten gespielt in den letzten 30 Tagen',howCounted:'So wird gezählt',
@@ -85,7 +86,8 @@
     statLineAll:'{tracks} Tracks von {artists} auf {labels}, {hours} Stunden Musik',artistsLink:'{n} Künstlern',labelsLink:'{n} Labels',allArtists:'Alle {n} Künstler',allLabels:'Alle {n} Labels',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
     indexTab:'Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
-    markArtists:'{mark}, {n} Künstler',markArtist1:'{mark}, 1 Künstler',markLabels:'{mark}, {n} Labels',markLabel1:'{mark}, 1 Label',symbols:'Zahlen und Zeichen',band:'{n} Tracks oder mehr',band1:'Ein Track'});
+    markArtists:'{mark}, {n} Künstler',markArtist1:'{mark}, 1 Künstler',markLabels:'{mark}, {n} Labels',markLabel1:'{mark}, 1 Label',symbols:'Zahlen und Zeichen',band:'{n} Tracks oder mehr',band1:'Ein Track',
+    markArtists0:'{mark}, keine Künstler',markLabels0:'{mark}, keine Labels',railLetters:'Zu einem Buchstaben springen',railCounts:'Zu einer Trackzahl springen',railFind:'Zurück zum Filter',filterHint:'Mit / filtern. In der Liste springst du mit den ersten Buchstaben zu einem Namen.'});
   const word = key => copy[radio.getState().language][key] || key;
   const node = (tag,cls,value) => {const n=document.createElement(tag);if(cls)n.className=cls;if(value)n.textContent=value;return n;};
   const entityID = value => /^(?:(?:art|trk|rel|lab|pl)_[a-f0-9]{12}|plex_[0-9]{1,32})$/.test(value || '');
@@ -291,7 +293,7 @@
     $('explorer-close').setAttribute('aria-label',word('back'));
     $('explorer-close').title=word('back');
     stageRow.setAttribute('aria-label',word('stages'));$('index-sides').setAttribute('aria-label',word('sides'));$('index-order').setAttribute('aria-label',word('order'));
-    $('discovery-query').placeholder=word('searchPlaceholder');sayVolume();
+    $('discovery-query').placeholder=word('searchPlaceholder');$('index-query').title=word('filterHint');sayVolume();
     renderPlayer();redraw();
     if(dialog.open&&view!=='explore'){fillRow();loadMusic();}
   }
@@ -712,8 +714,9 @@
   const today = () => new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,10);
   // History's address: a stage, and a day only when it is one before today; today is the live list.
   const historyAt = (stage,day) => '#history/'+stage+(day&&day<today()?'/'+day:'');
-  // The Index's address: a side, a stage unless it is All stages, then Most tracks and the filter when there are.
-  const indexAt = ({kind,scope,by,q}) => {const query=String(new URLSearchParams([...by==='tracks'?[['by','tracks']]:[],...q?[['q',q]]:[]]));return '#index/'+kind+(scope&&scope!=='radio'?'/'+scope:'')+(query?'?'+query:'');};
+  // The Index's address: a side, a stage unless it is All stages, then Most tracks, the filter and the mark the list was
+  // scrolled to when there are.
+  const indexAt = ({kind,scope,by,q,at}) => {const query=String(new URLSearchParams([...by==='tracks'?[['by','tracks']]:[],...q?[['q',q]]:[],...at?[['at',at]]:[]]));return '#index/'+kind+(scope&&scope!=='radio'?'/'+scope:'')+(query?'?'+query:'');};
   // A day an address can name: a real calendar date the Day field accepts, from its 1970-01-01 minimum, before today.
   const pastDay = day => {
     if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||day<'1970-01-01'||day>=today())return false;
@@ -749,7 +752,7 @@
   const centre=()=>{const current=stageRow.querySelector('[aria-current]'),a=stageRow.contains(document.activeElement)?document.activeElement:current,left=stageRow.scrollLeft;
     if(a===current||a.offsetLeft<left||a.offsetLeft+a.offsetWidth>left+stageRow.clientWidth)stageRow.scrollLeft=a.offsetLeft-(stageRow.clientWidth-a.offsetWidth)/2;fade(stageRow);};
   function fillRow() {
-    const held=stageRow.contains(document.activeElement),stations=radio.stations;
+    const held=stageRow.contains(document.activeElement),stations=radio.stations;stageRow.removeAttribute('data-lit');
     if(view==='statistics'||view==='index')stations.unshift({id:'radio'});
     stageRow.replaceChildren(...stations.map(({id,group},i)=>{
       const a=node('a');a.append(node('span','',scopeName(id)));if(view==='index'){a.append(node('small'));a.dataset.stage=id;}
@@ -771,7 +774,7 @@
     }
     clicked=null;
     view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();
-    $('music-view').hidden=next==='explore';$('music-view').dataset.view=next;$('index-head').hidden=next!=='index';$('discovery-search').hidden=next!=='explore';
+    $('music-view').hidden=next==='explore';$('music-view').dataset.view=next;$('index-head').hidden=$('index-rail').hidden=next!=='index';$('discovery-search').hidden=next!=='explore';
     $('discovery-status').hidden=next!=='explore';
     for(const link of document.querySelectorAll('.explorer-nav a')) {
       if(tab(link)===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current');
@@ -955,8 +958,15 @@
     for(const a of $('index-order').children){a.href=indexAt({...place,by:a.dataset.by});if(a.dataset.by===indexBy)a.setAttribute('aria-current','true');else a.removeAttribute('aria-current');}
     for(const a of stageRow.children)a.href=indexAt({...place,scope:a.dataset.stage});
     field.placeholder=word(musicKind==='artists'?'filterArtists':'filterLabels');field.setAttribute('aria-label',field.placeholder);
-    $('music-view').dataset.by=indexBy;
+    $('music-view').dataset.by=indexBy;$('index-rail').setAttribute('aria-label',word(indexBy==='tracks'?'railCounts':'railLetters'));
   }
+  // The marks of the order shown: the letters A to Z then #, or the bands of track counts. A mark says what it stands
+  // for and how many names it holds, or that it holds none.
+  const markList=()=>indexBy==='tracks'?bands.map(b=>b===1?'1':b+'+'):letters;
+  const markLabel=(mark,n)=>{
+    const name=mark==='#'?word('symbols'):indexBy!=='tracks'?mark:mark==='1'?word('band1'):word('band').replace('{n}',mark.slice(0,-1)),artists=musicKind==='artists';
+    return word(!n?(artists?'markArtists0':'markLabels0'):(artists?'markArtist':'markLabel')+(n===1?'1':'s')).replace('{mark}',name).replace('{n}',number(n));
+  };
   // The names of the stage that match the field, in sections: the letters A to Z then #, or the bands of track counts,
   // each under its mark, which says how many it holds. The note says how many match, or that none does here, with a way
   // to look on every stage when others hold some.
@@ -968,19 +978,17 @@
     // Ties between stations read in the stage bar's order, the radio's way, which can change while the explorer is closed.
     const say={rows:indexRows.get(lang),rank:new Map(stations.map((s,i)=>[s.id,i])),order:stations.map(s=>s.id).join(),list:new Intl.ListFormat(lang,{type:'conjunction'}),more:word('moreNames'),also:word('alsoOnStages'),only:word('onlyHere'),tracks:word('tracksN').replace('{n}',''),type:kind.slice(0,-1)};
     indexShown=indexBy==='tracks'?[...hits].sort((a,b)=>tally(b)-tally(a)):hits;
-    const sections=new Map((indexBy==='tracks'?bands.map(b=>b===1?'1':b+'+'):letters).map(m=>[m,[]]));
+    const sections=new Map(markList().map(m=>[m,[]]));
     for(const i of indexShown){const n=tally(i),b=bands.find(b=>n>=b);sections.get(indexBy==='tracks'?b===1?'1':b+'+':i.letter).push(i);}
     content.replaceChildren(...[...sections].filter(([,items])=>items.length).map(([mark,items])=>{
       const section=node('section','index-section'),heading=node('h3','index-mark'),rows=node('ol','index-rows'),n=items.length;
-      const name=mark==='#'?word('symbols'):indexBy!=='tracks'?mark:mark==='1'?word('band1'):word('band').replace('{n}',mark.slice(0,-1));
-      section.dataset.mark=mark;heading.id='m-'+mark;section.setAttribute('aria-labelledby',heading.id);
-      heading.setAttribute('aria-label',word((kind==='artists'?'markArtist':'markLabel')+(n===1?'1':'s')).replace('{mark}',name).replace('{n}',number(n)));
+      section.dataset.mark=mark;heading.id='m-'+mark;section.setAttribute('aria-labelledby',heading.id);heading.setAttribute('aria-label',markLabel(mark,n));
       heading.append(node('span','',mark),' ',node('small','',number(n)));rows.append(...items.map(i=>indexRow(i,say)));section.append(heading,rows);return section;
     }));
     const note=$('index-note'),total=scope==='radio'?all.length:all.filter(i=>i.stages[scope]).length;
     note.textContent=!q?'':hits.length?word('nOfTotal').replace('{n}',number(hits.length)).replace('{total}',number(total)):word(kind==='artists'?'noArtistMatch':'noLabelMatch').replace('{q}',indexQuery.trim());
     if(q&&!hits.length&&found.length){const a=node('a','',word('lookAll').replace('{n}',number(found.length)));a.href=indexAt({kind,scope:'radio',by:indexBy,q:indexQuery});note.append(' ',a);}
-    countStages();sizeSections();
+    countStages();sizeSections();fillRail(sections);
   }
   // Each section's height from its row count, so a section the browser skips holds its exact place: one section is
   // drawn and measured, from computed styles since a mark can be a fraction of a pixel tall, and the rest follow.
@@ -1006,6 +1014,112 @@
     }
     return null;
   }
+  // The rail: the magnifier, which goes back to the filter, and a mark for each section of the order, always the 27
+  // letters or the 7 bands, so it never changes shape. A mark with no names is disabled and says so. Its buttons are out
+  // of the Tab order: the keyboard has type-ahead and /, and a screen reader finds the rail as a landmark of named buttons.
+  const rail=$('index-rail').children[0],scrubMark=$('index-scrub');
+  // On a phone the explorer's bar scrolls away above the stage bar, on one line or, at 320 px or in a narrow German
+  // window, on two, and the rail rests and sticks at the height the bar gives it. The bar's height is watched from the
+  // Index's first draw on.
+  let barWatch=null;
+  function fillRail(sections) {
+    if(!barWatch){const bar=dialog.querySelector('.explorer-top');barWatch=new ResizeObserver(()=>$('music-view').style.setProperty('--explorer-top',bar.getBoundingClientRect().height+'px'));barWatch.observe(bar);}
+    const marks=[...sections.keys()];
+    if(rail.dataset.marks!==marks.join(' ')){
+      const find=node('button','rail-find');find.append(drawing('0 0 24 24',['M10.5 17a6.5 6.5 0 1 1 0-13 6.5 6.5 0 0 1 0 13ZM15.5 15.5 20 20'],'rail-icon'));
+      rail.replaceChildren(find,...marks.map(mark=>{const b=node('button');b.append(node('span','',mark));b.dataset.mark=mark;return b;}));rail.dataset.marks=marks.join(' ');
+      for(const b of rail.children){b.type='button';b.tabIndex=-1;}
+    }
+    rail.children[0].setAttribute('aria-label',word('railFind'));
+    for(const b of rail.children){if(!b.dataset.mark)continue;const n=sections.get(b.dataset.mark).length;b.disabled=!n;b.setAttribute('aria-label',markLabel(b.dataset.mark,n));}
+    nextFrame();
+  }
+  // Where the stage bar ends once it sticks: on a phone the explorer's bar scrolls away above it, so the bar ends 61 px
+  // higher than where it rests.
+  const stuckTop=()=>dialog.getBoundingClientRect().top+parseFloat(getComputedStyle($('music-filters')).top);
+  const stuckBar=()=>stuckTop()+$('music-filters').offsetHeight;
+  // The current mark is the section that crosses the stage bar's bottom, or the last one once the list ends; none while
+  // the list's top is in view. It compares the section boxes only.
+  function railCurrent() {
+    const sections=[...$('music-content').children],line=stuckBar()+1,end=dialog.scrollTop+dialog.clientHeight>=dialog.scrollHeight-1;
+    const current=view!=='index'||!sections.length||sections[0].getBoundingClientRect().top>line?null:end?sections.at(-1):sections.findLast(s=>s.getBoundingClientRect().top<=line);
+    for(const b of rail.children){if(b.dataset.mark&&b.dataset.mark===current?.dataset.mark)b.setAttribute('aria-current','true');else b.removeAttribute('aria-current');}
+    return current?.dataset.mark||'';
+  }
+  // 250 ms after the list stops, the address and the Index tab name the mark it shows, in place. A reload or a shared link
+  // then opens there. A mark of the address that has no names in this list is written out the same way, as none.
+  function writeMark(at=railCurrent()) {
+    if(!dialog.open||closing||view!=='index'||$('music-content').dataset.key!==musicKey())return;
+    const place=indexAt({kind:musicKind,scope:musicScope,by:indexBy,q:indexQuery,at});
+    if(location.hash!==place)history.replaceState(history.state,'',place);$('index-tab').setAttribute('href',place);
+  }
+  // The current mark follows the list once a frame, when the browser lays it out anyway, not inside a draw.
+  let railFrame=0,railStill=null,scrub=null,scrubHide=null,indexMark='';
+  const nextFrame=()=>{if(!railFrame)railFrame=requestAnimationFrame(()=>{railFrame=0;railCurrent();});};
+  dialog.addEventListener('scroll',()=>{
+    if(view!=='index')return;
+    nextFrame();clearTimeout(railStill);railStill=setTimeout(writeMark,250);
+  },{passive:true});
+  // A jump puts the section's top line at the stage bar's bottom; on a phone its heading then sticks right under the bar.
+  // A screen reader's activation also takes focus to the section's first name.
+  function jump(mark,focus) {
+    const section=[...$('music-content').children].find(s=>s.dataset.mark===mark);if(!section)return false;
+    dialog.scrollTop+=section.getBoundingClientRect().top-stuckBar();railCurrent();
+    if(focus)section.children[1].children[0].children[0].focus({preventScroll:true});
+    return true;
+  }
+  // A press on the rail jumps to the enabled mark nearest the pointer, and so does each new mark the pointer then reaches.
+  // Touch and pen show the mark beside the thumb and tick on Android; a mouse has the rail's line and the margin mark.
+  function scrubTo(event) {
+    let best=null,gap=Infinity;
+    for(const b of rail.children){if(!b.dataset.mark||b.disabled)continue;const box=b.getBoundingClientRect(),d=Math.abs((box.top+box.bottom)/2-event.clientY);if(d<gap){gap=d;best=b;}}
+    if(!best)return;
+    if(scrub.touch){const box=best.getBoundingClientRect();clearTimeout(scrubHide);scrubMark.textContent=best.dataset.mark;scrubMark.style.top=Math.min(Math.max(event.clientY,box.top),box.bottom)+'px';scrubMark.setAttribute('data-on','');}
+    if(best.dataset.mark===scrub.mark)return;
+    scrub.mark=best.dataset.mark;jump(scrub.mark);if(scrub.touch)navigator.vibrate?.(4);
+  }
+  rail.addEventListener('pointerdown',event=>{
+    if(event.button||event.target.closest?.('.rail-find'))return;
+    rail.setPointerCapture(event.pointerId);event.preventDefault();scrub={touch:event.pointerType!=='mouse',mark:''};scrubTo(event);
+  });
+  rail.addEventListener('pointermove',event=>{if(scrub)scrubTo(event);});
+  for(const type of ['pointerup','pointercancel'])rail.addEventListener(type,()=>{if(!scrub)return;scrub=null;clearTimeout(scrubHide);scrubHide=setTimeout(()=>scrubMark.removeAttribute('data-on'),350);});
+  rail.addEventListener('click',event=>{
+    const b=event.target.closest?.('button');if(!b)return;
+    if(!b.dataset.mark){dialog.scrollTop=0;$('index-query').focus({preventScroll:true});}else if(event.detail===0)jump(b.dataset.mark,true);
+  });
+  // Type-ahead: in the Index, a printable key outside a field goes to the list, digits and letters included, not to the
+  // page's keys. / goes back to the filter. Other characters gather for 900 ms and take focus to the first name shown that
+  // starts with them, or in A to Z to the first that sorts after them; that row comes under the stage bar unless it shows
+  // whole. Space stays play and pause.
+  let ahead='',aheadStop=null;
+  document.addEventListener('keydown',event=>{
+    const active=document.activeElement;
+    if(event.defaultPrevented||event.ctrlKey||event.metaKey||event.altKey||event.isComposing||!dialog.open||view!=='index'||(active!==dialog&&!dialog.contains(active))||event.target.matches?.('input, textarea, select, [contenteditable]'))return;
+    if(event.key===' '||[...event.key].length!==1)return;
+    event.preventDefault();
+    if(event.key==='/'){dialog.scrollTop=0;$('index-query').focus({preventScroll:true});$('index-query').select();return;}
+    ahead+=event.key;clearTimeout(aheadStop);aheadStop=setTimeout(()=>{ahead='';},900);
+    if($('music-content').dataset.key!==musicKey())return;
+    const q=loose(ahead),az=alphabet(),probe={name:ahead,letter:/^[a-z]/.test(q)?q[0].toUpperCase():'#'};
+    const item=indexShown.find(i=>i.key.startsWith(q))||(indexBy!=='tracks'?indexShown.find(i=>az(i,probe)>0):null),row=item&&indexRows.get(radio.getState().language).get(item);
+    if(!row)return;
+    row.focus({preventScroll:true});
+    // The row shows whole only below the line its scroll margin keeps clear: under the stage bar, and on a phone under
+    // the section's heading, which sticks there.
+    const box=row.getBoundingClientRect(),line=stuckTop()+parseFloat(getComputedStyle(row).scrollMarginTop);
+    if(box.top<line||box.bottom>dialog.getBoundingClientRect().bottom)dialog.scrollTop+=box.top-line;
+  });
+  // A row pointed at with a mouse or in focus lights its stations in the bar, and All stations, and dims the others.
+  function light(row) {
+    const stages=view==='index'&&row?.dataset.stages!==undefined?row.dataset.stages.split(' '):null;
+    stageRow.toggleAttribute('data-lit',Boolean(stages));
+    for(const a of stageRow.children)a.toggleAttribute('data-lit',Boolean(stages)&&(a.dataset.stage==='radio'||stages.includes(a.dataset.stage)));
+  }
+  $('music-content').addEventListener('pointerover',event=>{if(event.pointerType==='mouse')light(event.target.closest?.('.row'));});
+  $('music-content').addEventListener('pointerleave',()=>light(null));
+  $('music-content').addEventListener('focusin',event=>light(event.target.closest?.('.row')));
+  $('music-content').addEventListener('focusout',()=>light(null));
   // The filter waits for a pause in typing, then writes the address and draws in place, in the explorer's one entry. A
   // list scrolled past its top comes back under the head, so it starts under the field. With no names yet, nothing draws.
   function filterIndex() {
@@ -1058,6 +1172,8 @@
       parked=[content,$('index-note'),$('entity-inspector')].some(n=>n.contains(document.activeElement));if(parked)dialog.focus({preventScroll:true});
       content.replaceChildren();delete content.dataset.key;shownStage=null;$('index-note').textContent='';
     }
+    // The rail shows while the names load, every mark disabled.
+    if(mode==='index'){$('index-rail').hidden=false;fillRail(new Map(markList().map(m=>[m,[]])));}
     if($('music-status').contains(document.activeElement))stage().focus();
     // While any request runs the button does nothing, and says so: aria-disabled, unlike disabled, keeps focus on
     // it. Earlier tracks load under the busy button; other requests dim the list.
@@ -1116,8 +1232,11 @@
         const doc=await namesOf(kind,controller.signal);if(musicRequest!==controller)return;
         indexDoc=doc;if(entered)dialog.scrollTop=0;content.dataset.key=musicKey();drawIndex();$('music-status').textContent='';
         // The name that was under the stage bar stays there, or the first one that does not sort before it in the new
-        // stage, side or order, with the count it had where it came from.
-        if(anchor){
+        // stage, side or order, with the count it had where it came from. Without one, the mark of the address, as on a
+        // reload or a shared link, brings its section under the bar; a mark with no names here leaves the address.
+        const mark=indexMark;indexMark='';
+        if(!anchor){if(mark&&!jump(mark))writeMark('');}
+        else{
           const az=alphabet(),before=i=>indexBy==='tracks'?tally(i)>anchor.count||tally(i)===anchor.count&&az(i,anchor)<0:az(i,anchor)<0,item=indexShown.find(i=>!before(i))||indexShown.at(-1);
           if(item)dialog.scrollTop+=indexRows.get(radio.getState().language).get(item).getBoundingClientRect().top-indexLine();
         }
@@ -1140,7 +1259,7 @@
       else if(follow){unmark();$('music-status').textContent=content.children.length?'':word(day?'noDay':'noHistory');}
       else{
         if(content.contains(document.activeElement)||document.activeElement===button)stage().focus();
-        content.replaceChildren();delete content.dataset.key;historyPage=null;shownStage=null;button.hidden=true;
+        content.replaceChildren();delete content.dataset.key;historyPage=null;shownStage=null;button.hidden=true;if(mode==='index')$('index-rail').hidden=true;
         $('music-status').replaceChildren(node('span','',word(mode==='history'?'historyError':mode==='index'?'namesError':'musicError')+' '),action(word('retry'),()=>loadMusic()));
       }
     }}
@@ -1194,7 +1313,9 @@
       musicDay=section==='history'&&pastDay(second||'')?second:'';
       indexBy=index?query.get('by')==='tracks'?'tracks':'name':'';
       indexQuery=index?(query.get('q')||'').slice(0,200):'';
-      const place=section==='history'?historyAt(musicScope,musicDay):index?indexAt({kind:musicKind,scope:musicScope,by:indexBy,q:indexQuery}):'#statistics/'+musicScope;
+      // The Index keeps the mark it was scrolled to only when it is one of the order shown.
+      indexMark=index&&markList().includes(query.get('at'))?query.get('at'):'';
+      const place=section==='history'?historyAt(musicScope,musicDay):index?indexAt({kind:musicKind,scope:musicScope,by:indexBy,q:indexQuery,at:indexMark}):'#statistics/'+musicScope;
       if(location.hash!==place)history.replaceState(history.state,'',place);
       for(const link of document.querySelectorAll('.explorer-nav a'))if(tab(link)===section)link.setAttribute('href',place);
     }
@@ -1203,14 +1324,15 @@
     // focus on the row that was opened. The place is used once: the second restore() of a browser move changes nothing.
     if((section==='history'||section==='index')&&$('music-content').dataset.key===musicKey()){
       // The Index puts the row back at the height it stood, kept between the stage bar and the dialog's bottom, since a
-      // window resized or a phone turned meanwhile moves the columns.
+      // window resized or a phone turned meanwhile moves the columns. Without that place, the mark of the address leads.
       if(section==='index'){
         sizeSections();
         if(musicPlace?.key===musicKey()&&$('music-content').contains(musicPlace.row)){
           const {row,y,focus}=musicPlace,top=dialog.getBoundingClientRect().top,to=Math.min(Math.max(y,$('music-filters').getBoundingClientRect().bottom-top),dialog.clientHeight-56);
           dialog.scrollTop+=row.getBoundingClientRect().top-top-to;if(focus)row.focus({preventScroll:true});
         }
-        musicPlace=null;return;
+        else if(indexMark&&!jump(indexMark))writeMark('');
+        indexMark='';musicPlace=null;return;
       }
       // Only the rows the place was taken from: History's place never scrolls a list drawn since.
       if(musicPlace?.key===musicKey()){dialog.scrollTop=musicPlace.top;if($('music-content').contains(musicPlace.row))musicPlace.row.focus({preventScroll:true});}

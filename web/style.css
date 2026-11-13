@@ -617,7 +617,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
    its 64px column, its names in columns read left to right, then down. Off-screen sections skip layout and paint, and
    their height comes from their row count, so the scrollbar is exact and nothing moves. Sections reach --s2 past the
    edge on each side, padded back, so their paint containment clips no focus ring while the names start on the gutter. */
-#music-view[data-view=index] .music-filters { position:sticky; top:var(--top); z-index:2; height:var(--index-bar); margin:0 calc(-1 * var(--gutter)); align-items:center; background:var(--surface); border-bottom:1px solid var(--line); }
+#music-view[data-view=index] .music-filters { position:sticky; top:var(--top); z-index:2; height:var(--index-bar); margin:0 0 0 calc(-1 * var(--gutter)); align-items:center; background:var(--surface); border-bottom:1px solid var(--line); }
 #music-view[data-view=index] .stage-row { flex:1 1 auto; flex-wrap:nowrap; overflow-x:auto; scrollbar-width:none; margin:-6px 0; padding:6px var(--gutter); }
 .stage-row small { margin-left:var(--s1); font:11px/1.4 var(--mono); font-variant-numeric:tabular-nums; color:var(--muted); }
 .index-head { display:flex; flex-wrap:wrap; align-items:end; gap:var(--s3) var(--s4); margin-top:var(--s5); }
@@ -646,6 +646,46 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .index-rows .row { height:56px; scroll-margin-top:calc(var(--index-bar) + var(--s3)); }
 /* In A to Z a name with no picture shows no box: the margin letter already says its initial, and its column stays. */
 #music-view[data-by=name] .row[data-bare] .picture { visibility:hidden; }
+/* The rail takes the right gutter, beside the list from the head down, so no name loses room: the view's second column
+   is the gutter, or the rail where it is wider. Its marks start where they stick, right under the stage bar, so they
+   never move under a thumb. Each mark is mono 11, soft, the current one cream with the 1px line under it, and a mark with
+   no names is the line's colour. Its 44px target reaches over the rows' end where the gutter is narrower, and stays over
+   them. It ends where the explorer's bottom padding begins, so it still stands still at the list's end, and it clips at
+   the explorer's right edge, so 100+, a little wider than a phone's 24px rail, never scrolls the explorer sideways. Its
+   reach is its own padding and stays a target. Only the list's row grows to the rail's height, so a short list, a
+   narrow filter or the names loading never push the head down. Grid margins do not collapse, so the status line gives
+   the list the 16px it had. */
+#music-view[data-view=index] { --rail:24px; display:grid; grid-template-columns:minmax(0,1fr) max(var(--gutter), var(--rail)); grid-template-rows:auto auto auto 1fr; column-gap:0; margin-right:0; }
+#music-view[data-view=index] > * { grid-column:1; }
+#music-view[data-view=index] > .music-filters { grid-column:1 / -1; }
+#music-view[data-view=index] #music-status { margin-bottom:0; }
+#music-view[data-view=index] #music-status:empty { margin-top:0; }
+#music-view[data-view=index] > .index-rail { grid-column:2; grid-row:2 / span 3; }
+.rail-marks { --reach:max(0px, calc(44px - max(var(--gutter), var(--rail)))); position:sticky; top:calc(var(--top) + var(--index-bar)); z-index:1; display:flex; flex-direction:column; height:calc(100dvh - var(--bar) - var(--top) - var(--index-bar) - var(--s6)); margin-left:calc(-1 * var(--reach)); padding:var(--s2) 0 var(--s2) var(--reach); overflow-x:clip; touch-action:none; user-select:none; cursor:ns-resize; }
+#explorer .rail-marks button { flex:1 1 0; display:grid; place-items:center; min-height:0; font:11px/1 var(--mono); color:var(--soft); cursor:inherit; }
+#explorer .rail-marks button:disabled { color:var(--line); pointer-events:none; }
+#explorer .rail-marks button:hover, #explorer .rail-marks [aria-current] { color:var(--cream); }
+.rail-marks button > span { position:relative; }
+.rail-marks [aria-current] > span::after { content:""; position:absolute; inset:auto 0 -1px; height:1px; background:currentColor; }
+.rail-icon { width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.5; }
+/* The mark beside a thumb on the rail: the title style with the map's surface halo, fading out after the thumb lifts. */
+.index-scrub { position:fixed; z-index:3; right:calc(max(var(--gutter), var(--rail)) + var(--s4)); transform:translateY(-50%); font:44px/1.05 var(--serif); color:var(--cream); text-shadow:0 0 3px var(--surface), 0 0 8px var(--surface), 0 0 16px var(--surface); pointer-events:none; opacity:0; transition:opacity var(--hover) var(--ease); }
+.index-scrub[data-on] { opacity:1; }
+/* A row pointed at or in focus lights its stations in the bar; the others step back. */
+#stage-row a { transition:color var(--hover) var(--ease); }
+#stage-row[data-lit] a:not([data-lit]) { color:var(--muted); }
+/* On a tall desktop window the marks read in the station rail's serif, which a mouse finds more easily. A short window
+   shows every second mark as a dot, still a target, and a phone held sideways keeps the field and the type-ahead. */
+@media (min-width:761px) and (min-height:860px) and (pointer:fine) {
+  #music-view[data-view=index] { --rail:32px; }
+  #explorer .rail-marks button { font:19px/1 var(--serif); }
+}
+@media (max-height:620px) {
+  .rail-marks button:nth-child(2n+3):not([aria-current]) > span { display:none; }
+  .rail-marks button:nth-child(2n+3):not([aria-current])::before { content:""; width:3px; height:3px; border-radius:50%; background:var(--muted); }
+  .rail-marks button:nth-child(2n+3):disabled::before { background:var(--line); }
+}
+@media (max-height:420px) { .index-rail { display:none; } }
 /* A lazy picture covers its initial only once it has loaded. */
 .picture img[data-wait] { visibility:hidden; }
 /* On a phone the explorer's bar scrolls away, so the stage bar sticks to the top edge. The head stacks: the sides, the
@@ -653,7 +693,9 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
    row reached with Tab scrolls clear of both, and a row's count is its number only. */
 @media (max-width:760px) {
   #music-view[data-view=index] .music-filters { top:0; }
+  .rail-marks { top:calc(var(--explorer-top, var(--index-bar)) + var(--index-bar)); height:calc(100dvh - var(--bar) - var(--explorer-top, var(--index-bar)) - var(--index-bar) - var(--s6)); }
   .index-sides a { min-height:44px; font-size:32px; }
+  .index-scrub { font-size:32px; }
   .index-find { flex-basis:100%; }
   .index-section { display:block; padding:0 var(--s2) var(--s2); }
   .index-section + .index-section::before { display:none; }

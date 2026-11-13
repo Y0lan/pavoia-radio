@@ -1,5 +1,7 @@
 // Playwright CLI run-code callback for the Index: lines that fit, the place kept across changes and on return, speed,
-// nothing that moves, the phone header, and the keys. Run it against the preview with the names documents:
+// nothing that moves, the phone header, the keys, and step 2: the rail, the mark in the address, type-ahead and the lit
+// stations. Step 2's names (Recondite, Maceo Plex's five stations, Under the Sun's bands) are those of the stand-in in
+// /var/tmp/yolan/names-standin. Run it against the preview with the names documents:
 //   PAVOIA_NAMES=<folder with names-artists.json and names-labels.json> python3 design/stage-direction/serve.py 14541
 //   playwright-cli cli -s=index open http://127.0.0.1:14541/
 //   playwright-cli cli -s=index run-code --filename=tests/index-browser.js
@@ -13,7 +15,7 @@ async page => {
   await page.route('**/stream/**',route=>route.abort());
   await page.route('**/api/discovery/media/**',async route=>{await new Promise(r=>setTimeout(r,120));await route.fulfill({status:200,contentType:'image/jpeg',body:photo});});
   const drawn=()=>page.waitForFunction(()=>document.querySelector('#music-content .index-section')&&!document.getElementById('music-content').hasAttribute('aria-busy'),null,{timeout:30000});
-  const frames=(n=3)=>page.evaluate(n=>new Promise(done=>{const tick=()=>--n?requestAnimationFrame(tick):done();requestAnimationFrame(tick);}),n);
+  const frames=(n=3,p=page)=>p.evaluate(n=>new Promise(done=>{const tick=()=>--n?requestAnimationFrame(tick):done();requestAnimationFrame(tick);}),n);
   const open=async(hash,width=1440,height=900,lang='en')=>{
     await page.setViewportSize({width,height});await page.goto(origin+'/');await page.waitForFunction(()=>window.Pavoia?.getState);
     await page.locator('#language [value='+lang+']').dispatchEvent('click');
@@ -205,6 +207,130 @@ async page => {
   await phone.close();
   assert(Math.abs(header.height-61)<1&&header.lines===1&&header.close<=header.width,'the phone header: '+JSON.stringify(header));
   report.push(`13: header ${header.height} px, one line, ✕ ends at ${header.close} of ${header.width}`);
+
+  // Step 2. The rail, the mark in the address, type-ahead and the lit stations.
+  const stuck=()=>page.evaluate(()=>{const bar=document.getElementById('music-filters');return document.getElementById('explorer').getBoundingClientRect().top+parseFloat(getComputedStyle(bar).top)+bar.offsetHeight;});
+  const sectionTop=(mark,p=page)=>p.evaluate(m=>document.querySelector(`#music-content .index-section[data-mark="${m}"]`).getBoundingClientRect().top,mark);
+  const current=(p=page)=>p.evaluate(()=>document.querySelector('.rail-marks [aria-current]')?.dataset.mark||'');
+  // s2-2. At 1440x900 a click on M puts the M section's hairline at the stage bar's bottom, it stays there, and the
+  // address names M 250 ms after.
+  await open('#index/artists');
+  await page.locator('.rail-marks [data-mark=M]').click();const jumped=await sectionTop('M')-await stuck();
+  await page.waitForTimeout(400);const named=await page.evaluate(()=>location.hash);
+  await page.waitForTimeout(800);const later=await sectionTop('M')-await stuck();
+  assert(Math.abs(jumped)<.5&&Math.abs(later)<.5&&named==='#index/artists?at=M'&&await current()==='M','a click on M: '+JSON.stringify({jumped,later,named}));
+  report.push(`s2-2: M ${jumped.toFixed(1)} px off, ${later.toFixed(1)} px 1.2 s later, ${named} after 400 ms`);
+  // s2-4. A reload on a mark opens on it.
+  await page.goto(origin+'/#index/artists/bermuda-day?at=K');await drawn();await frames();
+  const reloaded={off:await sectionTop('K')-await stuck(),mark:await current(),hash:await page.evaluate(()=>location.hash)};
+  assert(Math.abs(reloaded.off)<.5&&reloaded.mark==='K'&&reloaded.hash==='#index/artists/bermuda-day?at=K','a reload on K: '+JSON.stringify(reloaded));
+  report.push(`s2-4: a reload of ?at=K opens on K, ${reloaded.off.toFixed(1)} px off`);
+  // s2-5. From the dialog, at most 21 Tab presses reach the first name: the rail is out of the Tab order.
+  await open('#index/artists');await page.evaluate(()=>document.getElementById('explorer').focus());
+  let tabs=0;while(tabs<40&&!await page.evaluate(()=>document.activeElement.matches('#music-content .row'))){await page.keyboard.press('Tab');tabs++;}
+  assert(tabs<=21,'Tab presses to the first name: '+tabs);report.push(`s2-5: ${tabs} Tab presses to the first name`);
+  // s2-6 and s2-12. With focus on a row, "recon" focuses Recondite within 1 s, Space still plays and pauses, and "1" and
+  // "m" change neither the station nor the volume.
+  await page.locator('#music-content .row').first().focus();const t0=Date.now();await page.keyboard.type('recon');
+  await page.waitForFunction(()=>document.activeElement.querySelector?.('.row-name')?.textContent==='Recondite',null,{timeout:1000});const ms=Date.now()-t0;
+  const was=await page.evaluate(()=>window.Pavoia.getState().wanted);await page.keyboard.press('Space');
+  const toggled=await page.evaluate(()=>window.Pavoia.getState().wanted)!==was;if(toggled)await page.keyboard.press('Space');
+  assert(toggled,'Space toggles the radio after the type-ahead');
+  const radio=()=>page.evaluate(()=>[window.Pavoia.getState().stage,document.getElementById('volume').value,document.getElementById('audio').volume]),keysBefore=await radio();
+  await page.waitForTimeout(1000);await page.keyboard.press('1');await page.keyboard.press('m');
+  const keysAfter=await radio(),landed=await page.evaluate(()=>document.activeElement.querySelector?.('.row-name')?.textContent);
+  assert(JSON.stringify(keysAfter)===JSON.stringify(keysBefore),'1 and m in the list: '+JSON.stringify([keysBefore,keysAfter]));
+  report.push(`s2-6: "recon" on Recondite in ${ms} ms, Space toggles; s2-12: 1 and m leave ${keysBefore[0]} and the volume ${keysBefore[1]} (focus on ${landed})`);
+  // s2-7. Pointing at Maceo Plex lights All stations and its stations and dims the others to muted.
+  await page.locator('#index-query').fill('Maceo Plex');await page.waitForFunction(()=>location.hash==='#index/artists?q=Maceo+Plex');await frames();
+  await page.locator('#music-content .row').filter({has:page.locator('.row-name',{hasText:/^Maceo Plex$/})}).hover();await page.waitForTimeout(300);
+  const lights=await page.evaluate(()=>{const probe=document.createElement('i');probe.style.color='var(--muted)';document.body.append(probe);const dim=getComputedStyle(probe).color;probe.remove();
+    return [...document.querySelectorAll('#stage-row a')].map(a=>({stage:a.dataset.stage,lit:a.hasAttribute('data-lit'),dim:getComputedStyle(a).color===dim}));});
+  const lit=lights.filter(l=>l.lit).map(l=>l.stage),dimmed=lights.filter(l=>l.dim).map(l=>l.stage);
+  // Maceo Plex plays on five stations in the names stand-in; the check reads them from its row.
+  const own=await page.evaluate(()=>[...document.querySelectorAll('#music-content .row')].find(a=>a.querySelector('.row-name').textContent==='Maceo Plex').dataset.stages.split(' '));
+  assert(lit.join()===lights.filter(l=>l.stage==='radio'||own.includes(l.stage)).map(l=>l.stage).join()&&dimmed.join()===lights.filter(l=>!l.lit).map(l=>l.stage).join()&&lit.length===own.length+1,'Maceo Plex lights: '+JSON.stringify({own,lights}));
+  report.push(`s2-7: Maceo Plex lights ${lit.join(' ')}, dims ${dimmed.join(' ')}`);
+  // s2-8. Under the Sun in Most tracks has no name of 100, 50 or 20 tracks or more; All stations has a name under every letter.
+  const disabled=()=>page.evaluate(()=>[...document.querySelectorAll('.rail-marks [data-mark]')].filter(b=>b.disabled).map(b=>b.dataset.mark));
+  await open('#index/artists/bermuda-day?by=tracks');const bands=await disabled();await open('#index/artists');const none=await disabled();
+  assert(bands.join()==='100+,50+,20+'&&none.length===0,'disabled marks: '+JSON.stringify({bands,none}));
+  report.push(`s2-8: Under the Sun by Most tracks disables ${bands.join(' ')}; All stations none`);
+  // s2-9. Serif 19 in a 32 px rail on a tall desktop window, mono 11 at 1366x768, no rail on a phone held sideways.
+  const look=async(w,h)=>{await open('#index/artists',w,h);return page.evaluate(()=>{const b=document.querySelector('.rail-marks [data-mark=A]'),r=document.getElementById('index-rail');
+    return {shown:r.offsetParent!==null,font:getComputedStyle(b).fontSize+' '+getComputedStyle(b).fontFamily.split(',')[0],rail:getComputedStyle(document.getElementById('music-view')).getPropertyValue('--rail').trim()};});};
+  const tall=await look(1440,900),laptop=await look(1366,768),sideways=await look(844,390);
+  assert(tall.shown&&tall.font==='19px "Instrument Serif"'&&tall.rail==='32px'&&laptop.shown&&laptop.font==='11px "JetBrains Mono"'&&!sideways.shown,'the rail\'s look: '+JSON.stringify({tall,laptop,sideways}));
+  report.push(`s2-9: ${tall.font} in ${tall.rail} at 1440x900, ${laptop.font} at 1366x768, no rail at 844x390`);
+  // s2-3. On a phone, a thumb drags from C to M: M's heading sits under the stage bar, the rail marks M, and the rail never
+  // moves. The phone's window has overlay scrollbars and touch. At 320 px the explorer's bar takes two lines, so the rail
+  // rests lower, and still stands still. In Most tracks, 100+ is a little wider than the rail and must not let the explorer
+  // scroll sideways. A name typed on a phone comes clear of its section's heading, which sticks under the bar.
+  const phoneIndex=async(width,height,hash)=>{
+    const context=await page.context().browser().newContext({viewport:{width,height},isMobile:true,hasTouch:true}),m=await context.newPage();
+    await m.route('**/stream/**',route=>route.abort());await m.goto(origin+'/');await m.waitForFunction(()=>window.Pavoia?.getState);
+    await m.evaluate(h=>{history.pushState({},'',h);dispatchEvent(new PopStateEvent('popstate'));},hash);
+    await m.waitForFunction(()=>document.querySelector('#music-content .index-section')&&!document.getElementById('music-content').hasAttribute('aria-busy'),null,{timeout:30000});
+    // The explorer slides 12 px up as it opens: a thumb aims at the rail once it stands still.
+    await m.waitForFunction(()=>getComputedStyle(document.getElementById('explorer')).transform==='none');
+    return [context,m];
+  };
+  for(const [width,height] of [[390,844],[320,640]]){
+    const [thumb,m]=await phoneIndex(width,height,'#index/artists');
+    const railTop=()=>m.evaluate(()=>document.querySelector('.rail-marks').getBoundingClientRect().top),centre=mark=>m.evaluate(k=>{const b=document.querySelector(`.rail-marks [data-mark="${k}"]`).getBoundingClientRect();return {x:b.left+b.width/2,y:b.top+b.height/2};},mark);
+    const touch=await thumb.newCDPSession(m),from=await centre('C'),to=await centre('M'),tops=[await railTop()],letters=[];
+    const bar=await m.evaluate(()=>document.querySelector('.explorer-top').getBoundingClientRect().height);
+    await touch.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[{x:from.x,y:from.y}]});tops.push(await railTop());
+    // The first jump from the top lands under the bar where it sticks once the tabs have scrolled away, not where it rests.
+    const firstJump=await m.evaluate(()=>document.querySelector('#music-content .index-section[data-mark=C] .index-mark').getBoundingClientRect().top-document.getElementById('music-filters').getBoundingClientRect().bottom);
+    // Held still a pixel lower, the thumb stays on C.
+    await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:from.x,y:from.y+1}]});const held=await current(m);
+    for(let i=1;i<=10;i++){await touch.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[{x:from.x,y:from.y+(to.y-from.y)*i/10}]});tops.push(await railTop());
+      letters.push(await m.evaluate(()=>{const s=document.getElementById('index-scrub');return s.hasAttribute('data-on')?s.textContent:'';}));}
+    await touch.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});await m.waitForTimeout(600);tops.push(await railTop());
+    const phoneBar=await m.evaluate(()=>{const bar=document.getElementById('music-filters');return bar.getBoundingClientRect().bottom;}),heading=await m.evaluate(()=>document.querySelector('#music-content .index-section[data-mark=M] .index-mark').getBoundingClientRect().top);
+    const scrubbed={width,bar,first:firstJump,held,heading,phoneBar,mark:await current(m),tops,letters:[...new Set(letters)].join(''),gone:await m.evaluate(()=>!document.getElementById('index-scrub').hasAttribute('data-on'))};
+    await thumb.close();
+    assert(Math.abs(firstJump)<.5&&held==='C'&&Math.abs(scrubbed.heading-scrubbed.phoneBar)<.5&&scrubbed.mark==='M'&&Math.max(...tops)-Math.min(...tops)<=1&&scrubbed.letters.endsWith('M')&&scrubbed.gone,'a thumb from C to M: '+JSON.stringify(scrubbed));
+    report.push(`s2-3 at ${width}: the explorer's bar ${bar} px; the first touch on C puts its heading ${firstJump.toFixed(1)} px from the bar and stays on C a pixel lower; thumb C to M shows ${scrubbed.letters}, M's heading at ${heading.toFixed(1)} under the bar at ${phoneBar.toFixed(1)}, the rail's top ${Math.min(...tops).toFixed(1)}-${Math.max(...tops).toFixed(1)}`);
+  }
+  const flat=[];
+  for(const [width,height] of [[390,844],[360,740],[320,640]]){
+    const [context,m]=await phoneIndex(width,height,'#index/labels?by=tracks');
+    const wide=await m.evaluate(()=>{const e=document.getElementById('explorer');e.scrollLeft=20;return {width:e.scrollWidth,client:e.clientWidth,left:e.scrollLeft};});
+    await context.close();
+    assert(wide.width<=wide.client&&wide.left===0,'Most tracks on a phone scrolls sideways at '+width+': '+JSON.stringify(wide));flat.push(`${width} ${wide.width}/${wide.client}`);
+  }
+  report.push('s2-3 sideways: none in Most tracks at '+flat.join(', '));
+  {
+    const [context,m]=await phoneIndex(390,844,'#index/artists');
+    await m.locator('.rail-marks [data-mark=M]').click();await frames(3,m);await m.evaluate(()=>{document.getElementById('explorer').scrollTop+=30;});await frames(3,m);
+    const name=await m.evaluate(()=>document.querySelector('#music-content .index-section[data-mark=M] .row .row-name').textContent);
+    await m.evaluate(()=>document.getElementById('explorer').focus({preventScroll:true}));for(const key of name.toLowerCase().slice(0,4))await m.keyboard.press(key);await frames(3,m);
+    const clear=await m.evaluate(()=>{const a=document.activeElement,box=a.getBoundingClientRect(),h=a.closest('.index-section').querySelector('.index-mark').getBoundingClientRect(),hit=document.elementFromPoint(box.left+30,box.top+8);
+      return {name:a.querySelector('.row-name')?.textContent,top:box.top,heading:h.bottom,hit:a.contains(hit)};});
+    await context.close();
+    assert(clear.name===name&&clear.top>=clear.heading-.5&&clear.hit,'a name typed on a phone shows clear of its heading: '+JSON.stringify(clear));
+    report.push(`s2-6 on a phone: "${name.toLowerCase().slice(0,4)}" brings ${name} to ${clear.top.toFixed(1)}, under its heading ending at ${clear.heading.toFixed(1)}`);
+  }
+  // The head stands still: the field keeps its place while the names load, and while a filter narrows the list to one
+  // name and to none, on a laptop and on a phone, in German.
+  for(const [width,height] of [[1440,900],[390,844]]){
+    await page.setViewportSize({width,height});await page.goto(origin+'/');await page.waitForFunction(()=>window.Pavoia?.getState);
+    await page.locator('#language [value=de]').dispatchEvent('click');
+    let release;const held=new Promise(r=>release=r),artists=/\/api\/library\/names\?kind=artists$/;
+    await page.route(artists,async route=>{await held;await route.continue();});
+    await page.evaluate(()=>{history.pushState({},'','#index/artists');dispatchEvent(new PopStateEvent('popstate'));});
+    await page.waitForFunction(()=>!document.getElementById('index-rail').hidden);await page.waitForTimeout(400);await frames();
+    const field=()=>page.evaluate(()=>document.getElementById('index-query').getBoundingClientRect().top),tops=[await field()];
+    release();await drawn();await frames();await page.unroute(artists);tops.push(await field());
+    await page.locator('#index-query').click();
+    for(const key of 'recondite'){await page.keyboard.type(key);await page.waitForTimeout(700);await frames();tops.push(await field());}
+    const one=await page.evaluate(()=>document.querySelectorAll('#music-content .row').length);
+    await page.locator('#index-query').fill('zzqx');await page.waitForFunction(()=>location.hash==='#index/artists?q=zzqx');await frames();tops.push(await field());
+    assert(one===1&&Math.max(...tops)-Math.min(...tops)<=.5,'the field moves at '+width+': '+JSON.stringify({one,tops}));
+    report.push(`head at ${width}: the field stays at ${tops[0].toFixed(1)} while loading, down to ${one} name and to none`);
+  }
 
   // 15. Space plays everywhere, the arrows change the radio's station, Enter keeps focus on a station and hands it from
   // Look on all stations to the field, and a mouse starts in the field: from the page, and by a click on the Index tab, which
