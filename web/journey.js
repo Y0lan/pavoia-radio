@@ -188,7 +188,7 @@
   // A window 1100px wide or more draws a record as a map, unless the listener chose the list; the choice is kept, and a
   // page that cannot read it draws the map.
   let listView=false;try{listView=localStorage.getItem('pavoia-explorer-view')==='list';}catch{/* Storage is optional. */}
-  const wide=matchMedia('(min-width:1100px)'),still=matchMedia('(prefers-reduced-motion: reduce)'),mapOn=()=>wide.matches&&!listView;
+  const wide=matchMedia('(min-width:1100px)'),phone=matchMedia('(max-width:760px)'),still=matchMedia('(prefers-reduced-motion: reduce)'),mapOn=()=>wide.matches&&!listView;
   // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
   // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
   // or ✕ always lands on the page in one step.
@@ -467,7 +467,7 @@
   // Similar regions keep their heading when empty, and say so in one sentence; so do a label's releases.
   const empties={similar:'noSimilar',similarLabels:'noSimilarLabels',similarReleases:'noSimilarReleases'};
   // The body, painted once: the regions as lists, closest first, then About and On the radio, in the same grid so they
-  // sit on the regions' columns.
+  // sit on the regions' columns. On a phone, where the grid is one column, On the radio comes first.
   function renderBody(e) {
     const panel=$('entity-inspector'),found=near.regions(e,records),map=panel.querySelector('.neighbourhood'),grid=node('div','regions'),line=panel.querySelector('.entity-line');
     bodyShown=true;
@@ -476,6 +476,13 @@
     // Its tracks on the radio, by release, each with where it plays and how long it lasts. An artist or a release whose
     // record holds fewer tracks than it counts is cut: it says how many of them it lists, and that the rest is not here.
     const played=radioTracks(e),cut=['artist','release'].includes(e.type)&&payloads.has(e.id)&&e.trackCount>played.length;
+    const radioList=(played.length||cut)&&regionSection('onRadio',played,'tracksNone','r',false,cut?word('nOfTotal').replace('{n}',number(played.length)).replace('{total}',number(e.trackCount)):played.length);
+    if(radioList&&cut&&played.length)radioList.append(node('p','collection-note',word('tracksCut')));
+    // A listener opens an artist to see where his tracks play. On a phone that would come last, under every other list,
+    // so there it comes first. With two columns or more it stays beside About, in the last column, where it fills
+    // About's row: a first place there would leave About alone and a region alone on its row.
+    const first=radioList&&phone.matches;
+    if(first)grid.append(radioList);
     // Nothing close at all, not even a track on the radio nor a cut list of them, says so in one sentence, unless the
     // header already said this track has no profiles yet: at the end of the header, with its notes. On the map the
     // regions sit around the header; in the list, in the grid under it.
@@ -504,10 +511,7 @@
     if(tags.length)about.append(node('p','entity-tags',tags.join(', ')));
     if(shown.length){const links=node('p','entity-links');links.append(node('span','',word('elsewhere')),...shown.map(l=>link(site(l.kind,l.url),l.url)));about.append(links);}
     if(about.children.length>1)grid.append(about);
-    if(played.length||cut){
-      const radioList=regionSection('onRadio',played,'tracksNone','r',false,cut?word('nOfTotal').replace('{n}',number(played.length)).replace('{total}',number(e.trackCount)):played.length);
-      if(cut&&played.length)radioList.append(node('p','collection-note',word('tracksCut')));grid.append(radioList);
-    }
+    if(radioList&&!first)grid.append(radioList);
     if(wide.matches)drawMap(panel,map,e);
     if(grid.children.length)panel.append(grid);
     // More follows the width and the font: a turned phone, a narrower window or a late Inter can cut a
@@ -1562,8 +1566,9 @@
     // Until a record is on air the page waits for one: the radio's next answer with a track lands it.
     else{landing=true;if(radio.getState().dataFresh)$('discovery-status').textContent=word('nothingOnAir');}
   }
-  // Crossing 1100px swaps the map and the list; focus in the record or the stage place goes back to its title.
-  wide.addEventListener('change',()=>{const held=$(view==='explore'?'entity-inspector':'music-content').contains(document.activeElement);redraw();if(held&&(view==='explore'?selected!==null:shownStage!==null))recordTitle.focus({preventScroll:true});});
+  // Crossing 1100px swaps the map and the list, and crossing 760px moves On the radio; focus in the record or the stage
+  // place goes back to its title.
+  for(const query of [wide,phone])query.addEventListener('change',()=>{const held=$(view==='explore'?'entity-inspector':'music-content').contains(document.activeElement);redraw();if(held&&(view==='explore'?selected!==null:shownStage!==null))recordTitle.focus({preventScroll:true});});
   window.addEventListener('popstate',restore);
   window.addEventListener('hashchange',restore);
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();

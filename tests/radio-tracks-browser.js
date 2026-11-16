@@ -1,8 +1,10 @@
 // Playwright CLI run-code callback for On the radio (explore plan step 6): an artist's tracks by release, each with its
 // stations, at 1440, 1100, 390 and 360 px, in English and German. It proves that the page never scrolls sideways, that
 // no station line is cut, that every row keeps its 56 px, that Show all adds rows below without moving any row already
-// shown, and that the keyboard focus ring of a row clears the release line over it. It needs no sound: the stream and
-// the previews are blocked, so it never counts as a listener. The discovery service does not run on a developer
+// shown, and that the keyboard focus ring of a row clears the release line over it. It also proves where the region
+// sits (explore plan step 7): on a phone it is the first region, under the header and above Similar artists; with two
+// columns or more, on the map and in the list, it stays in the last column, beside About, so no row has a hole. It
+// needs no sound: the stream and the previews are blocked, so it never counts as a listener. The discovery service does not run on a developer
 // machine, so the three records are inline, modelled on Morttagua, Maceo Plex and Frivolous; every picture is one local
 // photo. Run it against the preview:
 //   python3 design/stage-direction/serve.py 14541
@@ -13,15 +15,18 @@ async page => {
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   const origin=new URL(page.url()).origin,photo=Buffer.from(await (await fetch(origin+'/photos/selected/p005.jpg')).arrayBuffer());
   // An artist record as the API sends it: its tracks in the record's order, each [title, stations, release, artist,
-  // relation], then the releases [key, title, date]. A release key that is not in the list has no record at hand.
+  // relation], then the releases [key, title, date]. A release key that is not in the list has no record at hand. Each
+  // artist has a biography, so About shows, and two similar artists, so Similar artists shows.
   const hex=n=>n.toString(16).padStart(12,'0'),art=n=>'art_'+hex(n),trk=n=>'trk_'+hex(n),rel=n=>'rel_'+hex(n),media='/api/discovery/media/'+'a'.repeat(40);
   const record=(n,title,tracks,releases)=>{
-    const entity={id:art(n),type:'artist',title,image:media,trackCount:tracks.length,playlists:[],connections:tracks.map((_,i)=>({id:trk(n*100+i),relation:'track'}))};
+    const near=[1,2].map(k=>({id:art(n*100+k),type:'artist',title:title+' Kin '+k,image:media,trackCount:k,playlists:[],connections:[]}));
+    const entity={id:art(n),type:'artist',title,image:media,bio:title+' is a producer.',trackCount:tracks.length,playlists:[],
+      connections:[...tracks.map((_,i)=>({id:trk(n*100+i),relation:'track'})),...near.map(a=>({id:a.id,relation:'similar'}))]};
     const songs=tracks.map(([name,stations,release,artist=title,relation='primary'],i)=>({id:trk(n*100+i),type:'track',title:name,artist,album:releases.find(r=>r[0]===release)?.[1]||'',
       releaseDate:releases.find(r=>r[0]===release)?.[2]||'',durationMs:400000+i*7000,image:media,playlists:stations.map(station=>({code:'X',station})),
       connections:[{id:art(n),relation},...release?[{id:rel(n*100+release),relation:'release'}]:[]]}));
     const albums=releases.map(([key,name,date])=>({id:rel(n*100+key),type:'release',title:name,artist:title,releaseDate:date,image:media,connections:[]}));
-    return {entity,included:[...songs,...albums]};
+    return {entity,included:[...songs,...albums,...near]};
   };
   const records={
     morttagua:record(1,'Morttagua',[
@@ -57,10 +62,14 @@ async page => {
   const rows=()=>page.locator(region).evaluate(section=>{const origin=document.getElementById('entity-inspector').getBoundingClientRect().top;return [...section.querySelectorAll('.row')].map(a=>{const box=a.getBoundingClientRect(),line=a.querySelector('.row-line');
     return {name:a.querySelector('.row-name').textContent,top:box.top-origin,height:box.height,cut:line.scrollWidth>line.clientWidth,line:line.textContent};});});
   const sideways=()=>page.evaluate(()=>{const d=document.getElementById('explorer');return document.documentElement.scrollWidth>innerWidth||d.scrollWidth>d.clientWidth;});
-  for(const width of [1440,1100,390,360])for(const language of ['en','de'])for(const [name,data] of Object.entries(records)){
-    const at=`${name} at ${width} in ${language}`;
+  // 1100 px is checked twice: on the map, and in the list the listener can choose there. 900 px has no map.
+  for(const [width,view] of [[1440,'map'],[1100,'map'],[1100,'list'],[900,'list'],[390,'list'],[360,'list']])for(const language of ['en','de'])for(const [name,data] of Object.entries(records)){
+    const at=`${name} at ${width} (${view}) in ${language}`;
     await page.setViewportSize({width,height:width>760?900:780});
     await page.goto(origin+'/?station=palac-feel');await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
+    // The view is the one this case names, whatever an earlier run left in the browser.
+    await page.evaluate(view=>{try{if(view==='list')localStorage.setItem('pavoia-explorer-view','list');else localStorage.removeItem('pavoia-explorer-view');}catch{}},view);
+    await page.reload();await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
     await page.locator('#language [value='+language+']').dispatchEvent('click');
     await page.evaluate(id=>{location.hash='#explore/'+id;},data.entity.id);
     await page.waitForFunction(()=>{const w=document.getElementById('explore-workspace');return !w.hidden&&!w.hasAttribute('aria-busy')&&document.querySelector('#entity-inspector .regions');},null,{timeout:15000});
@@ -71,6 +80,12 @@ async page => {
     const before=await rows();
     assert(before.length===6,'Not six rows first: '+at);
     assert(!await sideways(),'The page scrolls sideways: '+at);
+    // Where the region sits: first under the header with no map, beside About and after it on the map.
+    const place=await page.evaluate(region=>{const box=n=>{if(!n)return null;const b=n.getBoundingClientRect();return {top:b.top,bottom:b.bottom,left:b.left,right:b.right};},i=document.getElementById('entity-inspector');
+      return {map:Boolean(i.querySelector('.neighbourhood')),first:i.querySelector('.region')===document.querySelector(region),radio:box(document.querySelector(region)),
+        header:box(i.querySelector('.entity-heading')),similar:box(i.querySelector('.region[data-key=similar]')),about:box(i.querySelector('.record-about')),grid:box(i.querySelector(':scope > .regions'))};},region);
+    if(width<=760)assert(!place.map&&place.first&&place.radio.top>=place.header.bottom&&place.similar&&place.radio.bottom<=place.similar.top,'On the radio is not the first region, under the header and above Similar: '+at);
+    else assert(place.map===(view==='map')&&!place.first&&place.about&&Math.abs(place.radio.top-place.about.top)<0.5&&place.radio.left>=place.about.right&&Math.abs(place.radio.right-place.grid.right)<0.5,'On the radio is not beside About, after it, in the last column: '+at);
     await page.locator(region+' > button').click();await frames();
     const after=await rows();
     assert(after.length===total,'Show all did not show every row: '+at);
@@ -94,5 +109,6 @@ async page => {
     assert(!await sideways(),'The page scrolls sideways after Show all: '+at);
   }
   assert(!errors.length,'Page errors: '+errors.join(' | '));
-  return 'radio tracks: 24 records checked (3 artists, 4 widths, 2 languages)';
+  await page.evaluate(()=>{try{localStorage.removeItem('pavoia-explorer-view');}catch{}});
+  return 'radio tracks: 36 records checked (3 artists, 6 layouts, 2 languages), each with the place of its region';
 }

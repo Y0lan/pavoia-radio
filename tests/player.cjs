@@ -1477,6 +1477,7 @@ test('the explorer frame stops above the player bar and its controls read in Int
 });
 
 // Step 6, then explorer v2 step 2: a record is a header, then what is close to it, ranked, then About and On the radio.
+// Explore plan step 7: with no map, On the radio comes first, before what is close to it.
 const byClass=(root,name)=>root.descendants().filter(n=>(n.className||n.attrs?.class||'').split(' ').includes(name));
 const inspector=e=>e.elements['entity-inspector'];
 const cls=n=>n.className||n.attrs?.class;
@@ -1506,7 +1507,7 @@ const hood=()=>{
  return {[A(1)]:{entity:centre,included:[eulberg,extrawelt,kiasmos,jimi,taum,theater,plangent,...tracks]},[A(101)]:{entity:eulberg,included:named},
   [A(104)]:{entity:kiasmos,included:[rec(T(4),'Track 4',[],{playlists:[{code:'LIF',station:'Lost in Feelings'}]})]}};
 };
-// The regions around the record, as read: each heading and its rows. On the radio, after them in their grid, is not one of them.
+// The regions around the record, as read: each heading and its rows. On the radio, in their grid, is not one of them.
 const regionsOf=e=>byClass(byClass(inspector(e),'regions')[0]||inspector(e),'region').filter(r=>r.attrs['aria-labelledby']!=='r-onRadio').map(r=>[textOf(r.children[0]),...byClass(r,'row').map(a=>[a.getAttribute('href').slice(9),...a.children.slice(1).map(textOf)].join('|'))]);
 
 test('a record reads its header, then what is close to it, then About and On the radio, with no map',async()=>{
@@ -1520,7 +1521,7 @@ test('a record reads its header, then what is close to it, then About and On the
  assert.ok(!css.includes('#efb7b0'),'no pink');
  assert.doesNotMatch(cssRules().get('.explore-workspace'),/grid-template-columns/,'one column');
  const e=setup({journey:true});await flush();const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;e.visit('#explore/art_000000000001');await flush();
- assert.deepEqual([inspector(e).children.map(cls),byClass(inspector(e),'regions')[0].children.slice(-2).map(cls)],[['entity-heading','regions'],['record-about','region']],'the header, the regions, then About and On the radio on the same grid');
+ assert.deepEqual([inspector(e).children.map(cls),byClass(inspector(e),'regions')[0].children.map(n=>n.dataset.key||cls(n))],[['entity-heading','regions'],['similar','worked','releases','labels','record-about','onRadio']],'the header, then the regions, About and On the radio on the same grid, in the order read');
  for(const gone of ['roots-band',"drawing('0 0 1000 72'"])assert.ok(!journey.includes(gone)&&!css.includes(gone),gone+' is gone');
 });
 
@@ -1534,7 +1535,7 @@ test('a record lists what is close to it, ranked, each name with its reason in w
   ['Labels 1','lab_000000000001|Plangent']],
   'the closest first, ties to the artist with more tracks; an artist that only remixed or shares a label is never called similar; own releases newest first, then those its artists share');
  assert.deepEqual(e.discoveryRequests.slice(sent).map(r=>r.url),['/api/discovery/entity/art_000000000001','/api/discovery/entity/art_000000000101'],'one naming request: the neighbour that names Hemmann and Shared EP, the smaller of two');
- const similar=byClass(inspector(e),'region')[0],row=byClass(similar,'row')[0];
+ const similar=byClass(inspector(e),'region').find(r=>r.dataset.key==='similar'),row=byClass(similar,'row')[0];
  assert.deepEqual([similar.localName,similar.attrs['aria-labelledby'],similar.children[0].localName,similar.children[0].id,similar.children[1].localName,similar.children[1].children[0].localName,row.parent.localName],['section','r-similar','h4','r-similar','ol','li','li'],'a region reads as a heading, then a list');
  assert.deepEqual([row.className,row.children.map(cls),row.children[1].children.map(cls)],['row',['picture','row-text','row-fact'],['row-name','row-line']],'each name is one row: picture, name over its reason, and a fact');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
@@ -1709,14 +1710,14 @@ test('the profile keeps its picture box, names its type above the title and read
 test('About holds the biography, the tags and the links; On the radio lists its tracks',async()=>{
  const e=setup({journey:true});await flush();const data=hood();e.discovery=url=>data[url.split('/').pop()]||null;
  e.visit('#explore/art_000000000001');await flush();
- const [about,radio]=byClass(inspector(e),'regions')[0].children.slice(-2);
+ const grid=()=>byClass(inspector(e),'regions')[0],about=byClass(grid(),'record-about')[0],radio=grid().children.find(n=>n.dataset.key==='onRadio');
  assert.deepEqual([about.localName,cls(about),about.attrs['aria-labelledby'],about.children[0].id,about.children.map(n=>n.localName+'.'+(cls(n)||''))],['section','record-about','r-about','r-about',['h4.','div.entity-bio','p.entity-tags','p.entity-links']],'About {title}, then the biography, the tags and the links');
  assert.deepEqual([about.children[0].textContent,about.children[2].textContent],['About Recondite','techno, ambient'],'tags in words, no bookkeeping tag');
  assert.deepEqual([textOf(radio.children[0]),byClass(radio,'row').map(a=>[a.getAttribute('href'),...a.children.slice(1).map(textOf)])],['On the radio 3',[['#explore/trk_000000000001','Track 1Lost\u00a0in\u00a0Feelings','7:04'],['#explore/trk_000000000002','Track 2Lost\u00a0in\u00a0Feelings','7:04'],['#explore/trk_000000000003','Track 3Essentials','7:04']]],'each track, where it plays, each station name whole, and how long');
- assert.match(cssRules('(min-width:761px)').get('.regions > :is(.record-about, .release-years, .changes)'),/grid-column:1 \/ -2/,'side by side on a wide screen: On the radio in the last column of the regions, About across the ones before it');
+ assert.match(cssRules('(min-width:761px)').get('.regions > :is(.record-about, .release-years, .changes)'),/grid-column:1 \/ -2/,'on a wide screen About spans every column of the regions but the last, where the map puts On the radio');
  assert.ok(!web('style.css').includes('record-more'),'no second grid, whose columns would miss those of the regions');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
- assert.deepEqual(byClass(inspector(e),'regions')[0].children.slice(-2).map(n=>textOf(n.children[0])),['Über Recondite','Im Radio 3']);
+ assert.deepEqual([byClass(grid(),'record-about')[0],grid().children.find(n=>n.dataset.key==='onRadio')].map(n=>textOf(n.children[0])),['Über Recondite','Im Radio 3']);
 });
 
 test('external links sit in one line, listening services first, named, each address once',async()=>{
@@ -3072,6 +3073,25 @@ test('from 1100px wide a record is a map: the header in the middle, the closest 
  assert.match(rules.get('.map-lines'),/fill:none; stroke:var\(--line\); stroke-width:1;/);assert.match(rules.get('.map-lines [data-lit]'),/stroke:var\(--soft\)/);
  assert.match(rules.get('.neighbourhood ~ .regions'),/padding-top:var\(--s5\); border-top:1px solid var\(--line\)/,'About and On the radio under a line');
  assert.match(still.get('.neighbourhood :is(.region, .map-lines)'),/transition:opacity 180ms ease/);assert.match(still.get('@starting-style'),/\.neighbourhood :is\(\.region, \.map-lines\) \{ opacity:0; \}/,'names and lines fade in, unless motion is reduced');
+});
+
+// Explore plan step 7: On the radio comes first in the list and on a phone. On the map, the regions sit around the header
+// and only About and On the radio are in the grid under it: there it keeps its place beside About, so About never stands
+// alone on its row.
+test('On the radio comes first on a phone, and stays beside About, after it, where the grid has columns',async()=>{
+ const saved={},storage={getItem:key=>saved[key]??null,setItem(key,value){saved[key]=value;}},data=hood();
+ const e=setup({journey:true,media:['(min-width:1100px)'],storage});mapBoxes(e);await flush();e.discovery=url=>data[url.split('/').pop()]||null;
+ e.visit('#explore/art_000000000001');await flush();
+ const keys=()=>byClass(inspector(e),'regions')[0].children.map(n=>n.dataset.key||cls(n)),wide=['similar','worked','releases','labels','record-about','onRadio'];
+ assert.deepEqual([Boolean(mapOf(e)),keys(),byClass(mapOf(e),'region').map(n=>n.dataset.key)],[true,['record-about','onRadio'],['similar','worked','releases','labels']],'on the map: About, then On the radio, in the grid under it');
+ byClass(inspector(e),'neighbourhood-caption')[0].children.at(-1).emit('click');
+ assert.deepEqual([Boolean(mapOf(e)),keys()],[false,wide],'the list the listener chose, at the same width: still beside About, so no row has a hole');
+ // A phone has one column: what the listener came for is first. A window that crosses 760px draws again.
+ const p=setup({journey:true,media:['(max-width:760px)']});await flush();p.discovery=url=>data[url.split('/').pop()]||null;p.visit('#explore/art_000000000001');await flush();
+ const phone=()=>byClass(inspector(p),'regions')[0].children.map(n=>n.dataset.key||cls(n));
+ assert.deepEqual(phone(),['onRadio','similar','worked','releases','labels','record-about'],'on a phone: On the radio, then the regions, then About');
+ p.queries.get('(max-width:760px)').change(false);assert.deepEqual(phone(),wide,'widened past the phone layout, it goes back beside About');
+ p.queries.get('(max-width:760px)').change(true);assert.deepEqual(phone()[0],'onRadio','and narrowed again, it is first');
 });
 
 test('the map or the list is the listener\'s choice, kept across visits; a narrow window or blocked storage draws as before',async()=>{
