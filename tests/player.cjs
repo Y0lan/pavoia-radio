@@ -1712,7 +1712,7 @@ test('About holds the biography, the tags and the links; On the radio lists its 
  const [about,radio]=byClass(inspector(e),'regions')[0].children.slice(-2);
  assert.deepEqual([about.localName,cls(about),about.attrs['aria-labelledby'],about.children[0].id,about.children.map(n=>n.localName+'.'+(cls(n)||''))],['section','record-about','r-about','r-about',['h4.','div.entity-bio','p.entity-tags','p.entity-links']],'About {title}, then the biography, the tags and the links');
  assert.deepEqual([about.children[0].textContent,about.children[2].textContent],['About Recondite','techno, ambient'],'tags in words, no bookkeeping tag');
- assert.deepEqual([textOf(radio.children[0]),byClass(radio,'row').map(a=>[a.getAttribute('href'),...a.children.slice(1).map(textOf)])],['On the radio 3',[['#explore/trk_000000000001','Track 1Lost in Feelings','7:04'],['#explore/trk_000000000002','Track 2Lost in Feelings','7:04'],['#explore/trk_000000000003','Track 3Essentials','7:04']]],'each track, where it plays, and how long');
+ assert.deepEqual([textOf(radio.children[0]),byClass(radio,'row').map(a=>[a.getAttribute('href'),...a.children.slice(1).map(textOf)])],['On the radio 3',[['#explore/trk_000000000001','Track 1Lost\u00a0in\u00a0Feelings','7:04'],['#explore/trk_000000000002','Track 2Lost\u00a0in\u00a0Feelings','7:04'],['#explore/trk_000000000003','Track 3Essentials','7:04']]],'each track, where it plays, each station name whole, and how long');
  assert.match(cssRules('(min-width:761px)').get('.regions > :is(.record-about, .release-years, .changes)'),/grid-column:1 \/ -2/,'side by side on a wide screen: On the radio in the last column of the regions, About across the ones before it');
  assert.ok(!web('style.css').includes('record-more'),'no second grid, whose columns would miss those of the regions');
  e.elements['explorer-close'].emit('click');e.setLanguage('de');e.visit('#explore/art_000000000001');await flush();
@@ -3200,7 +3200,134 @@ test('an artist whose only links are its tracks lists them On the radio, and is 
  e.visit('#explore/'+id('art',1));await flush();
  const notes=byClass(inspector(e),'collection-note').map(textOf),radio=byClass(inspector(e),'region').find(r=>r.attrs['aria-labelledby']==='r-onRadio');
  assert.ok(!notes.some(n=>n.startsWith('Nothing in the collection')),'no sentence that says nothing is linked');
- assert.deepEqual(byClass(radio,'row').map(a=>a.children.slice(1).map(textOf)),[['OneLost in Feelings','5:00'],['TwoAn Album']]);
+ assert.deepEqual(byClass(radio,'row').map(a=>a.children.slice(1).map(textOf)),[['OneLost\u00a0in\u00a0Feelings','5:00'],['TwoAn Album']]);
+});
+
+// Explore plan step 6: an artist's tracks on the radio by release, each with its stations in the rail's order and, when
+// it is someone else's, its credit. song() is a track of the radio: its stations, its release, its artist, and the
+// relation of the record's artist on it (none when on is null).
+const song=(n,title,{stations=['Night in Motion'],release=null,artist='Maceo Plex',relation='primary',on=id('art',1),album='',date='',ms=300000}={})=>
+ rec(id('trk',n),title,[...on?[[on,relation]]:[],...release?[[release,'release']]:[]],{artist,album,releaseDate:date,durationMs:ms,playlists:stations.map(station=>({code:'X',station}))});
+// A record and its tracks, as the API sends them, with the releases at hand.
+const tracked=(entity,tracks,releases=[])=>({entity:{...entity,connections:[...entity.connections,...tracks.map(t=>({id:t.id,relation:'track'}))]},included:[...tracks,...releases]});
+const onRadioOf=e=>byClass(inspector(e),'region').find(r=>r.attrs['aria-labelledby']==='r-onRadio');
+// Each item of On the radio: its release line or null, then its row's name, line and fact.
+const radioRows=e=>onRadioOf(e).children.find(n=>n.localName==='ol').children.map(li=>[byClass(li,'release-line')[0]?.textContent??null,...['row-name','row-line','row-fact'].map(k=>byClass(li,k)[0]?.textContent??'')]);
+const nb=s=>s.replace(/ /g,' ');
+
+test('On the radio groups an artist\'s tracks by release, newest first, undated last, the record\'s order inside',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e),R=n=>id('rel',n);
+ const releases=[rec(R(1),'Old EP',[],{releaseDate:'2014-05-01'}),rec(R(2),'New EP',[],{releaseDate:'2020-07-23'}),rec(R(3),'No Date EP',[],{releaseDate:''}),rec(R(0),'Twin EP',[],{releaseDate:'2020-07-23'})];
+ // In the record's order: Old, none, New, No Date, New, a release whose record is not at hand, dated by its track, and a
+ // release of the same day as New EP, with a lower id, that comes later in the record.
+ const tracks=[song(1,'Old One',{release:R(1),album:'Old EP',date:'2014-05-01'}),song(2,'Loose',{album:'Loose Album'}),song(3,'New One',{release:R(2),album:'New EP',date:'2020-07-23'}),
+  song(4,'Undated',{release:R(3),album:'No Date EP'}),song(5,'New Two',{release:R(2),album:'New EP',date:'2020-07-23'}),song(6,'Elsewhere',{release:R(4),album:'Lost EP',date:'2017-03-03'}),song(7,'Twin',{release:R(0),album:'Twin EP',date:'2020-07-23'})];
+ await show(tracked(rec(id('art',1),'Maceo Plex',[],{trackCount:7}),tracks,releases));
+ byClass(onRadioOf(e),'text-button')[0].emit('click');
+ const motion=nb('Night in Motion');
+ assert.deepEqual(radioRows(e),[['New EP · 2020','New One',motion,'5:00'],[null,'New Two',motion,'5:00'],['Twin EP · 2020','Twin',motion,'5:00'],['Lost EP · 2017','Elsewhere',motion,'5:00'],['Old EP · 2014','Old One',motion,'5:00'],
+  ['No Date EP','Undated',motion,'5:00'],[null,'Loose',motion,'5:00']],'newest first, two releases of one day in the record\'s order; a release not at hand takes its track\'s album and date; undated next; no release last, with no line');
+ assert.deepEqual(onRadioOf(e).children.find(n=>n.localName==='ol').children.map(li=>li.children.map(cls)),[['release-line','row'],['row'],['release-line','row'],['release-line','row'],['release-line','row'],['release-line','row'],['row']],'a release line sits in the item of its first track, before its row');
+ const rules=cssRules();
+ assert.match(rules.get('.release-line'),/margin:var\(--s3\) 0 var\(--s1\); font-size:12px; line-height:1\.4; color:var\(--muted\); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;/,'the small muted words of a row, on one line, 4px over its row so the row\'s focus ring clears its letters');
+ assert.match(rules.get('.region li:first-child > .release-line'),/margin-top:0/);
+});
+
+test('each track names its stations in the rail order',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e);
+ const record=()=>tracked(rec(id('art',1),'Maceo Plex'),[song(1,'Two Places',{stations:['Fontanna','Under the Sun']}),song(2,'Three Places',{stations:['Lost in Feelings','Etage 0','Night in Motion']})]);
+ await show(record());
+ assert.deepEqual(radioRows(e).map(r=>r[2]),[nb('Under the Sun')+', Fontanna',[nb('Night in Motion'),nb('Lost in Feelings'),nb('Etage 0')].join(', ')],'by stage, as the rail shows them');
+ e.elements['explorer-close'].emit('click');press(e,'feeling');await show(record());
+ assert.deepEqual(radioRows(e).map(r=>r[2]),[nb('Under the Sun')+', Fontanna',[nb('Night in Motion'),nb('Etage 0'),nb('Lost in Feelings')].join(', ')],'by feeling, the rail\'s new order');
+});
+
+test('a track names its credit only when the artist is not its main artist',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e),A=id('art',1);
+ const artist=()=>tracked(rec(A,'Maceo Plex'),[song(1,'Daliah (Maceo Plex remix)',{artist:'Melawati',relation:'remixer',stations:['Lost in Feelings']}),song(2,'Featured',{artist:'Maceo Plex feat. Maars'}),
+  song(3,'Raw Credit (Maceo Plex remix)',{artist:'Arude;Vanice',relation:'remixer'}),song(4,'Spaced',{artist:'Timmy Vegas; Leighton Ashcroft',relation:'remixer'}),
+  song(5,'Not Linked',{artist:'Someone Else',on:null}),song(6,'Not Linked Mine',{on:null})]);
+ await show(artist());
+ assert.deepEqual(radioRows(e).map(r=>r[2]),[nb('Lost in Feelings')+' · By Melawati',nb('Night in Motion'),nb('Night in Motion')+' · By Arude, Vanice',nb('Night in Motion')+' · By Timmy Vegas, Leighton Ashcroft',
+  nb('Night in Motion')+' · By Someone Else',nb('Night in Motion')],'a remix says whose track it is; a joint credit where he is the main artist says nothing; a raw ";" reads as a list; with no relation, the names decide');
+ await show(tracked(rec(id('rel',1),'Timeless Ibiza',[],{artist:'Various Artists'}),[song(7,'One',{artist:'Morttagua',on:null}),song(8,'Two',{artist:'Aaron Suiss',on:null})]));
+ assert.deepEqual(radioRows(e).map(r=>r[2]),[nb('Night in Motion')+' · By Morttagua',nb('Night in Motion')+' · By Aaron Suiss'],'on a compilation every track names its artist');
+ await show(tracked(rec(id('rel',2),'Conjure One EP',[],{artist:'Maceo Plex'}),[song(9,'Conjure Balearia',{on:null})]));
+ assert.deepEqual(radioRows(e).map(r=>r[2]),[nb('Night in Motion')],'a track by the release\'s own artist names nobody');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(artist());
+ assert.equal(radioRows(e)[0][2],nb('Lost in Feelings')+' · Von Melawati','in German, Von; the station keeps its name');
+});
+
+test('station names keep their spaces whole, so the line breaks only between names',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e);
+ await show(tracked(rec(id('art',1),'Maceo Plex'),[song(1,'Dhaboros',{stations:['Lost in Feelings','Night in Motion']})]));
+ const line=radioRows(e)[0][2];
+ assert.deepEqual([line,line.includes('Night in'),line.split(', ').length],['Night in Motion, Lost in Feelings',false,2],'a non-breaking space inside each name, a plain one only after the comma');
+ const rules=cssRules();
+ assert.match(rules.get('.region[data-key=onRadio] .row-line'),/white-space:normal/,'the stations wrap, never cut');
+ assert.match(rules.get('.region[data-key=onRadio] .row-name'),/white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2;/,'the name takes two lines at most');
+});
+
+test('one release, or a release record, has no release line',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e),R=id('rel',1);
+ await show(tracked(rec(id('art',1),'Maceo Plex'),[song(1,'Lonely Tribe',{release:R,date:'2019-07-22'}),song(2,'Lonely Tribe (Fango Remix)',{release:R,stations:[],album:'Lonely Tribe'})],[rec(R,'Lonely Tribe',[],{releaseDate:'2019-07-22'})]));
+ assert.deepEqual(radioRows(e),[[null,'Lonely Tribe',nb('Night in Motion'),'5:00'],[null,'Lonely Tribe (Fango Remix)','Lonely Tribe','5:00']],'one release: no line, and a track no station plays names its album, as before');
+ const own=id('rel',2);
+ await show(tracked(rec(own,'Conjure One EP',[],{artist:'Maceo Plex',releaseDate:'2014-03-31'}),[song(3,'Conjure Balearia',{release:own}),song(4,'Conjure Dreams',{release:own})]));
+ assert.deepEqual(radioRows(e).map(r=>r[0]),[null,null],'a release lists its own tracks with no line');
+});
+
+test('the same title on two releases shows twice',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e),R=n=>id('rel',n);
+ await show(tracked(rec(id('art',1),'Stimming'),[song(1,'Magdalena',{release:R(1),artist:'Stimming'}),song(2,'Magdalena',{release:R(2),artist:'Stimming'})],
+  [rec(R(1),'Mesdames EP',[],{releaseDate:'2008-01-01'}),rec(R(2),'Saturday, I\'m in Love - Chapter.01',[],{releaseDate:'2016-01-01'})]));
+ assert.deepEqual(radioRows(e).map(r=>r.slice(0,2)),[['Saturday, I\'m in Love - Chapter.01 · 2016','Magdalena'],['Mesdames EP · 2008','Magdalena']]);
+});
+
+test('a cut record says n of m, and one with none listed says so',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e);
+ const thirteen=Array.from({length:13},(_,i)=>song(i+1,'Track '+(i+1),{artist:'Arude'}));
+ const arude=()=>tracked(rec(id('art',1),'Arude',[[id('rel',9),'release']],{trackCount:39}),thirteen,[rec(id('rel',9),'Some EP')]);
+ await show(arude());
+ const region=()=>onRadioOf(e),tail=()=>region().children.slice(-2).map(n=>[n.localName,cls(n),textOf(n)]);
+ assert.deepEqual([textOf(region().children[0]),tail()],['On the radio 13 of 39',[['button','text-button','Show the 13 listed'],['p','collection-note','Not all of them are listed here yet.']]],'the count of all of them, a button that does not say all, and a note at the end');
+ await show(tracked(rec(id('art',1),'Citizen Kain',[[id('rel',9),'release']],{trackCount:32}),[],[rec(id('rel',9),'Some EP')]));
+ assert.deepEqual([textOf(region().children[0]),region().children.slice(1).map(n=>[n.localName,cls(n),textOf(n)])],['On the radio 0 of 32',[['p','collection-note','None of them are listed here yet.']]],'none listed: the heading and the note only');
+ await show(tracked(rec(id('art',1),'Maceo Plex',[],{trackCount:2}),[song(1,'One'),song(2,'Two')]));
+ assert.deepEqual([textOf(region().children[0]),byClass(region(),'collection-note').length],['On the radio 2',0],'a whole list: its number, and no note');
+ e.elements['explorer-close'].emit('click');e.setLanguage('de');await show(arude());
+ assert.deepEqual([textOf(region().children[0]),textOf(region().children.at(-2)),textOf(region().children.at(-1))],['Im Radio 13 von 39','Die 13 aufgeführten zeigen','Hier sind noch nicht alle aufgeführt.']);
+ await show(tracked(rec(id('art',1),'Citizen Kain',[[id('rel',9),'release']],{trackCount:32}),[],[rec(id('rel',9),'Some EP')]));
+ assert.deepEqual([textOf(region().children[0]),textOf(region().children.at(-1))],['Im Radio 0 von 32','Hier ist noch keiner davon aufgeführt.']);
+});
+
+test('a cut record with nothing else linked is not linked to nothing',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e);
+ const said=()=>byClass(inspector(e),'collection-note').map(textOf).filter(n=>n.startsWith('Nothing in the collection'));
+ await show(tracked(rec(id('art',1),'Citizen Kain',[],{trackCount:32}),[]));
+ assert.deepEqual([said(),textOf(onRadioOf(e).children[0])],[[],'On the radio 0 of 32'],'its tracks exist, they are only not listed here');
+ await show(tracked(rec(id('art',1),'Nobody',[],{trackCount:0}),[]));
+ assert.deepEqual([said().length,Boolean(onRadioOf(e))],[1,false],'with no track at all, the sentence stays');
+});
+
+test('Show all keeps the release lines and focuses the first new row',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e),R=n=>id('rel',n);
+ // Eight tracks on four releases of two tracks: the seventh opens the oldest release, so its item starts with a line.
+ const tracks=[1,2,3,4,5,6,7,8].map(n=>song(n,'Track '+n,{release:R(Math.ceil(n/2))}));
+ await show(tracked(rec(id('art',1),'Maceo Plex'),tracks,[1,2,3,4].map(n=>rec(R(n),'EP '+n,[],{releaseDate:(2024-n)+'-01-01'}))));
+ assert.deepEqual(radioRows(e).map(r=>r.slice(0,2)),[['EP 1 · 2023','Track 1'],[null,'Track 2'],['EP 2 · 2022','Track 3'],[null,'Track 4'],['EP 3 · 2021','Track 5'],[null,'Track 6']]);
+ const more=byClass(onRadioOf(e),'text-button')[0];assert.equal(more.textContent,'Show all 8');more.emit('click');
+ const items=onRadioOf(e).children.find(n=>n.localName==='ol').children;
+ assert.deepEqual(radioRows(e).slice(6).map(r=>r.slice(0,2)),[['EP 4 · 2020','Track 7'],[null,'Track 8']],'the rest comes below, its release line with it');
+ assert.deepEqual([e.document.activeElement===byClass(items[6],'row')[0],cls(items[6].children[0])],[true,'release-line'],'focus lands on the row link, not on the release line before it');
+});
+
+test('a label gets no On the radio',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e),A=n=>id('art',n);
+ await show({entity:rec(id('lab',1),'BeatFreak Recordings',[[A(1),'artist'],[A(2),'artist']],{trackCount:57}),included:[rec(A(1),'One',[],{trackCount:1}),rec(A(2),'Two',[],{trackCount:2})]});
+ assert.deepEqual([Boolean(onRadioOf(e)),byClass(inspector(e),'region').length>0],[false,true],'a label counts tracks its record does not hold: no list, no note');
+ await show({entity:rec(id('trk',1),'A Track',[[A(1),'primary']],{artist:'One',trackCount:3,playlists:[{code:'X',station:'Fontanna'}]}),included:[rec(A(1),'One',[],{trackCount:1})]});
+ assert.equal(Boolean(onRadioOf(e)),false,'nor does a track');
 });
 
 test('the 10 s limit of a hop holds until the naming requests settle, also after the deadline painted the body',async()=>{
@@ -3887,4 +4014,19 @@ test('On air now: a miss after a track waits 1 min again, a track with no end 2 
  try{for(let i=0;i<9;i++)f.fire(90000);await flush();
   assert.deepEqual([airRead(airRows(f)[6])[2],waits(60000),waits(120000)],['No track announced',1,0],'1 min, not 2');
  }finally{clock.now=t1;}
+});
+
+test('a release can be cut too, and a record painted from a copy, before its own answer, is not called cut',async()=>{
+ const e=setup({journey:true});await flush();const show=shower(e);
+ // A compilation that counts 5 tracks and lists 2.
+ await show(tracked(rec(id('rel',1),'Big Compilation',[],{artist:'Various Artists',trackCount:5}),[song(1,'One',{artist:'A'}),song(2,'Two',{artist:'B'})]));
+ const region=()=>onRadioOf(e);
+ assert.deepEqual([textOf(region().children[0]),textOf(region().children.at(-1))],['On the radio 2 of 5','Not all of them are listed here yet.'],'a release says n of m as an artist does');
+ // A track's answer brings a copy of its artist, who counts 16 tracks. The artist's own answer fails: the body paints
+ // with the one track at hand, and says nothing about a cut, because only the record's own answer can tell.
+ const artist=id('art',700),one={...song(1,'Only One'),connections:[{id:artist,relation:'primary'}]};
+ const copy={...rec(artist,'Maceo Plex',[[one.id,'track']]),trackCount:16};
+ e.discovery=url=>url.endsWith(one.id)?{entity:one,included:[copy]}:null;
+ e.visit('#explore/'+one.id);await flush();e.visit('#explore/'+artist);await flush();
+ assert.deepEqual([textOf(region().children[0]),byClass(region(),'collection-note').length],['On the radio 1',0],'the tracks at hand, with no claim about the rest');
 });

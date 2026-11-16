@@ -277,6 +277,7 @@ Known test debt:
     is a smoke check of production.
 - Several browser tests need fixtures, because the local discovery service
   does not run on a developer machine.
+- [tests/radio-tracks-browser.js](../tests/radio-tracks-browser.js) carries its own records and blocks the stream, so it runs on `serve.py`.
 
 ## Waiting
 

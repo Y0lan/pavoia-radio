@@ -37,7 +37,7 @@
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
       artist:'Artist',track:'Track',release:'Release',label:'Label',playlist:'Playlist',primary:'Artist',featured:'Featuring',remixer:'Remixed by',
       similar:'Similar artists',collaboration:'Collaboration',remix:'Remix',shared_release:'Shared release','musicbrainz:member of band':'Band member','musicbrainz:collaboration':'Collaboration',
-      favorite:'Essentials favourite',onRadio:'On the radio',bioFrom:'Biography from',more:'More',less:'Less',showAll:'Show all {n}',trail:'Path',elsewhere:'Elsewhere',
+      favorite:'Essentials favourite',onRadio:'On the radio',bioFrom:'Biography from',more:'More',less:'Less',showAll:'Show all {n}',showListed:'Show the {n} listed',trail:'Path',elsewhere:'Elsewhere',
       bioEnglish:'Biography in English',held:'Artist details are being checked.',artists:'Artists',tracks:'Tracks',
       preview:'Listen · 60 s',stopPreview:'Stop',previewError:'The preview could not play. Try again.',
       result:'result',results:'results',firstResults:'First 40 results. Add a word to narrow them.',
@@ -48,6 +48,7 @@
       inCommon:'{n} artists in common',inCommon1:'1 artist in common',moreNames:'{n} more',tracksN:'{n} tracks',tracks1:'1 track',
       noSimilar:'No similar artists in the collection yet.',noSimilarLabels:'No similar labels in the collection yet.',noSimilarReleases:'No similar releases in the collection yet.',
       noLabelReleases:'This label’s releases are not listed yet.',nothingLinked:'Nothing in the collection is linked to {title} yet.',
+      tracksCut:'Not all of them are listed here yet.',tracksNone:'None of them are listed here yet.',
       showList:'Show as a list',showMap:'Show as a map',mapHint:'The nearer a name, the closer it is. Pick one to go there.',
     },
     de:{ deeper:'Entdecke die Wurzeln dahinter',roots:'Die Wurzeln',back:'Zurück zum Radio',
@@ -56,7 +57,7 @@
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
       artist:'Künstler',track:'Track',release:'Veröffentlichung',label:'Label',playlist:'Playlist',primary:'Künstler',featured:'Mit',remixer:'Remix von',
       similar:'Ähnliche Künstler',collaboration:'Zusammenarbeit',remix:'Remix',shared_release:'Gemeinsame Veröffentlichung','musicbrainz:member of band':'Bandmitglied','musicbrainz:collaboration':'Zusammenarbeit',
-      favorite:'Essentials-Favorit',onRadio:'Im Radio',bioFrom:'Biografie von',more:'Mehr',less:'Weniger',showAll:'Alle {n} zeigen',trail:'Pfad',elsewhere:'Anderswo',
+      favorite:'Essentials-Favorit',onRadio:'Im Radio',bioFrom:'Biografie von',more:'Mehr',less:'Weniger',showAll:'Alle {n} zeigen',showListed:'Die {n} aufgeführten zeigen',trail:'Pfad',elsewhere:'Anderswo',
       bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',artists:'Künstler',tracks:'Tracks',
       preview:'Anhören · 60 s',stopPreview:'Stopp',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
       result:'Treffer',results:'Treffer',firstResults:'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.',
@@ -67,6 +68,7 @@
       inCommon:'{n} gemeinsame Künstler',inCommon1:'1 gemeinsamer Künstler',moreNames:'{n} weitere',tracksN:'{n} Tracks',tracks1:'1 Track',
       noSimilar:'Noch keine ähnlichen Künstler in der Sammlung.',noSimilarLabels:'Noch keine ähnlichen Labels in der Sammlung.',noSimilarReleases:'Noch keine ähnlichen Veröffentlichungen in der Sammlung.',
       noLabelReleases:'Die Veröffentlichungen dieses Labels sind noch nicht verzeichnet.',nothingLinked:'In der Sammlung ist noch nichts mit {title} verbunden.',
+      tracksCut:'Hier sind noch nicht alle aufgeführt.',tracksNone:'Hier ist noch keiner davon aufgeführt.',
       showList:'Als Liste zeigen',showMap:'Als Karte zeigen',mapHint:'Je näher ein Name, desto enger die Verbindung. Wähle einen, um dorthin zu gehen.',
     },
   };
@@ -148,17 +150,20 @@
   // A region: a heading with the count of its names, then a list, six rows until the listener asks for the rest, whose
   // pictures load only then: Show all {n} shows that count. One with nothing in it says so in one sentence. On the map
   // it holds the 14 closest at once, the most a side shows, each knowing the name it hangs from. A region whose every
-  // name has a place of its own links there instead of Show all, and on the map from its count.
+  // name has a place of its own links there instead of Show all, and on the map from its count. A count in words, such
+  // as "13 of 39", reads as given. A name that opens a group, such as a track's release, carries the group's line over
+  // its row, in the same item.
   function regionSection(key,items,empty,prefix='r',map=false,count=items.length,all=null) {
-    const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.dataset.id=i.id;if(i.via)li.dataset.via=i.via;li.append(door(i,i.line,i.fact));return li;});
+    const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.dataset.id=i.id;if(i.via)li.dataset.via=i.via;if(i.group)li.append(node('p','release-line',i.group));li.append(door(i,i.line,i.fact));return li;});
     heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);section.dataset.key=key;
-    if(count!==null){const n=node('small','',map&&all?'':number(count));if(map&&all){const a=node('a','',number(count));a.href=all.getAttribute('href');a.setAttribute('aria-label',all.textContent);n.append(a);}heading.append(' ',n);}
+    if(count!==null){const n=node('small','',map&&all?'':typeof count==='string'?count:number(count));if(map&&all){const a=node('a','',number(count));a.href=all.getAttribute('href');a.setAttribute('aria-label',all.textContent);n.append(a);}heading.append(' ',n);}
     section.append(heading);
     if(!items.length){section.append(node('p','collection-note',word(empty)));return section;}
     list.append(...rows(items.slice(0,map?14:6)));section.append(list);
     if(map)return section;
-    // The button goes once used, so focus moves on to the first row it showed, never to the page.
-    if(items.length>6){const more=all||action(word('showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].children[0].focus();},'text-button');section.append(more);}
+    // The button goes once used, so focus moves on to the first row it showed, never to the page, nor to a group's line.
+    // Under a count in words, such as 13 of 39, it does not say all: it shows the ones listed.
+    if(items.length>6){const more=all||action(word(typeof count==='string'?'showListed':'showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].querySelector('.row').focus();},'text-button');section.append(more);}
     return section;
   }
   // {names}: "A", "A and B", or "A, B and 3 more", in the listener's language.
@@ -370,6 +375,35 @@
   radio.openTrack=id=>{if(entityID('plex_'+id))go('#explore/plex_'+id);};
   // The stages that play a track, by name.
   const stagesOf=t=>[...new Set((t.playlists||[]).map(p=>radio.stations.find(s=>s.id===p.id||s.name===p.station)).filter(Boolean))];
+  // The same stages in the order of the rail, as the listener sees it.
+  const railStations=t=>{const rail=radio.stations.map(s=>s.id);return stagesOf(t).sort((a,b)=>rail.indexOf(a.id)-rail.indexOf(b.id));};
+  // Whose track it is, when it is not simply this artist's or this release's: on an artist, a track where the artist is
+  // not the main artist, such as a remix or a featuring; on a release, a track by another artist than the release's.
+  // A joint credit stays silent when the artist is its main one. A raw credit's ";" reads as a list.
+  function creditOf(t,e) {
+    const own=(t.connections||[]).filter(c=>c.id===e.id);
+    const other=e.type==='release'?t.artist!==e.artist:own.length?!own.some(c=>c.relation==='primary'):t.artist!==e.title;
+    return other&&t.artist?t.artist.replace(/\s*;\s*/g,', '):'';
+  }
+  // A record's tracks on the radio, by release, the newest first: a release dates from its record, or from its first
+  // track when its record is not at hand; undated releases follow, then the tracks with no release. Ties, and the
+  // tracks inside a release, keep the record's order. Each track says where it plays, in the rail's order, each name
+  // whole, so the line breaks only between names; then whose it is when that is someone else; where no stage plays it
+  // and no line names its release, its album. With two groups or more, a release is named once, with its year, over
+  // its first track.
+  function radioTracks(e) {
+    const groups=new Map();
+    for(const t of (e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track')){
+      const key=(t.connections||[]).find(c=>c.relation==='release')?.id||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(t);
+    }
+    const dated=[...groups].map(([key,tracks])=>({key,tracks,date:records.get(key)?.releaseDate||tracks[0].releaseDate||''}));
+    dated.sort((a,b)=>!a.key-!b.key||!a.date-!b.date||(a.date<b.date)-(a.date>b.date));
+    return dated.flatMap(({key,tracks,date})=>tracks.map((t,i)=>{
+      const group=groups.size>1&&key&&!i?[records.get(key)?.title||t.album,/^\d{4}/.exec(date)?.[0]].filter(Boolean).join(' · '):'';
+      const credit=creditOf(t,e),where=railStations(t).map(s=>s.name.replace(/ /g,'\u00a0')).join(', ')||(groups.size>1&&key?'':t.album||'');
+      return {...t,group,line:[where,credit&&word('byNames').replace('{names}',credit)].filter(Boolean).join(' · '),fact:t.durationMs?time(t.durationMs/1000):''};
+    }));
+  }
   // One line of facts under the title, in a sentence: where it plays, and the one fact its type has. Each stage
   // links to its place in Statistics, and a favourite keeps the Essentials heart.
   function recordLine(e) {
@@ -439,13 +473,13 @@
     bodyShown=true;
     // The line fills in with what the payload brought, such as an artist's stages, unless the listener is in it.
     if(line&&!line.contains(document.activeElement)){line.before(recordLine(e));line.remove();}
-    // Its tracks on the radio: where each plays, or its release where none does, and how long it lasts.
-    const played=(e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track')
-      .map(t=>({...t,line:stagesOf(t).map(s=>s.name).join(', ')||t.album||'',fact:t.durationMs?time(t.durationMs/1000):''}));
-    // Nothing close at all, not even a track on the radio, says so in one sentence, unless the header already said this
-    // track has no profiles yet: at the end of the header, with its notes. On the map the regions sit around the header;
-    // in the list, in the grid under it.
-    if(found.every(r=>!r.total)&&!played.length){if(!e.basicDetails)recordTitle.parentNode.append(node('p','collection-note',word('nothingLinked').replace('{title}',e.title)));}
+    // Its tracks on the radio, by release, each with where it plays and how long it lasts. An artist or a release whose
+    // record holds fewer tracks than it counts is cut: it says how many of them it lists, and that the rest is not here.
+    const played=radioTracks(e),cut=['artist','release'].includes(e.type)&&payloads.has(e.id)&&e.trackCount>played.length;
+    // Nothing close at all, not even a track on the radio nor a cut list of them, says so in one sentence, unless the
+    // header already said this track has no profiles yet: at the end of the header, with its notes. On the map the
+    // regions sit around the header; in the list, in the grid under it.
+    if(found.every(r=>!r.total)&&!played.length&&!cut){if(!e.basicDetails)recordTitle.parentNode.append(node('p','collection-note',word('nothingLinked').replace('{title}',e.title)));}
     else for(const r of found){
       const empty=e.type==='label'&&r.key==='releases'?'noLabelReleases':empties[r.key];
       if(r.items.length||(empty&&!r.total))(map||grid).append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty,'r',Boolean(map)));
@@ -469,7 +503,11 @@
     const tags=(e.tags||[]).filter(t=>!t.includes('_')&&t.toLowerCase()!=='electronic').slice(0,4);
     if(tags.length)about.append(node('p','entity-tags',tags.join(', ')));
     if(shown.length){const links=node('p','entity-links');links.append(node('span','',word('elsewhere')),...shown.map(l=>link(site(l.kind,l.url),l.url)));about.append(links);}
-    if(about.children.length>1)grid.append(about);if(played.length)grid.append(regionSection('onRadio',played));
+    if(about.children.length>1)grid.append(about);
+    if(played.length||cut){
+      const radioList=regionSection('onRadio',played,'tracksNone','r',false,cut?word('nOfTotal').replace('{n}',number(played.length)).replace('{total}',number(e.trackCount)):played.length);
+      if(cut&&played.length)radioList.append(node('p','collection-note',word('tracksCut')));grid.append(radioList);
+    }
     if(wide.matches)drawMap(panel,map,e);
     if(grid.children.length)panel.append(grid);
     // More follows the width and the font: a turned phone, a narrower window or a late Inter can cut a

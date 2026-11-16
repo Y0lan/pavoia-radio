@@ -413,6 +413,13 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .region h4 small a { text-decoration:underline; text-underline-offset:3px; }
 .region h4 small a:is(:hover, :focus-visible) { color:var(--cream); }
 .region ol { margin:0; padding:0; list-style:none; }
+/* On the radio: a release names its tracks once, over the first, in the small words of a row's second line, with no
+   link and no edge. The 4px under it keep the focus ring of the row below (3px offset, 2px wide) off its letters.
+   A track's stations wrap between names, never cut, and its name takes two lines at most. */
+.release-line { margin:var(--s3) 0 var(--s1); font-size:12px; line-height:1.4; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.region li:first-child > .release-line { margin-top:0; }
+.region[data-key=onRadio] .row-line { white-space:normal; }
+.region[data-key=onRadio] .row-name { white-space:normal; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
 /* About and On the radio close the record in the same grid, side by side on a wide screen: On the radio takes the
    last column, About the ones before it. A station's Release years and its Added and removed read as About does. */
 @media (min-width:761px) { .regions > :is(.record-about, .release-years, .changes) { grid-column:1 / -2; } }
