@@ -56,7 +56,7 @@ async page => {
   assert(await page.locator('#entity-inspector .regions').count()===0,'Empty connections shown');
   assert(!await page.locator('#discovery-status').textContent(),'Stale error shown');
   await page.screenshot({path:'output/playwright/corrections-basic-320.png'});
-  // The explorer keeps one history entry, so Back would close it: the History tab is the way back to the list.
+  // The History tab goes back to the list, as Back would: each move in the explorer is one history entry.
   await page.locator('.explorer-nav a[href^="#history"]').click();
   await page.waitForFunction(()=>!document.getElementById('music-view').hidden&&document.querySelector('#music-content > .row'));
   // Statistics: All stations from the station row. Release years are one bar a year, oldest first, each named in its

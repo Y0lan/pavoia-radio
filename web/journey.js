@@ -190,13 +190,29 @@
   let listView=false;try{listView=localStorage.getItem('pavoia-explorer-view')==='list';}catch{/* Storage is optional. */}
   const wide=matchMedia('(min-width:1100px)'),phone=matchMedia('(max-width:760px)'),still=matchMedia('(prefers-reduced-motion: reduce)'),mapOn=()=>wide.matches&&!listView;
   // The explorer is a plain dialog over an inert page: the player bar under it stays in reach.
-  // It takes one history entry, right above the page's, and moves inside replace that entry, so Back
-  // or ✕ always lands on the page in one step.
+  // Each move in it is a history entry above the page's, so Back and Forward walk the visit, and ✕
+  // goes back over all of it to the page in one step.
   const dialog=$('explorer'),behind=document.querySelectorAll('main, .roots-footer');
   // An entry this page opened carries this page's life in its state, so Back and Forward, which keep
-  // the page, keep it too; any other explorer entry is marked as found, not owned.
+  // the page, keep it too; any other explorer entry is marked as found, not owned. Each entry of a visit
+  // also holds its depth over the visit's first one (owned when the page is right under that one), the
+  // life that wrote the first one (base), the life that wrote the entry before it (backLife) and its own key.
   const life=performance.timeOrigin||Date.now();
-  let landing=false,closing=false;
+  let landing=false,closing=false,pushes=0,restored='';
+  // Every history write of a move goes through here: Safari throws after 100 writes in 30 s, and the place
+  // opens all the same.
+  const writeState=(method,state,url)=>{try{history[method](state,'',url);return true;}catch{return false;}};
+  // The one place that adds an entry. Opening the explorer starts a visit at depth 0, owned; a move inside
+  // goes one deeper. At depth 40 a move replaces the entry, so a visit holds 41 entries at most and the page
+  // entry stays in the browser's history (Chromium keeps 50), where ✕ reaches it. An entry that cannot be
+  // pushed is replaced, as a move at depth 40 is, and when that fails too the move goes on.
+  function push(to) {
+    const s=history.state||{},key=life+':'+(++pushes),depth=s.depth||0;
+    const stay=dialog.open?{...s,seen:life,key}:{...s,explorer:life,seen:life,base:life,depth:0,owned:0,key};
+    if(dialog.open&&depth>=40){writeState('replaceState',stay,to);return;}
+    const next=dialog.open?{explorer:life,seen:life,base:s.base??null,depth:depth+1,owned:s.owned?1:0,key,backLife:s.seen??null}:{explorer:life,seen:life,base:life,depth:0,owned:1,key};
+    if(!writeState('pushState',next,to))writeState('replaceState',stay,to);
+  }
   // A new visit starts with an empty trail and a fresh History, and never shows the last visit's record while the first loads.
   // The dialog takes focus itself, not its first tab, which would show a ring on a page just loaded.
   function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=true;delete $('music-content').dataset.key;dialog.show();dialog.focus({preventScroll:true});for(const n of behind)n.inert=true;}
@@ -306,15 +322,17 @@
     renderPlayer();redraw();
     if(dialog.open&&view!=='explore'){fillRow();loadMusic();}
   }
-  // Every move into or inside the explorer comes through go(): opening adds the explorer's one entry,
-  // and a move inside replaces it. A link goes to its place's one address, so a link to the place shown,
-  // written short or by an old name, changes nothing.
-  function go(hash) {
-    const to=placeOf(hash).address;
-    if(closing||(dialog.open&&to===location.hash))return;
-    if(dialog.open)history.replaceState(history.state,'',to);
-    else history.pushState({explorer:life},'',to);
-    radio.renderScene();restore();
+  // Every move into or inside the explorer comes through go(): opening and each move inside add one entry,
+  // and a move asked as a replace (the Day field) writes the entry shown. A link goes to its place's one
+  // address, so a link to the place shown, written short or by an old name, changes nothing; so does the Roots
+  // tab with no search on the record on air, where it lands. The place opens even when the browser refused to
+  // write its address.
+  function go(hash,{replace}={}) {
+    const to=placeOf(hash).address,lands=to==='#explore'&&entityID(nowID())?placeOf('#explore/'+nowID()).address:to;
+    if(closing||(dialog.open&&lands===location.hash))return;
+    if(replace)writeState('replaceState',{...history.state},to);
+    else push(to);
+    radio.renderScene();restore(to);
   }
   // A hop paints twice, and nothing moves once it shows. The header comes at once from a record already fetched, or
   // with its payload. The regions, About and On the radio come once: when the payload, the credited artists and the
@@ -323,10 +341,11 @@
   async function loadEntity(id) {
     const from=glide;setView('explore');if(preview)finishPreview();
     selected=null;hop?.abort();const controller=new AbortController();hop=controller;
-    // A record opened from a focused result, a History row or a name in the last record keeps focus visible
-    // and off the field: on the explorer while it loads, then on the record's title. Touch screens open no keyboard.
+    // A record opened from a focused result, a History row or a name in the last record, or reached by Back from a
+    // tab's field or link, keeps focus visible and off the field: on the explorer while it loads, then on the record's
+    // title. Touch screens open no keyboard.
     const workspace=$('explore-workspace');
-    if([$('discovery-results'),$('music-content'),workspace].some(n=>n.contains(document.activeElement)))dialog.focus({preventScroll:true});
+    if([$('discovery-results'),$('music-view'),workspace].some(n=>n.contains(document.activeElement)))dialog.focus({preventScroll:true});
     $('discovery-results').hidden=true;
     // Every request of the hop shares its controller: the next hop, a tab or closing the explorer drops them all.
     const timeout=setTimeout(()=>controller.abort(),10000),fetched=async id=>cached(id)||request('/api/discovery/entity/'+id,controller.signal);
@@ -649,8 +668,13 @@
   // page, where Space plays. Opening a record or a tab moves on instead: no keyboard pops up on touch.
   const hideResults=()=>{if($('discovery-results').contains(document.activeElement))$('discovery-query').focus();$('discovery-results').hidden=true;};
   // Results stay in place while the next ones load. The URL holds the query (#explore?q=…), so each
-  // history entry keeps its own search, and the Roots tab points to the last one.
-  const searchPage=query=>{history.replaceState(history.state,'',query?'#explore?q='+encodeURIComponent(query):'#explore');$('roots-tab').setAttribute('href',location.hash);};
+  // history entry keeps its own search, and the Roots tab points to the last one. The first results after a
+  // record or a tab are one entry, so Back returns there; each later key writes that entry in place.
+  const searchPage=query=>{
+    const address=query?'#explore?q='+encodeURIComponent(query):'#explore';
+    if(dialog.open&&!/^#explore(?:\?|$)/.test(location.hash))push(address);else writeState('replaceState',history.state,address);
+    $('roots-tab').setAttribute('href',location.hash);
+  };
   // Leaving a record for a search or a tab ends its preview, whose button goes with it.
   const hideRecord=()=>{if(preview)finishPreview();$('explore-workspace').hidden=true;};
   // The results speak for themselves; only a cut list or an empty one says so on screen. The count is still
@@ -708,20 +732,34 @@
   $('volume').addEventListener('input',()=>{unmuted=null;volume();sayVolume();try{localStorage.setItem('pavoia-volume',$('volume').value);}catch{/* Storage is optional. */}});
   // The footer opens the record on air; only with nothing on air does it open the search.
   $('go-deeper').addEventListener('click',()=>go(entityID(nowID())?'#explore/'+nowID():'#explore'));
-  // ✕ and Escape. An entry this page opened goes back to the page's entry right under it, and
-  // restore() then closes the dialog; until then, work stops and moves wait. Any other (a shared link,
-  // a reload, a restored session, a typed URL) closes in place, since the entry under it may not be
-  // this page. A plain dialog fires no cancel event, so Escape is caught below.
+  // ✕ and Escape leave the whole visit in one step. A visit this page opened goes back over its depth to
+  // the page's entry right under it, and one opened on a found entry (a shared link, a reload, a restored
+  // session, a typed URL) goes back to that entry, which then closes in place; restore() closes the dialog,
+  // and until then, work stops and moves wait. With no entry to reach, it closes in place. A plain dialog
+  // fires no cancel event, so Escape is caught below.
   const halt=()=>{clearTimeout(typing);hop?.abort();hop=null;musicRequest?.abort();musicRequest=null;naming?.abort();stopAir();};
   const close=()=>{
     if(!dialog.open||closing)return;
     halt();
-    // The browser may have pruned the page's entry; the Navigation API says so before going back.
-    // ponytail: without that API, such a pruned history (over 50 entries in one tab) leaves the close
-    // waiting, since a slow Back and a failed one look the same; every current browser has the API.
-    if(history.state?.explorer===life&&window.navigation?.canGoBack!==false){closing=true;history.back();return;}
-    shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();
+    const s=history.state||{},n=(s.depth||0)+(s.owned?1:0);
+    if(n>0&&reachable(n)){closing=true;history.go(-n);return;}
+    shut();writeState('replaceState',null,location.pathname+location.search);radio.renderScene();
   };
+  // history.go(-n) must land in this document: a Back with no entry to land on fires nothing and would leave the
+  // close waiting, and one into another document reloads the page and stops the music. The Navigation API names
+  // the entry; an owned visit must find the page there, not an explorer entry. Without that API, the entry must be
+  // inside the history, and the visit must start in this page life, since after a reload some browsers load the
+  // entries under it as another document. A slow Back and a lost one look the same, so no timer guesses.
+  function reachable(n) {
+    const s=history.state||{},nav=window.navigation;
+    if(nav?.entries&&nav.currentEntry){
+      const under=nav.entries()[nav.currentEntry.index-n];
+      if(!under?.sameDocument)return false;
+      try{return !s.owned||!placeOf(new URL(under.url).hash).section;}catch{return false;}
+    }
+    if(nav?.canGoBack===false||n>=history.length)return false;
+    return s.base===life;
+  }
   function shut(){closing=false;halt();finishPreview();for(const n of behind)n.inert=false;dialog.close();}
   $('explorer-close').addEventListener('click',close);
   // Explorer links, in the explorer or the player bar, go through go(). Ctrl, Cmd, Shift and middle
@@ -1240,7 +1278,7 @@
   $('music-content').addEventListener('pointerleave',()=>light(null));
   $('music-content').addEventListener('focusin',event=>light(event.target.closest?.('.row')));
   $('music-content').addEventListener('focusout',()=>light(null));
-  // The filter waits for a pause in typing, then writes the address and draws in place, in the explorer's one entry. A
+  // The filter waits for a pause in typing, then writes the address and draws in place, in the entry shown. A
   // list scrolled past its top comes back under the head, so it starts under the field. With no names yet, nothing draws.
   function filterIndex() {
     indexQuery=$('index-query').value.slice(0,200);
@@ -1397,9 +1435,10 @@
     finally{clearTimeout(timeout);if(!musicRequest||musicRequest===controller){musicRequest=null;content.removeAttribute('aria-busy');button.removeAttribute('aria-busy');button.removeAttribute('aria-disabled');if(button.dataset.journey==='loadingMore')say('older');}}
   }
   $('music-filters').addEventListener('submit',event=>event.preventDefault());
-  // A day picked goes into the address, as a stage does; picking the day shown asks for it again. A year typed digit by
-  // digit passes through years like 0002, under the field's min: the list waits for a real day.
-  $('history-day').addEventListener('change',()=>{const field=$('history-day');if(!field.validity.valid)return;const place=historyAt(musicScope,field.value);if(place===location.hash)loadMusic();else go(place);});
+  // A day picked goes into the address, in the entry shown: the field's arrows change the day one step at a time, and
+  // typing is not a move. Picking the day shown asks for it again. A year typed digit by digit passes through years like
+  // 0002, under the field's min: the list waits for a real day.
+  $('history-day').addEventListener('change',()=>{const field=$('history-day');if(!field.validity.valid)return;const place=historyAt(musicScope,field.value);if(place===location.hash)loadMusic();else go(place,{replace:true});});
   // The field allows days up to today, as of when the listener reaches for it: History can stay open past midnight.
   $('history-day').addEventListener('focus',()=>{$('history-day').max=today();});
   $('history-more').addEventListener('click',()=>{if(!musicRequest)loadMusic(true);});
@@ -1530,14 +1569,14 @@
     const mark=index&&markList(by).includes(query.get('at'))?query.get('at'):'';
     return {section,scope,kind,day,by,q,mark,address:section==='history'?historyAt(scope,day):index?indexAt({kind,scope,by,q,at:mark}):'#statistics/'+scope};
   }
-  function restore(){
+  function restore(hash=location.hash){
     landing=false;
-    const place=placeOf(location.hash),{section,type,id,name}=place;
+    const place=placeOf(hash),{section,type,id,name}=place;
     if(!section){if(dialog.open)shut();return;}
     // Going back landed on another explorer entry, so the page was not right under: close in place.
     if(closing){shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();return;}
     // An entry the browser added itself, such as a typed URL, may not sit right above the page.
-    if(!history.state?.explorer)history.replaceState({...history.state,explorer:true},'');
+    if(!history.state?.explorer)writeState('replaceState',{...history.state,explorer:true,seen:life,base:life,depth:0,owned:0});
     open();
     if(id)return loadEntity(id);
     if(name)return byName(type,name);
@@ -1545,12 +1584,12 @@
     // tab keeps it.
     if(section!=='explore'){
       ({scope:musicScope,kind:musicKind,day:musicDay,by:indexBy,q:indexQuery,mark:indexMark}=place);
-      if(location.hash!==place.address)history.replaceState(history.state,'',place.address);
+      if(location.hash!==place.address)writeState('replaceState',history.state,place.address);
       for(const link of document.querySelectorAll('.explorer-nav a'))if(tab(link)===section)link.setAttribute('href',place.address);
     }
     setView(section);
     // The History tab or the Index tab, from a record or another tab, brings back the same rows without a reload, with
-    // focus on the row that was opened. The place is used once: the second restore() of a browser move changes nothing.
+    // focus on the row that was opened. The place is used once.
     if((section==='history'||section==='index')&&$('music-content').dataset.key===musicKey()){
       // The Index puts the row back at the height it stood, kept between the stage bar and the dialog's bottom, since a
       // window resized or a phone turned meanwhile moves the columns. Without that place, the mark of the address leads.
@@ -1586,8 +1625,10 @@
   // Crossing 1100px swaps the map and the list, and crossing 760px moves On the radio; focus in the record or the stage
   // place goes back to its title.
   for(const query of [wide,phone])query.addEventListener('change',()=>{const held=$(view==='explore'?'entity-inspector':'music-content').contains(document.activeElement);redraw();if(held&&(view==='explore'?selected!==null:shownStage!==null))recordTitle.focus({preventScroll:true});});
-  window.addEventListener('popstate',restore);
-  window.addEventListener('hashchange',restore);
+  // A browser move fires popstate, then hashchange when the hash differs: it restores once. A hash written with no
+  // popstate still restores.
+  window.addEventListener('popstate',()=>{restore();restored=location.href;});
+  window.addEventListener('hashchange',()=>{const same=location.href===restored;restored='';if(!same)restore();});
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
     // A record that has left the air loses its red dot in place; nothing else on the page moves.
     if(selected&&selected.id!==enriched?.entity.id)$('entity-inspector').querySelector('.on-air')?.remove();

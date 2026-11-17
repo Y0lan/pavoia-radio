@@ -34,7 +34,7 @@ async page => {
   await page.waitForFunction(()=>!document.getElementById('music-content').hasAttribute('aria-busy')&&document.querySelectorAll('#music-content > .row').length>0);
   const row=page.locator('#music-content > .row').first();await row.click();
   await page.waitForFunction(()=>!document.getElementById('explore-workspace').hidden);
-  // Back closes the explorer, which keeps one history entry: the History tab is the way back to the list.
+  // The History tab is one way back to the list; Back is the other, since each move in the explorer is one entry.
   await page.locator('.explorer-nav a[href^="#history"]').click();
   await page.waitForFunction(()=>document.querySelectorAll('#music-content > .row').length===50&&!document.getElementById('music-view').hidden);
   assert((await page.locator('#stage-row [aria-current]').innerText())==='Ambiance','Back lost the selected history stage');

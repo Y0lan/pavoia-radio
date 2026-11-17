@@ -45,7 +45,7 @@ const ordered=()=>blocks(web('style.css').replace(/\/\*[\s\S]*?\*\//g,'')).flatM
 const lastAt=(media,selector)=>ordered().findLastIndex(([m,list])=>m===media&&list.split(/,\s*/).includes(selector));
 const status = (title, count=2) => ({track:{id:'123', title, artist:'Artist '+title}, audience:{available:true,listeners:count,measuredAt:new Date(clock.now).toISOString()}});
 
-function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search='',state=null,storage={getItem:()=>null,setItem(){}},journey=false,media=[]}={}) {
+function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search='',state=null,below=[],storage={getItem:()=>null,setItem(){}},journey=false,media=[]}={}) {
   const imageRequests=[];
   class Element {
     constructor(){this.dataset={};this.events={};this.children=[];this.attrs={};this.textContent='';this.complete=true;this.naturalWidth=100;this.classList={add(){},remove(){},toggle(){}};this.style={setProperty(key,value){this[key]=value;}};}
@@ -99,6 +99,9 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
   // The rail opens on the way switch, then the Bus, as in index.html.
   for(const value of ['feeling','stage'])elements.ways.append(Object.assign(new Element(),{localName:'button',value,attrs:{'aria-pressed':String(value==='stage')}}));
   elements.moods.append(elements.ways,elements['bus-link']);
+  // The music view holds its bar, the Index head, the rail and the rows, as in index.html.
+  elements['music-filters'].append(elements['stage-row'],elements['history-day']);elements['index-head'].append(elements['index-sides'],elements['index-query'],elements['index-order']);
+  elements['music-view'].append(elements['music-filters'],elements['index-head'],elements['index-rail'],elements['music-content'],elements['history-more']);
   const body=new Element();
   const audio=elements.audio;
   audio.paused=true;audio.readyState=0;audio.calls=[];
@@ -118,14 +121,15 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
   const window=new Element();
   window.MediaMetadata=MediaMetadata;window.dispatchEvent=event=>window.emit(event.type,event);
   // Session history as a browser keeps it: entries with their state, query and hash, and a position. Assigning the hash
-  // adds an entry, as a link does; tests fire its popstate and hashchange themselves, or through env.visit().
-  let current=hash,query=search,at=0;const entries=[{state,hash,search}];
+  // adds an entry, as a link does; tests fire its popstate and hashchange themselves, or through env.visit(). `below` holds
+  // the entries under the one the page loads on, as after a reload.
+  let current=hash,query=search,at=below.length;const entries=[...below.map(entry=>({state:null,hash:'',search,...entry})),{state,hash,search}];
   const urlHash=url=>url.includes('#')?url.slice(url.indexOf('#')):'';
   // A URL with only a hash keeps the query, as a browser resolves it; one with a path takes its own query, or none.
   const urlSearch=url=>{const path=url.split('#')[0];return !path?query:path.includes('?')?path.slice(path.indexOf('?')):'';};
-  const location={pathname:'/',get search(){return query;},get hash(){return current;},set hash(value){current=value&&!value.startsWith('#')?'#'+value:value;entries.splice(++at,Infinity,{state:null,hash:current,search:query});}};
+  const location={pathname:'/',get href(){return 'https://radio.test/'+query+current;},get search(){return query;},get hash(){return current;},set hash(value){current=value&&!value.startsWith('#')?'#'+value:value;entries.splice(++at,Infinity,{state:null,hash:current,search:query});}};
   const move=url=>{if(url!==undefined){query=urlSearch(url);current=urlHash(url);}};
-  const history={get state(){return entries[at].state;},
+  const history={get state(){return entries[at].state;},get length(){return entries.length;},
     pushState(state,_title,url){move(url);entries.splice(++at,Infinity,{state,hash:current,search:query});},
     replaceState(state,_title,url){move(url);entries[at]={state,hash:current,search:query};},
     go(delta){if(!delta)throw new Error('history.go(0) reloads the page');if(!entries[at+delta])return;at+=delta;({hash:current,search:query}=entries[at]);window.emit('popstate');},
@@ -1071,7 +1075,7 @@ const textOf=n=>typeof n==='string'?n:(n.textContent||'')+n.children.map(textOf)
 // that only changes the state is not counted.
 const countWrites=e=>{let n=0;for(const name of ['pushState','replaceState']){const write=e.history[name];e.history[name]=function(state,title,url){const from=e.location.hash;write.call(this,state,title,url);if(e.location.hash!==from)n++;};}return ()=>n;};
 
-test('the explorer opens over an inert page, keeps the player, and ✕, Escape or Back go back to the page in one step',async()=>{
+test('the explorer opens over an inert page, keeps the player, and ✕ or Escape go back to the page in one step, and Back goes back one move',async()=>{
  const e=setup({journey:true});await flush();const explorer=e.elements.explorer,main=e.elements.main,footer=e.elements['roots-footer'];
  e.discovery=url=>entity(url.includes('plex_')?'trk_0123456789ab':url.split('/').pop());
  const link=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
@@ -1081,11 +1085,13 @@ test('the explorer opens over an inert page, keeps the player, and ✕, Escape o
  assert.deepEqual([e.entries(),e.position()],[['','#explore/art_0123456789ab'],1],'opening adds one entry above the page');
  link('#history');link('#statistics');await flush();e.elements['credited-artists'].emit('click');
  e.run('window.Pavoia.openTrack("7")');await flush();
- assert.deepEqual([e.location.hash,e.entries().length,e.position()],['#explore/trk_0123456789ab',2,1],'moves inside replace that entry, even when the roots rename the record');
+ assert.deepEqual([e.location.hash,e.entries().length,e.position()],['#explore/trk_0123456789ab',5,4],'each move inside adds one entry, and the roots rename the record in its own');
  e.elements['explorer-close'].emit('click');await flush();
- assert.deepEqual([explorer.open,main.inert,footer.inert,e.location.hash,e.position()],[false,false,false,'',0],'✕ goes back one step, to the page, so Back then leaves the site');
- link('#statistics');await flush();e.history.go(-1);await flush();
- assert.deepEqual([explorer.open,e.location.hash,e.position()],[false,'',0],'the browser\'s Back closes it the same way');
+ assert.deepEqual([explorer.open,main.inert,footer.inert,e.location.hash,e.position()],[false,false,false,'',0],'✕ goes back over the whole visit in one step, to the page, so Back then leaves the site');
+ link('#statistics');await flush();link('#history');await flush();e.history.go(-1);await flush();
+ assert.deepEqual([explorer.open,e.location.hash,e.position()],[true,'#statistics/palac-feel',1],'the browser\'s Back goes back one move');
+ e.history.go(-1);await flush();
+ assert.deepEqual([explorer.open,e.location.hash,e.position()],[false,'',0],'and from the first place of the visit, it closes the explorer');
  link('#explore/art_0123456789ab');await flush();
  assert.equal(e.key('Escape').key,'Escape');await flush();
  assert.deepEqual([explorer.open,e.location.hash,e.position()],[false,'',0],'Escape leaves too, though a plain dialog has no cancel event');
@@ -1208,7 +1214,7 @@ test('the search runs as you type, through one request at a time, and Enter stil
  query.value='abcde';query.emit('input');e.elements['discovery-search'].emit('submit',{preventDefault(){}});assert.equal(typed(),0,'Enter cancels the pending wait');
 });
 
-test('a result replaces the search in the explorer\'s entry, and the Roots tab returns to the last search',async()=>{
+test('a result opened from the search adds one entry, and the Roots tab returns to the last search',async()=>{
  const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'];
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
  const link=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
@@ -1216,7 +1222,7 @@ test('a result replaces the search in the explorer\'s entry, and the Roots tab r
  query.value='jimi';query.emit('input');e.fire(300);await flush();
  assert.deepEqual([e.location.hash,results.hidden,results.children.length],['#explore?q=jimi',false,1],'typing turns the record into the search page');
  const searches=e.discoveryRequests.length;follow(e,firstLink(results));await flush();
- assert.deepEqual([e.location.hash,e.entries().length,results.hidden,e.elements['explore-workspace'].hidden],['#explore/art_0123456789ab',2,true,false],'the result replaces the search, so the explorer keeps one entry');
+ assert.deepEqual([e.location.hash,e.entries().length,results.hidden,e.elements['explore-workspace'].hidden],['#explore/art_0123456789ab',4,true,false],'the result is one entry over the search, which is one over the record');
  const tab=()=>e.elements['roots-tab'].getAttribute('href'),current=()=>e.nav.map(link=>link.getAttribute('aria-current'));
  assert.deepEqual(current(),['page',null,null,null],'Roots stays the current tab though its link carries the search');
  link('#history');link(tab());await flush();
@@ -1252,21 +1258,23 @@ test('clearing the field drops a search still loading, and Escape over the stati
  assert.equal(escape.prevented,true,'without clearing the typed query, so Back finds it again');
 });
 
-test('however deep the digging, the explorer keeps one entry and closing reaches the page',async()=>{
+test('however deep the digging, ✕ reaches the page in one step',async()=>{
  const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
  const link=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
  for(let i=1;i<=60;i++){link('#explore/art_'+i.toString(16).padStart(12,'0'));await flush();}
- assert.deepEqual([e.entries().length,e.position()],[2,1],'sixty moves, one entry');
- e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([e.entries().length,e.position(),e.history.state.depth],[42,41,40],'sixty moves: the page, then depths 0 to 40');
+ const steps=[],go=e.history.go;e.history.go=function(delta){steps.push(delta);go.call(this,delta);};
+ e.elements['explorer-close'].emit('click');await flush();e.history.go=go;
+ assert.deepEqual(steps,[-41],'✕ goes back over the whole visit at once');
  assert.deepEqual([e.position(),e.location.hash,e.elements.explorer.open,e.elements.main.inert],[0,'',false,false]);
  const at=e.position();e.elements['explorer-close'].emit('click');await flush();assert.equal(e.position(),at,'a click on ✕ while it fades out goes nowhere');
  link('#explore/art_0123456789ab');await flush();
- let asked=0,arrive;const back=e.history.back;e.history.back=()=>{asked++;arrive=()=>back.call(e.history);};
+ let asked=0,arrive;e.history.go=delta=>{asked++;arrive=()=>go.call(e.history,delta);};
  e.elements['explorer-close'].emit('click');e.key('Escape');link('#history');await flush();
  assert.deepEqual([asked,e.elements.explorer.open,e.location.hash,e.entries()],[1,true,'#explore/art_0123456789ab',['','#explore/art_0123456789ab']],'while a slow Back is on its way, a second close or a move changes nothing');
  arrive();await flush();
  assert.deepEqual([e.elements.explorer.open,e.position(),e.entries()],[false,0,['','#explore/art_0123456789ab']],'then it lands on the page, and Forward still holds the explorer');
- e.history.back=back;link('#explore/art_0123456789ab');await flush();e.evict(1);e.window.navigation={canGoBack:false};
+ e.history.go=go;link('#explore/art_0123456789ab');await flush();e.evict(1);e.window.navigation={canGoBack:false};
  e.elements['explorer-close'].emit('click');await flush();assert.deepEqual([asked,e.elements.explorer.open,e.location.hash],[1,false,''],'where the Navigation API says the page entry is gone, the close happens in place');
 });
 
@@ -1277,7 +1285,7 @@ test('the current tab keeps its history entry, and a new language searches again
  const kept=e.entries(),asked=e.historyRequests.length,writes=countWrites(e);
  assert.equal(click('#history'),true);await flush();
  assert.deepEqual([e.entries(),e.historyRequests.length,writes()],[kept,asked,0],'a link to the view already shown changes nothing: no request, no entry, no address written');
- assert.equal(click('#statistics'),true);assert.deepEqual([e.location.hash,e.entries().length],['#statistics/palac-feel',kept.length],'another tab replaces the explorer\'s one entry');
+ assert.equal(click('#statistics'),true);assert.deepEqual([e.location.hash,e.entries().length],['#statistics/palac-feel',kept.length+1],'another tab adds one entry');
  e.visit('#explore/art_0123456789ab');await flush();assert.equal(click('#explore/art_0123456789ab'),true,'the player title linking to the record shown is stopped too');
  assert.deepEqual([click('#explore/art_0123456789ab',{ctrlKey:true}),click('#explore/art_0123456789ab',{metaKey:true}),click('#explore/art_0123456789ab',{shiftKey:true}),click('#explore/art_0123456789ab',{button:1})],[false,false,false,false],'a new tab or window still opens it');
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
@@ -1382,12 +1390,12 @@ test('a track that arrives while the explorer closes does not close it in place,
  e.response={track:null,audience:{available:false,listeners:null}};await e.poll();await flush();
  e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore'})},preventDefault(){}});await flush();
  assert.equal(e.elements['discovery-status'].textContent,'Nothing on air right now. Search to start.');
- let arrive;const back=e.history.back;e.history.back=()=>{arrive=()=>back.call(e.history);};
+ let arrive;const go=e.history.go;e.history.go=delta=>{arrive=()=>go.call(e.history,delta);};
  e.elements['explorer-close'].emit('click');
  e.response={track:{id:'123',title:'Later',artist:'Artist Later'},audience:{available:true,listeners:2,measuredAt:new Date(e.clock.now).toISOString()}};await e.poll();await flush();
  assert.deepEqual([e.elements.explorer.open,e.location.hash],[true,'#explore'],'the track waits for the close, it does not land the leaving page');
  arrive();await flush();assert.deepEqual([e.elements.explorer.open,e.position(),e.entries()],[false,0,['','#explore']],'Back lands on the page and Forward keeps the explorer');
- e.history.back=back;e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
+ e.history.go=go;e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
  e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#explore?q=jimi'})},preventDefault(){}});await flush();
  const query=e.elements['discovery-query'],results=e.elements['discovery-results'];let loaded;
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:new Promise(resolve=>{loaded=()=>resolve(entity(url.split('/').pop()));});
@@ -1824,7 +1832,7 @@ test('the header line names the stages that play a record: each links to its pla
  const heart=line.descendants().find(n=>n.attrs?.role==='img');
  assert.deepEqual([heart.attrs['aria-label'],heart.attrs.class,heart.attrs['aria-hidden'],heart.parent.children[1]],['Essentials favourite','essentials-icon',undefined,places[1]],'the heart goes with Essentials');
  const kept=e.entries().length;follow(e,places[1]);await flush();
- assert.deepEqual([e.window.Pavoia.getState().stage,e.elements.explorer.open,e.location.hash,e.entries().length],['palac-feel',true,'#statistics/essentials',kept],'the stage\'s place opens in the explorer\'s one entry, and the radio stays where it is');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.elements.explorer.open,e.location.hash,e.entries().length],['palac-feel',true,'#statistics/essentials',kept+1],'the stage\'s place opens in one entry more, and the radio stays where it is');
  e.window.Pavoia.tune('nowhere');assert.equal(e.window.Pavoia.getState().stage,'palac-feel','an unknown stage changes nothing');
  follow(e,byClass(inspector(e),'row').find(a=>a.getAttribute('href')==='#explore/art_000000000104'));
  assert.deepEqual([inspector(e).descendants().find(n=>n.localName==='h3').textContent,textOf(byClass(inspector(e),'entity-line')[0])],['Kiasmos',''],'a record already fetched shows at once, before its tracks are known');
@@ -1915,7 +1923,7 @@ test('every name in the player bar is a link the explorer routes, and openTrack 
  assert.deepEqual(credits.map(a=>[a.localName,a.className,a.getAttribute('href')]),[['a','artist-credit','#explore/art_000000000001'],['a','artist-credit','#explore/art_000000000002']]);
  assert.deepEqual([label.localName,label.getAttribute('href'),label.getAttribute('aria-label')],['a','#explore/lab_000000000001','Label: Watergate']);
  follow(e,label);await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash,e.discoveryRequests.at(-1).url],[true,'#explore/lab_000000000001','/api/discovery/entity/lab_000000000001'],'the document handler routes it');
- follow(e,credits[1]);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/art_000000000002',2],'inside, it replaces the explorer\'s entry');
+ follow(e,credits[1]);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/art_000000000002',3],'inside, it adds one entry');
  e.elements['explorer-close'].emit('click');await flush();
  e.window.Pavoia.openTrack('nope');await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash],[false,''],'an invalid track opens nothing');
  e.window.Pavoia.openTrack('7');await flush();assert.equal(e.location.hash,'#explore/plex_7');
@@ -1938,7 +1946,7 @@ test('the trail steps back through the records of this visit',async()=>{
  for(const n of [4,5,6]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
  assert.deepEqual(steps().map(n=>n.textContent),['Name art_000000000003','Name art_000000000004','Name art_000000000005','Name art_000000000006'],'the last four');
  follow(e,steps()[1]);await flush();
- assert.deepEqual([e.location.hash,e.entries().length,steps().map(n=>n.textContent)],['#explore/art_000000000004',2,['Name art_000000000001','Name art_000000000002','Name art_000000000003','Name art_000000000004']],'going back cuts the trail there, in the explorer\'s one entry');
+ assert.deepEqual([e.location.hash,e.entries().length,steps().map(n=>n.textContent)],['#explore/art_000000000004',8,['Name art_000000000001','Name art_000000000002','Name art_000000000003','Name art_000000000004']],'going back cuts the trail there, in one entry more, as any link');
  e.elements['explorer-close'].emit('click');await flush();open('#explore/art_000000000009');await flush();assert.equal(trail(),undefined,'a new visit starts a new trail');
  assert.match(cssRules().get('.entity-trail'),/font-size:12px;.*color:var\(--soft\)/);assert.match(cssRules().get('.entity-trail [aria-current]'),/color:var\(--cream\)/);
 });
@@ -2010,7 +2018,7 @@ test('History rows are links that read the time, then the title over its artist,
  assert.deepEqual(row.children[1].children.map(n=>n.localName+'.'+n.className),['span.row-name','span.row-line'],'the title over its artist, with no bold');
  assert.deepEqual([row.children[0].textContent,row.children[0].dateTime,row.children[1].children.map(n=>n.textContent)],[new Date(items[0].startedAt).toLocaleTimeString('en',{timeStyle:'short'}),items[0].startedAt,['Title 0','Artist 0']],'the short time only');
  assert.equal(kids[6].getAttribute('href'),null,'a track without a valid id is no link');
- follow(e,row);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/plex_101',2],'the document handler routes it through go(), so it replaces the explorer\'s one entry');
+ follow(e,row);await flush();assert.deepEqual([e.location.hash,e.entries().length],['#explore/plex_101',3],'the document handler routes it through go(), so it adds one entry');
  e.setLanguage('de');routeTo(e,'#history');await flush();
  assert.deepEqual(e.elements['music-content'].children.filter(n=>n.localName==='h3').map(n=>n.textContent).slice(0,2),['Heute','Gestern'],'rows drawn in English are drawn again in German');
 });
@@ -2441,16 +2449,16 @@ test('Switch to this stage tunes the radio without starting it, then gives way t
  assert.match(cssRules().get('#explorer :is(#music-status button, #history-more, .stage-switch)'),/border:1px solid var\(--line\)/,'a bordered button');
 });
 
-test('History and Statistics keep their stage and day in the address, in one entry, behind a stage row',async()=>{
+test('History and Statistics keep their stage and day in the address, in one entry each, behind a stage row',async()=>{
  const e=setup({journey:true});await flush();e.discovery={items:[]};e.historyReply=answer(played(50,0,'9:1'));
  const row=e.elements['stage-row'],links=()=>row.children.map(a=>[textOf(a),a.getAttribute('href'),a.attrs['aria-current']??null]),tabs=()=>e.document.querySelectorAll('.explorer-nav a').map(a=>a.getAttribute('href'));
  await stagePlace(e,'#statistics/radio',{scope:'radio'});const kept=e.entries().length;
  assert.deepEqual([links()[0],links()[6],links().at(-1),links().length],[['All stations','#statistics/radio','page'],['Fontanna','#statistics/fontanna',null],['Essentials','#statistics/essentials',null],10],'All stations, then the nine stations; the current one marked');
  assert.equal(row.attrs['aria-label'],'Stations','the row is named by what it lists');
  e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};follow(e,stageLink(e,'fontanna'));await flush();
- assert.deepEqual([e.location.hash,e.entries().length,textOf(currentStage(e))],['#statistics/fontanna',kept,'Fontanna'],'a stage in the row replaces the explorer\'s one entry');
+ assert.deepEqual([e.location.hash,e.entries().length,textOf(currentStage(e))],['#statistics/fontanna',kept+1,'Fontanna'],'a stage in the row adds one entry');
  follow(e,byClass(e.elements['music-content'],'row').find(a=>a.getAttribute('href')==='#statistics/bermuda-evening'));await flush();
- assert.deepEqual([e.location.hash,e.entries().length],['#statistics/bermuda-evening',kept],'so does a stage it shares tracks with');
+ assert.deepEqual([e.location.hash,e.entries().length],['#statistics/bermuda-evening',kept+2],'so does a stage it shares tracks with');
  routeTo(e,'#history/bermuda-day/2026-03-28');await flush();
  assert.deepEqual([links().length,links()[0],links()[1],e.elements['history-day'].value,asked(e).get('until'),tabs()],[10,['All stations','#history/radio',null],['Under the Sun','#history/bermuda-day/2026-03-28','page'],'2026-03-28',new Date(2026,2,29).toISOString(),['#explore','#history/bermuda-day/2026-03-28','#statistics/bermuda-evening','#index/artists']],'History: All stations, which has no day, then the nine stages, each keeping the day; each tab keeps its last place');
  const today=localDay(new Date());
@@ -2581,7 +2589,7 @@ test('the labels document turns the counts into links to the Index, most tracks 
   'the artists counted by the statistics, the labels of the document on this station, each into the Index on this station, most tracks first');
  assert.ok(!content.descendants().some(n=>/^#statistics\/[^/]+\/(?:artists|labels)$/.test(n.getAttribute?.('href')||'')),'no link to the old lists of names');
  const kept=e.entries().length;follow(e,content.descendants().find(n=>n.textContent==='All 250 artists'));await flush();
- assert.deepEqual([e.location.hash,e.entries().length,e.document.querySelectorAll('.explorer-nav a')[2].getAttribute('href')],['#index/artists/bermuda-day?by=tracks',kept,'#statistics/bermuda-day'],'the Index replaces the explorer\'s one entry, and the Statistics tab returns to the place');
+ assert.deepEqual([e.location.hash,e.entries().length,e.document.querySelectorAll('.explorer-nav a')[2].getAttribute('href')],['#index/artists/bermuda-day?by=tracks',kept+1,'#statistics/bermuda-day'],'the Index adds one entry, and the Statistics tab returns to the place');
  e.response={...status('First'),...everyName({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();content=e.elements['music-content'];
  assert.deepEqual([links(),e.namesRequests.map(r=>r.url).filter(url=>url.endsWith('=labels'))],[[['250 artists','#index/artists?by=tracks'],['140 labels','#index/labels?by=tracks'],['All 250 artists','#index/artists?by=tracks'],['All 140 labels','#index/labels?by=tracks']],['/api/library/names?kind=labels']],
   'All stations counts every label of the document and leads into the Index on all stations; the document loads once per page');
@@ -2730,7 +2738,7 @@ const typeIndex=(e,text)=>{const field=e.elements['index-query'];field.value=tex
 // A key in the field goes to the field first, then to the document, as a browser sends it.
 const keyIn=(e,key)=>{const event={key,code:key,repeat:false,isComposing:false,ctrlKey:false,metaKey:false,altKey:false,target:control('input',{type:'search'}),defaultPrevented:false,preventDefault(){this.defaultPrevented=true;}};e.elements['index-query'].emit('keydown',event);e.document.emit('keydown',event);return event;};
 
-test('the Index has an address: a side, a stage, an order and a filter, and the old lists of names lead to it, in one entry',async()=>{
+test('the Index has an address: a side, a stage, an order and a filter, and the old lists of names lead to it, in one entry each',async()=>{
  const e=await indexed();
  routeTo(e,'#index');await flush();const kept=e.entries().length,tab=e.elements['index-tab'];
  assert.deepEqual([e.location.hash,kept,e.elements['music-view'].dataset.view,e.elements['index-head'].hidden,tab.attrs['aria-current'],tab.getAttribute('href')],['#index/artists',2,'index',false,'page','#index/artists'],'bare #index is the Artists side, on All stages, in one entry above the page');
@@ -2740,7 +2748,8 @@ test('the Index has an address: a side, a stage, an order and a filter, and the 
   ['#index/artists?at=K','#index/artists?at=K'],['#index/artists?at=%23','#index/artists?at=%23'],['#index/artists?at=k','#index/artists'],['#index/labels/fontanna?at=K&by=tracks&q=ame','#index/labels/fontanna?by=tracks&q=ame'],
   ['#index/artists?by=tracks&at=100%2B','#index/artists?by=tracks&at=100%2B'],['#index/artists?by=tracks&at=100','#index/artists?by=tracks'],['#index/artists/fontanna?q=fri&at=F','#index/artists/fontanna?q=fri&at=F'],
   ['#statistics/bermuda-day/artists','#index/artists/bermuda-day?by=tracks'],['#statistics/radio/labels','#index/labels?by=tracks'],['#statistics/library/artists','#index/artists?by=tracks'],['#statistics/bus/labels','#index/labels?by=tracks']]){
-  routeTo(e,typed);await flush();assert.deepEqual([e.location.hash,tab.getAttribute('href'),e.entries().length],[place,place,kept],typed);
+  // A link to the place shown adds nothing; any other adds one entry, at the place's one address.
+  const shown=e.location.hash,before=e.entries().length;routeTo(e,typed);await flush();assert.deepEqual([e.location.hash,tab.getAttribute('href'),e.entries().length],[place,place,before+(place===shown?0:1)],typed);
  }
  assert.equal(e.elements['index-query'].value,'','the field shows the filter of the address');
  routeTo(e,'#index/artists/fontanna?q=fri');await flush();
@@ -2748,11 +2757,12 @@ test('the Index has an address: a side, a stage, an order and a filter, and the 
   ['fri',[['All stations','#index/artists?q=fri',null],['Under the Sun','#index/artists/bermuda-day?q=fri',null]],'Fontanna','page'],'All stations first; each station keeps the side, the order and the filter');
  assert.deepEqual([...e.elements['index-sides'].children,...e.elements['index-order'].children].map(a=>[a.getAttribute('href'),a.attrs['aria-current']??null]),
   [['#index/artists/fontanna','page'],['#index/labels/fontanna',null],['#index/artists/fontanna?q=fri','true'],['#index/artists/fontanna?by=tracks&q=fri',null]],'the sides drop the filter, the orders keep it');
- follow(e,e.elements['index-order'].children[1]);await flush();follow(e,stageOf(e,'radio'));await flush();follow(e,e.elements['index-sides'].children[1]);await flush();
- assert.deepEqual([e.location.hash,e.entries().length],['#index/labels?by=tracks',kept],'sides, orders and stages replace the one entry');
+ const before=e.entries().length;follow(e,e.elements['index-order'].children[1]);await flush();follow(e,stageOf(e,'radio'));await flush();follow(e,e.elements['index-sides'].children[1]);await flush();
+ assert.deepEqual([e.location.hash,e.entries().length],['#index/labels?by=tracks',before+3],'sides, orders and stages add one entry each');
  e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};routeTo(e,'#statistics/fontanna');await flush();
  assert.deepEqual([tab.getAttribute('href'),e.document.querySelectorAll('.explorer-nav a')[2].getAttribute('href'),e.elements['index-head'].hidden,e.elements['music-view'].dataset.view],['#index/labels?by=tracks','#statistics/fontanna',true,'statistics'],'the tab keeps its last place; the head shows only in the Index');
- e.history.go(-1);await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash],[false,''],'Back closes the explorer in one step');
+ e.history.go(-1);await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash],[true,'#index/labels?by=tracks'],'Back goes back one move');
+ e.elements['explorer-close'].emit('click');await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash,e.position()],[false,'',0],'and ✕ closes the explorer in one step');
 });
 
 test('a names document keeps only valid names, ids, pictures and stages, and files each name under its folded first letter, # last',async()=>{
@@ -2837,7 +2847,7 @@ test('the filter ignores case and accents, writes the address in place, and the 
  for(const id of Object.keys(rects))delete e.elements[id].getBoundingClientRect;
  routeTo(e,'#index/artists/ambiance?q=ame');await flush();
  const look=note.children.find(n=>n.localName==='a');
- assert.deepEqual([textOf(note),look.getAttribute('href'),e.entries().length],['No artist matches “ame”. Look on all stations (2)','#index/artists?q=ame',kept],'a station with no match offers every station, with how many match there');
+ assert.deepEqual([textOf(note),look.getAttribute('href'),e.entries().length],['No artist matches “ame”. Look on all stations (2)','#index/artists?q=ame',kept+1],'a station with no match offers every station, with how many match there');
  assert.match(cssRules().get('.index-note a'),/text-decoration:underline; text-decoration-color:var\(--muted\); text-underline-offset:3px/,'a link in a sentence');
  routeTo(e,'#index/artists/bermuda-day?q=ame');await flush();assert.equal(textOf(note),'No artist matches “ame”. Look on all stations (2)');
  routeTo(e,'#index/artists/palac-dance?q=ame');await flush();assert.deepEqual([textOf(note),note.children.length],['2 of 4',0],'the total is the names on this stage');
@@ -2933,16 +2943,17 @@ test('a record opened from the Index comes back through its tab to the same row,
  assert.deepEqual([e.location.hash,e.document.activeElement.localName,explorer.scrollTop],['#explore/art_01a5cef5b30e','h3',0],'the record, at its title');
  routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
  assert.deepEqual([e.location.hash,e.namesRequests.length-asked,e.document.activeElement===row,explorer.scrollTop,row.getBoundingClientRect().top,e.entries().length,countsOf(e).radio],
-  ['#index/artists/bermuda-day?by=tracks',0,true,700,300,kept,'14'],'the same rows, the row where it stood, focused, and the stage bar\'s counts');
+  ['#index/artists/bermuda-day?by=tracks',0,true,700,300,kept+2,'14'],'the same rows, the row where it stood, focused, and the stage bar\'s counts');
  e.window.emit('popstate');explorer.scrollTop=10;e.window.emit('hashchange');await flush();
- assert.equal(explorer.scrollTop,10,'the place is used once: a browser move restores twice');
+ assert.equal(explorer.scrollTop,10,'the place is used once: the hashchange after a browser move restores nothing');
  // A window made shorter while the record showed: the row stays in view, above the dialog's bottom.
  follow(e,row);await flush();explorer.clientHeight=200;routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
  assert.deepEqual([row.getBoundingClientRect().top,e.document.activeElement===row],[144,true]);
  // Left by a tab, the Index keeps its first row under the bar, with no focus.
  e.response={...status('First'),...stageStats(),...stageMusic()};routeTo(e,'#statistics/bermuda-day');await flush();
  assert.ok(!list.descendants().includes(row),'another place draws its own');
- e.history.go(-1);await flush();assert.equal(explorer.open,false,'and Back closes the explorer in one step');
+ e.history.go(-1);await flush();assert.deepEqual([explorer.open,e.location.hash],[true,'#index/artists/bermuda-day?by=tracks'],'and Back goes back one move, to the Index');
+ e.elements['explorer-close'].emit('click');await flush();assert.deepEqual([explorer.open,e.location.hash,e.position()],[false,'',0],'then ✕ closes the explorer in one step');
 });
 
 test('the names load once per side and page, Try again asks again after a failure, and the head works without them',async()=>{
@@ -3707,7 +3718,7 @@ const laidIndex=e=>{
 };
 const railOf=e=>e.elements['index-rail'].children[0];
 // The Index's parts sit inside the explorer, as in index.html, so focus on them is focus in the explorer.
-const nest=e=>{e.elements.explorer.append(e.elements['music-content'],e.elements['index-query'],e.elements['index-rail'],e.elements['stage-row']);return e;};
+const nest=e=>{e.elements.explorer.append(e.elements['music-view']);return e;};
 const marksOn=e=>railOf(e).children.slice(1).map(b=>[textOf(b),b.disabled]);
 const currentMark=e=>railOf(e).children.filter(b=>b.attrs['aria-current']).map(b=>b.dataset.mark);
 const typed=(e,key,target=control('a'))=>e.key(key===' '?'Space':key==='/'?'Slash':'Key'+key.toUpperCase(),target,{key});
@@ -4131,4 +4142,188 @@ test('a move inside the open explorer writes the canonical address once',async()
   assert.deepEqual([e.location.hash,writes()],[address,1],href+' from another place is written once, at '+address);
   await flush();assert.deepEqual([e.location.hash,writes()],[address,1],'and nothing renames it after');
  }
+});
+
+// One history entry for each move: the browser's Back and Forward, and a phone's Back gesture, walk the visit, and ✕
+// leaves all of it in one step.
+const titleShown=e=>inspector(e).descendants().find(n=>n.localName==='h3')?.textContent;
+const walk=async(e,ids)=>{for(const id of ids){routeTo(e,'#explore/'+id);await flush();}};
+// Every history.go(delta) the page asks for from now on, still carried out.
+const goes=e=>{const steps=[],go=e.history.go;e.history.go=function(delta){steps.push(delta);go.call(this,delta);};return steps;};
+
+test('each record and each tab move is one entry, and Back and Forward walk them',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());e.historyReply=()=>({items:[],next:null});
+ await walk(e,['art_000000000001','art_000000000002','art_000000000003']);routeTo(e,'#history');await flush();routeTo(e,'#statistics');await flush();
+ assert.deepEqual([e.entries(),e.position(),e.history.length],[['','#explore/art_000000000001','#explore/art_000000000002','#explore/art_000000000003','#history/palac-feel','#statistics/palac-feel'],5,6],'3 records and 2 tabs: 5 entries above the page');
+ e.history.go(-1);await flush();assert.deepEqual([e.elements.explorer.open,e.location.hash,e.elements['music-view'].dataset.view],[true,'#history/palac-feel','history'],'Back shows the tab before');
+ e.history.go(-1);await flush();assert.deepEqual([e.location.hash,titleShown(e)],['#explore/art_000000000003','Name art_000000000003'],'and then the record before');
+ e.history.go(-1);await flush();assert.deepEqual([e.location.hash,titleShown(e)],['#explore/art_000000000002','Name art_000000000002']);
+ e.history.go(1);await flush();assert.deepEqual([e.location.hash,titleShown(e),e.position()],['#explore/art_000000000003','Name art_000000000003',3],'Forward shows it again');
+ e.history.go(1);await flush();assert.deepEqual([e.location.hash,e.elements['music-view'].dataset.view,e.entries().length],['#history/palac-feel','history',6],'and the tab after it, with every entry kept');
+});
+
+test('typing a search, the filter, at= and the Day field write the entry in place',async()=>{
+ const e=await indexed();laidIndex(e);e.historyReply=()=>({items:[],next:null});
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
+ routeTo(e,'#explore');await flush();const query=e.elements['discovery-query'];
+ query.value='jimi';query.emit('input');e.fire(300);await flush();let kept=e.entries().length;
+ for(const typed of ['jimi j','jimi ju']){query.value=typed;query.emit('input');e.fire(300);await flush();}
+ assert.deepEqual([e.location.hash,e.entries().length],['#explore?q=jimi%20ju',kept],'the search after its first results');
+ routeTo(e,'#index/artists');await flush();kept=e.entries().length;
+ const explorer=e.elements.explorer;explorer.scrollTop=2500;explorer.emit('scroll');explorer.emit('scroll');e.fire('frame');e.fire(250);
+ assert.deepEqual([e.location.hash,e.entries().length],['#index/artists?at=F',kept],'the at= mark');
+ typeIndex(e,'am');typeIndex(e,'ame');
+ assert.deepEqual([e.location.hash,e.entries().length],['#index/artists?q=ame',kept],'the filter');
+ routeTo(e,'#history/bermuda-day');await flush();kept=e.entries().length;const day=e.elements['history-day'];
+ for(const value of ['2026-03-28','2026-03-27']){day.value=value;day.emit('change');await flush();}
+ assert.deepEqual([e.location.hash,e.entries().length],['#history/bermuda-day/2026-03-27',kept],'the Day field, one day at a time');
+ e.history.go(-1);await flush();assert.equal(e.location.hash,'#index/artists?q=ame','so Back skips the days and the keys typed');
+});
+
+test('the first result list after a record adds one entry, and the next keys replace it',async()=>{
+ const e=setup({journey:true});await flush();const query=e.elements['discovery-query'];
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
+ routeTo(e,'#explore/art_000000000001');await flush();
+ query.value='jimi';query.emit('input');e.fire(300);await flush();
+ assert.deepEqual([e.entries(),e.position()],[['','#explore/art_000000000001','#explore?q=jimi'],2],'the first results are one entry over the record');
+ query.value='jimx';query.emit('input');e.fire(300);await flush();query.value='jim';e.elements['discovery-search'].emit('submit',{preventDefault(){}});await flush();
+ assert.deepEqual([e.entries(),e.position()],[['','#explore/art_000000000001','#explore?q=jim'],2],'the next keys write that entry');
+ e.history.go(-1);await flush();assert.deepEqual([e.location.hash,titleShown(e)],['#explore/art_000000000001','Name art_000000000001'],'Back from the search returns to the record');
+});
+
+test('✕ and Escape leave the whole visit in one step, onto the page entry',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ const ids=['art_000000000001','art_000000000002','art_000000000003','art_000000000004','art_000000000005'];
+ for(const leave of [()=>e.elements['explorer-close'].emit('click'),()=>e.key('Escape')]){
+  await walk(e,ids);assert.deepEqual([e.history.state.depth,e.position()],[4,5],'depth 4');
+  const steps=goes(e);leave();await flush();
+  assert.deepEqual([steps,e.position(),e.location.hash,e.elements.explorer.open],[[-5],0,'',false],'one step back to the page');
+ }
+});
+
+test('a shared link: moves from it add entries, and ✕ goes back to it and closes in place',async()=>{
+ const e=setup({journey:true,hash:'#explore/art_0123456789ab'});await flush();e.discovery=url=>entity(url.split('/').pop());
+ assert.deepEqual([e.history.state.owned,e.history.state.depth],[0,0],'a shared link is found, not owned');
+ await walk(e,['art_000000000001','art_000000000002']);
+ assert.deepEqual([e.entries(),e.history.state.depth],[['#explore/art_0123456789ab','#explore/art_000000000001','#explore/art_000000000002'],2],'each move adds one entry');
+ const steps=goes(e);e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([steps,e.position(),e.elements.explorer.open,e.location.hash,e.url()],[[-2],0,false,'','/?station='+e.window.Pavoia.getState().stage],'✕ goes back to the shared link\'s entry and closes it in place, onto the radio');
+});
+
+test('where the Navigation API says the page entry is gone or in another document, ✕ closes in place',async()=>{
+ // The Navigation API as Chromium keeps it: every entry of the harness, and those the test marks as another document.
+ const api=(e,other=()=>false)=>({entries:()=>e.urls().map((url,index)=>({url:'https://radio.test'+url,index,sameDocument:!other(index)})),get currentEntry(){return {index:e.position()};},canGoBack:true});
+ for(const [what,other,expected] of [['in this document',()=>false,[-3]],['in another document',i=>i===0,[]]]){
+  const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());e.window.navigation=api(e,other);
+  await walk(e,['art_000000000001','art_000000000002','art_000000000003']);
+  const steps=goes(e),at=e.position();e.elements['explorer-close'].emit('click');await flush();
+  assert.deepEqual([steps,e.position(),e.elements.explorer.open,e.location.hash],[expected,expected.length?0:at,false,''],'the page entry '+what);
+ }
+ // The page entry pruned, as the oldest entries of a long history are: the entry the visit counts back to is gone.
+ const pruned=setup({journey:true});await flush();pruned.discovery=url=>entity(url.split('/').pop());
+ await walk(pruned,['art_000000000001','art_000000000002','art_000000000003']);pruned.evict(1);pruned.window.navigation=api(pruned);
+ let steps=goes(pruned);pruned.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([steps,pruned.elements.explorer.open,pruned.location.hash,pruned.position()],[[],false,'',2],'a page entry gone: it closes in place');
+ // An owned visit whose entry n steps back holds an explorer place: that entry is not the page, so it is not taken for it.
+ const e=setup({journey:true,hash:'#explore/art_000000000003',state:{explorer:1,seen:1,base:1,depth:1,owned:1,key:'1:3'},below:[{hash:''},{hash:'#explore/art_000000000001'},{hash:'#explore/art_000000000002'}]});await flush();
+ e.discovery=url=>entity(url.split('/').pop());e.window.navigation=api(e);
+ steps=goes(e);e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([steps,e.elements.explorer.open,e.location.hash,e.position()],[[],false,'',3],'an explorer entry where the page should be: it closes in place');
+});
+
+test('without the Navigation API, ✕ closes in place when the page entry would be past the start of the history',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ await walk(e,['art_000000000001','art_000000000002','art_000000000003','art_000000000004']);e.evict(1);
+ assert.deepEqual([e.history.length,e.history.state.depth+1],[4,4],'the page entry is gone: 4 entries, and the page would be 4 back');
+ const steps=goes(e);e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([steps,e.elements.explorer.open,e.location.hash],[[],false,''],'it closes in place');
+ routeTo(e,'#explore/art_000000000005');await flush();
+ assert.deepEqual([e.elements.explorer.open,e.location.hash,titleShown(e)],[true,'#explore/art_000000000005','Name art_000000000005'],'and the close does not stay on its way: a later move opens');
+});
+
+test('past depth 40 a move replaces the entry, so ✕ still reaches the page in one step',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ await walk(e,Array.from({length:45},(_,i)=>'art_'+(i+1).toString(16).padStart(12,'0')));
+ assert.deepEqual([e.entries().length,e.history.state.depth,e.location.hash,titleShown(e)],[42,40,'#explore/art_00000000002d','Name art_00000000002d'],'45 moves: the page, then depths 0 to 40, the last one shown');
+ const steps=goes(e);e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([steps,e.position(),e.location.hash,e.elements.explorer.open],[[-41],0,'',false]);
+});
+
+test('after a reload, moves carry the old base, and ✕ without the Navigation API closes in place',async()=>{
+ const old=n=>({explorer:1,seen:1,base:1,depth:n,owned:1,key:'1:'+(n+1)});
+ const e=setup({journey:true,hash:'#explore/art_000000000003',state:old(2),below:[{hash:''},{hash:'#explore/art_000000000001',state:old(0)},{hash:'#explore/art_000000000002',state:old(1)}]});await flush();
+ e.discovery=url=>entity(url.split('/').pop());
+ routeTo(e,'#explore/art_000000000004');await flush();
+ assert.deepEqual([e.history.state.base,e.history.state.depth,e.history.state.owned,e.history.length],[1,3,1,5],'the move carries the base of the visit, from the page life before the reload');
+ const steps=goes(e);e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([steps,e.elements.explorer.open,e.location.hash,e.position()],[[],false,'',4],'no Back into entries another document may hold: it closes in place');
+});
+
+test('one browser move restores once',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ await walk(e,['art_000000000001']);
+ let before=e.discoveryRequests.length;e.visit('#explore/art_000000000002');await flush();
+ assert.equal(e.discoveryRequests.length-before,1,'popstate restores; the hashchange after it asks nothing');
+ before=e.discoveryRequests.length;e.location.hash='#explore/art_000000000003';e.window.emit('hashchange');await flush();
+ assert.deepEqual([e.discoveryRequests.length-before,titleShown(e)],[1,'Name art_000000000003'],'a hash written with no popstate still restores');
+});
+
+test('a station change deep in a visit adds no entry, and ✕ lands on the station tuned',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ await walk(e,['art_000000000001','art_000000000002','art_000000000003','art_000000000004']);
+ const kept=e.entries().length,from=e.window.Pavoia.getState().stage;e.key('ArrowRight');await flush();const to=e.window.Pavoia.getState().stage;
+ assert.notEqual(to,from);assert.deepEqual([e.entries().length,e.location.search],[kept,'?station='+to],'the arrow names the station in the entry shown');
+ e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([e.url(),e.position(),e.elements.explorer.open],['/?station='+to,0,false]);
+});
+
+test('a pushState or a replaceState that throws during a move still opens the place',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ await walk(e,['art_000000000001']);
+ for(const name of ['pushState','replaceState'])e.history[name]=()=>{throw new Error('SecurityError: too many calls to the History API');};
+ routeTo(e,'#explore/art_000000000002');await flush();
+ assert.deepEqual([titleShown(e),e.elements.explorer.open],['Name art_000000000002',true],'the record shows, though the address lags');
+ routeTo(e,'#explore/art_000000000003');await flush();
+ assert.equal(titleShown(e),'Name art_000000000003','and the next move works');
+});
+
+test('the Roots tab on the record on air adds no entry, and from another record it adds one',async()=>{
+ const e=setup({journey:true});await flush();
+ // The roots rename the record on air, as they rename every plex_ one.
+ e.discovery=url=>url.endsWith('/entity/plex_123')?entity('trk_0000000000aa','track'):entity(url.split('/').pop());
+ routeTo(e,'#explore');await flush();assert.equal(e.location.hash,'#explore/trk_0000000000aa');
+ const kept=e.entries().length,writes=countWrites(e);
+ routeTo(e,'#explore');await flush();
+ assert.deepEqual([e.location.hash,e.entries().length,writes()],['#explore/trk_0000000000aa',kept,0],'a link to the record on air, shown already, changes nothing');
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#explore');await flush();
+ assert.deepEqual([e.location.hash,e.entries().length,titleShown(e)],['#explore/trk_0000000000aa',kept+2,'Name trk_0000000000aa'],'from another record it is one entry, on the record on air');
+ e.history.go(-1);await flush();assert.deepEqual([e.location.hash,titleShown(e)],['#explore/art_000000000001','Name art_000000000001'],'and Back returns to that record');
+});
+
+test('Back from a tab to a record puts focus on its title, from a field or a link above the rows too',async()=>{
+ const e=await indexed();laidIndex(e);e.historyReply=()=>({items:[],next:null});
+ const title=()=>inspector(e).descendants().find(n=>n.localName==='h3');
+ for(const [tab,field] of [['#index/artists','index-query'],['#history/bermuda-day','history-day'],['#history/bermuda-day','stage-row']]){
+  routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,tab);await flush();
+  e.elements[field].focus();e.history.go(-1);await flush();
+  assert.deepEqual([e.location.hash,e.document.activeElement===title(),title()?.textContent],['#explore/art_000000000001',true,'Name art_000000000001'],field);
+ }
+});
+
+test('an address typed short restores once, and a push the browser refuses keeps the depth true',async()=>{
+ // A typed #history fires popstate, then hashchange. The first restore rewrites it to its full address; the second
+ // event finds the place shown and asks nothing.
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());e.historyReply=()=>({items:[],next:null});
+ await walk(e,['art_000000000001']);
+ const asked=e.historyRequests.length;e.visit('#history');await flush();
+ assert.deepEqual([e.location.hash,e.historyRequests.length-asked],['#history/palac-feel',1],'one History request for one typed address');
+ // Only pushState throws: the move replaces the entry shown, so the visit is no deeper and ✕ still counts right.
+ const f=setup({journey:true});await flush();f.discovery=url=>entity(url.split('/').pop());
+ await walk(f,['art_000000000001','art_000000000002']);
+ const depth=f.history.state.depth,at=f.position(),entries=f.entries().length,push=f.history.pushState;
+ f.history.pushState=()=>{throw new Error('SecurityError: too many calls to the History API');};
+ routeTo(f,'#explore/art_000000000003');await flush();
+ assert.deepEqual([titleShown(f),f.location.hash,f.history.state.depth,f.position(),f.entries().length],['Name art_000000000003','#explore/art_000000000003',depth,at,entries],'the place opens in the entry shown, at the same depth');
+ f.history.pushState=push;f.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([f.elements.explorer.open,f.position(),f.location.hash],[false,0,''],'✕ goes back to the page entry in one step');
 });
