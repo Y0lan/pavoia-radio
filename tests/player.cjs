@@ -297,6 +297,65 @@ test('late metadata cannot overwrite a newer station or clear its poll guard',as
  assert.equal(e.elements['player-title'].textContent,'Next');
 });
 
+// Two stations inside the page: the one shown and the one tuned. They are one for now, so the page behaves as before.
+test('the page asks one /api/radio request per poll while the station shown and the station tuned are one',async()=>{
+ const e=setup({deferFetch:true});await flush();const radio=()=>e.requests.filter(r=>r.url.startsWith('/api/radio/')),title=()=>e.elements['player-title'].textContent;
+ assert.deepEqual(radio().map(r=>r.url),['/api/radio/palac-feel'],'the start asks once');
+ let tick=e.poll();await flush();assert.equal(radio().length,1,'a tick while the station has not answered asks nothing more');
+ e.complete(0,status('First'));await tick;await flush();assert.equal(e.elements['player-title'].textContent,'First');
+ let said=0;e.window.addEventListener('pavoia:radio',()=>{said++;});
+ for(const n of [2,3,4]){
+  let answered=false;tick=e.poll();assert.equal(typeof tick?.then,'function','a tick returns its promise');tick.then(()=>{answered=true;});await flush();
+  assert.deepEqual([radio().length,radio().at(-1).url,answered],[n,'/api/radio/palac-feel',false],'each 10 s tick asks once, and waits for the answer');
+  const before=said;e.complete(n-1,status('Track '+n));await tick;assert.equal(title(),'Track '+n,'its answer is in the bar when the tick ends');
+  assert.equal(said-before,1,'an answer is announced once, so the explorer draws the player once');
+ }
+ tick=e.poll();await flush();const left=radio().at(-1);
+ e.change('03');
+ assert.deepEqual([left.signal.aborted,radio().length,radio().at(-1).url,title()],[true,6,'/api/radio/palac-dance','Loading track…'],'a station change drops the old station\'s request and asks the new one once');
+ left.resolve({ok:true,json:async()=>({...status('Old'),stage:{id:'palac-feel'}})});await tick;await flush();
+ assert.equal(title(),'Loading track…','the old station\'s late answer writes nothing');
+ e.complete(5,status('Dance'));await flush();assert.equal(title(),'Dance');
+ e.change('04');
+ assert.deepEqual([radio().length,radio().at(-1).url,title()],[7,'/api/radio/palac-feel','Loading track…'],'back on a station, its record was forgotten: it loads again');
+ e.change('03');e.change('04');e.complete(6,status('Old'));await flush();
+ assert.deepEqual([radio().length,title()],[9,'Loading track…'],'a dropped request\'s late answer writes nothing while the same station asks again');
+ e.complete(8,status('Feelings'));await flush();assert.equal(title(),'Feelings');
+});
+
+test('getState names the station shown and the station tuned',async()=>{
+ const e=setup({journey:true});await flush();const s=()=>e.window.Pavoia.getState(),both=()=>[s().viewing,s().stage,s().apart];
+ assert.deepEqual(both(),['palac-feel','palac-feel',false],'one station at the start');
+ assert.deepEqual(s().viewingTrack,{id:'123',title:'First',artist:'Artist First'},'the track the station shown answered');
+ e.response=status('Dance');e.change('03');await flush();assert.deepEqual([...both(),s().viewingTrack?.title],['palac-dance','palac-dance',false,'Dance'],'after a rail change');
+ e.key('ArrowRight');await flush();assert.deepEqual(both(),['palac-feel','palac-feel',false],'after an arrow');
+ e.key('Digit5',undefined,{key:'5'});await flush();assert.deepEqual(both(),['etage-zero','etage-zero',false],'after 1 to 9');
+ e.visit('#bus');await flush();assert.deepEqual(both(),['etage-zero','etage-zero',false],'on the Bus');
+ e.discovery=url=>url.includes('/search?')?{items:[]}:{entity:{id:'trk_0123456789ab',type:'track',title:'T',previewUrl:'/api/discovery/preview/trk_0123456789ab',connections:[]},included:[]};
+ e.elements['preview-audio'].play=async()=>{};e.click();e.playing();
+ e.visit('#explore/trk_0123456789ab');await flush();e.elements['entity-inspector'].querySelector('.preview-toggle').emit('click');await flush();
+ assert.equal(s().wanted,false,'the preview holds the radio');
+ e.change('03');await flush();assert.deepEqual([...both(),s().wanted],['palac-dance','palac-dance',false,true],'after a change during a preview');
+ e.response=new Error('Offline');await e.poll();
+ assert.deepEqual([s().viewingTrack,s().track?.title,s().dataFresh],[null,'Dance',false],'a failed answer is no track on air for the station shown');
+});
+
+test('the play button is enabled at startup, before any station change',async()=>{
+ const e=setup();
+ assert.equal(e.elements.play.disabled,false,'the bar is drawn at startup, so the markup\'s disabled goes');
+});
+
+test('a language switch keeps the bar on what its station answered: loading, or its name after a failed answer',async()=>{
+ const e=setup({deferFetch:true});await flush();const title=()=>e.elements['player-title'].textContent;
+ assert.equal(title(),'Loading track…');
+ e.setLanguage('de');assert.equal(title(),'Titel wird geladen…','a switch while the station has not answered still says it loads');
+ e.requests[0].reject(new Error('Offline'));await flush();
+ assert.equal(title(),'Lost in Feelings','a failed answer with no track known names the station');
+ e.setLanguage('en');assert.equal(title(),'Lost in Feelings','a switch after it keeps the station\'s name, not No track announced');
+ e.setLanguage('de');assert.equal(title(),'Lost in Feelings','in either language');
+ assert.equal(e.mediaSession.metadata,null,'and the lock screen stays clear');
+});
+
 test('live audience updates independently and never presents missing data as zero',async()=>{
  const e=setup();await flush();const live=e.elements['live-text'],body=e.document.body;
  e.audienceResponse=status('Count',0).audience;await e.pollAudience();assert.equal(live.textContent,'Live','nobody listening shows no count');

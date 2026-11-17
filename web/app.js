@@ -139,9 +139,7 @@ try { const saved=localStorage.getItem('pavoia-way'); if (Object.hasOwn(ways,sav
 let shown = [];
 let playbackState='paused';
 let playbackText='paused';
-let radioData=null;
 let dataFresh=false;
-let loading=true;
 
 const $ = id => document.getElementById(id);
 const plain = mood => mood.title.join(' ').trim();
@@ -164,9 +162,13 @@ const moodOf = id => moods.find(mood => mood.stage === id) || null;
 let remembered = null;
 try { remembered = localStorage.getItem('pavoia-station'); } catch { /* Storage is optional. */ }
 let currentMood = moodOf(new URLSearchParams(location.search).get('station')) || moodOf(remembered) || moods[3];
-// A change of station or a play remembers it for the next visit.
+// currentMood is the station shown: the hero, the rail, the address and the Live count. tunedMood is the station the
+// player bar holds: the one that plays, or that the bar's play starts. For now a station change moves both at once.
+let tunedMood = currentMood;
+const apart = () => tunedMood !== currentMood;
+// A change of station or a play remembers the station in the bar for the next visit.
 function rememberStation() {
-  try { localStorage.setItem('pavoia-station', currentMood.stage); } catch { /* Storage is optional. */ }
+  try { localStorage.setItem('pavoia-station', tunedMood.stage); } catch { /* Storage is optional. */ }
 }
 let track = null;
 let wanted = false;
@@ -178,7 +180,9 @@ let retryTimer;
 let watchdog;
 let healthyTimer;
 let removeListeners = () => {};
-let pollController;
+// What each station followed (the one shown and the one tuned) has on air, by stage, and the request that asks it.
+const air = new Map(), polls = new Map();
+const airOf = mood => air.get(mood.stage) || { track: null, fresh: false, loading: Boolean(mood.stage) };
 let audienceController, audienceData=null, audienceStage;
 // The wait before each new try after a loss; the last one repeats for as long as the listener wants to play.
 const delays = [1000, 2000, 4000, 8000, 15000];
@@ -418,13 +422,13 @@ $('poster').addEventListener('pointerup', event => {
 
 function metadata(value) {
   track = value;
-  $('player-title').textContent = track ? track.title || text('untitled') : currentMood.stage ? text('noTrack') : text('notOnAir');
+  $('player-title').textContent = track ? track.title || text('untitled') : tunedMood.stage ? text('noTrack') : text('notOnAir');
   $('player-artist').textContent = track ? track.artist || text('unknownArtist') : '';
   $('player-album').textContent = track?.album || '';
   $('player-album').hidden = !track?.album;
   if ('mediaSession' in navigator && 'MediaMetadata' in window) {
     navigator.mediaSession.metadata = track ? new MediaMetadata({
-      title: track.title || text('untitled'), artist: track.artist || '', album: albumOf(currentMood),
+      title: track.title || text('untitled'), artist: track.artist || '', album: albumOf(tunedMood),
     }) : null;
   }
   tabTitle();
@@ -477,10 +481,10 @@ function renderScene() {
   $('station-label').textContent = `${text('stationPosition')} ${index+1} ${text('of')} ${shown.length}, ${spoken(currentMood)}`;
   $('station-position').hidden = bus;
 }
-// The tab names the record while it plays, and the stage otherwise.
+// The tab names the record while it plays, and otherwise the station the listener wants to hear, or the one shown.
 function tabTitle() {
   const name = playbackState === 'playing' && track ? `▶ ${track.title || text('untitled')} · ${track.artist || text('unknownArtist')}`
-    : location.hash === '#bus' ? 'The Bus' : plain(currentMood);
+    : location.hash === '#bus' ? 'The Bus' : plain(wanted ? tunedMood : currentMood);
   document.title = `${name} · Pavoia Radio`;
 }
 // The address names the station shown, in place, so a copied address opens it: a station never adds a history entry,
@@ -504,16 +508,36 @@ $('moods').addEventListener('click', event => {
   if (event.target.name === 'mood' && event.target.value === currentMood.id) {leaveBus();closeStations();}
 });
 
+// The view: the scene, the header's Live line and the checked station, all of the station shown.
 function render() {
   changePhoto();
   renderStatus();
-  button.disabled = !currentMood.stage;
   document.querySelector(`input[value="${currentMood.id}"]`).checked = true;
-  metadata(null);
+}
+// The bar: the station it holds, and what that station has on air.
+function renderBar() {
+  button.disabled = !tunedMood.stage;
   // The bar names the stage after a station named otherwise; where its column is narrow, the stylesheet hides it.
-  const suffix = stageSuffix(currentMood);
-  $('player-stage').replaceChildren(plain(currentMood), ...suffix ? [Object.assign(document.createElement('span'), { className: 'player-stage-of', textContent: ` · ${suffix}` })] : []);
-  if (currentMood.stage) $('player-title').textContent = text('loading');
+  const suffix = stageSuffix(tunedMood);
+  $('player-stage').replaceChildren(plain(tunedMood), ...suffix ? [Object.assign(document.createElement('span'), { className: 'player-stage-of', textContent: ` · ${suffix}` })] : []);
+  syncBar();
+}
+// The bar's track is the one its station answered last: Loading track… until the first answer, and after a failed
+// answer the last track known, or the station's name when none is. A failed answer clears the lock screen.
+function syncBar() {
+  const entry = airOf(tunedMood), failed = !entry.loading && !entry.fresh;
+  dataFresh = entry.fresh;
+  metadata(entry.track);
+  if (entry.loading && tunedMood.stage) $('player-title').textContent = text('loading');
+  if (failed && !track) $('player-title').textContent = plain(tunedMood);
+  if (failed && 'mediaSession' in navigator) navigator.mediaSession.metadata = null;
+}
+// Only the station shown and the station tuned are followed: one left behind is asked no more and forgotten, so a return
+// to it says Loading track… until it answers.
+function prunePolls() {
+  const kept = stage => stage === currentMood.stage || stage === tunedMood.stage;
+  for (const [stage, controller] of polls) if (!kept(stage)) { controller.abort(); polls.delete(stage); }
+  for (const stage of air.keys()) if (!kept(stage)) air.delete(stage);
 }
 
 function state(value, status) {
@@ -604,7 +628,7 @@ function connect() {
   };
   watchdog = setTimeout(() => fail(token), 20000);
   // A new source discards any buffered audio and joins the current broadcast.
-  audio.src = `/stream/${currentMood.stage}.mp3`;
+  audio.src = `/stream/${tunedMood.stage}.mp3`;
   try {
     const attempt = audio.play();
     if (attempt) attempt.catch(error => fail(token, error.name === 'NotAllowedError'));
@@ -615,7 +639,7 @@ function connect() {
 
 function play() {
   window.Pavoia?.cancelPreview?.();
-  if (!currentMood.stage) return;
+  if (!tunedMood.stage) return;
   if (wanted) return reconnectNow();
   wanted = true;
   lost = false;
@@ -685,12 +709,14 @@ if ('mediaSession' in navigator) {
   }
 }
 
-async function poll() {
-  if (!currentMood.stage || pollController) return;
+// Each station followed is asked what it has on air every 10 s and after each change. The bar reads the station tuned,
+// the header the station shown; while they are one, the page asks once.
+async function poll(mood = currentMood) {
+  const stage = mood.stage;
+  if (!stage || polls.has(stage)) return;
   const controller = new AbortController();
-  const stage = currentMood.stage;
-  pollController = controller;
-  const current = () => pollController === controller;
+  polls.set(stage, controller);
+  const current = () => polls.get(stage) === controller;
   const timeout = setTimeout(() => controller.abort(), 6000);
   controller.signal.addEventListener('abort', () => clearTimeout(timeout), { once: true });
   try {
@@ -701,20 +727,20 @@ async function poll() {
     if (!current()) return;
     if (!data || data.stage?.id !== stage || !data.audience || !('track' in data)) throw new Error('schema');
     if (data.track !== null && (typeof data.track.id !== 'string' || typeof data.track.title !== 'string' || typeof data.track.artist !== 'string')) throw new Error('track');
-    radioData=data; dataFresh=true; loading=false;
-    metadata(data.track);
-    renderStatus();
+    air.set(stage, { track: data.track, fresh: true, loading: false });
   } catch {
     if (!current()) return;
-    dataFresh=false; loading=false;
-    renderStatus();
-    if ('mediaSession' in navigator) navigator.mediaSession.metadata = null;
-    announceRadio();
+    air.set(stage, { track: air.get(stage)?.track ?? null, fresh: false, loading: false });
   } finally {
     clearTimeout(timeout);
-    if (current()) pollController = null;
+    if (current()) polls.delete(stage);
   }
+  // One announcement per answer: the bar's, or for a station only shown, its own.
+  if (stage === currentMood.stage) renderStatus();
+  if (stage === tunedMood.stage) syncBar();
+  else if (stage === currentMood.stage) announceRadio();
 }
+const pollAll = () => Promise.all([poll(currentMood), apart() && poll(tunedMood)]);
 
 // The live count is polled every 2 s after anything that can change it (page shown, station change,
 // playback start, a new count) and twice as rarely each time it stays the same, up to every 30 s.
@@ -762,15 +788,14 @@ function selectMood(id) {
   release();
   retries = 0;
   lost = false;
-  if (pollController) pollController.abort();
-  pollController = null;
   audienceController?.abort();audienceController=null;audienceData=null;audienceStage=null;
-  currentMood = next;
+  currentMood = tunedMood = next;
+  prunePolls();
   writeAddress();
   rememberStation();
-  radioData=null; dataFresh=false; loading=Boolean(next.stage);
   if (!next.stage) wanted = false;
   render();
+  renderBar();
   if (wanted) connect();
   else state('paused', 'paused');
   poll();
@@ -778,14 +803,15 @@ function selectMood(id) {
 }
 $('moods').addEventListener('change', event => selectMood(event.target.value));
 
-document.addEventListener('visibilitychange', () => { if (!document.hidden) {poll();pollListeners(true);} else {audienceController?.abort();} });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) {pollAll();pollListeners(true);} else {audienceController?.abort();} });
 writeAddress();
 arrangeStations();
 localise();
 render();
+renderBar();
 state('paused', 'paused');
 poll();
-setInterval(poll, 10000);
+setInterval(pollAll, 10000);
 pollListeners(true);
 setInterval(tickListeners, 1000);
 audio.addEventListener('playing', () => pollListeners(true));
@@ -795,16 +821,15 @@ audio.addEventListener('playing', () => pollListeners(true));
 // so the dot moves at most once per stage change. Screen readers get #live-label instead of the
 // visible words: "Connecting…" while pending, then the full sentence, zero included, and whether a track is on air.
 function renderStatus() {
-  const live=$('live-text'),label=$('live-label'),onAir=Boolean(dataFresh && track);
-  const pending=Boolean(currentMood.stage) && (loading || audienceStage!==currentMood.stage);
+  const live=$('live-text'),label=$('live-label'),seen=airOf(currentMood),onAir=Boolean(seen.fresh && seen.track);
+  const pending=Boolean(currentMood.stage) && (seen.loading || audienceStage!==currentMood.stage);
   document.body.toggleAttribute('data-on-air',onAir);
   live.toggleAttribute('data-pending',pending);
   live.removeAttribute('title');
-  if (!loading && !dataFresh && !track) $('player-title').textContent=plain(currentMood);
   if (pending) { label.textContent=text('connecting'); return; }
   const { listeners: count, measuredAt, available }=audienceData || {};
   const fresh=Number.isFinite(Date.parse(measuredAt)) && Math.abs(Date.now()-Date.parse(measuredAt))<=AUDIENCE_SLOW+5000;
-  const known=dataFresh && fresh && available && Number.isInteger(count) && count>=0;
+  const known=seen.fresh && fresh && available && Number.isInteger(count) && count>=0;
   live.textContent=text('live')+(onAir && known && count>=1 ? ` · ${count}${narrowHeader.matches ? '' : ' '+text('listening')}` : '');
   if (known) live.title=`${count} ${text('audience')}: ${plain(currentMood)}`;
   // The muted dot is not read aloud, so the label says when no track is on air.
@@ -827,8 +852,7 @@ function localise() {
   document.querySelector('.player').setAttribute('aria-label',text('player'));
   renderArtworkToggle();
   renderScene();
-  metadata(track);
-  if (!dataFresh && 'mediaSession' in navigator) navigator.mediaSession.metadata=null;
+  syncBar();
   renderStatus();
   state(playbackState,playbackText);
 }
@@ -851,5 +875,8 @@ function announceRadio() {
 // One object per station, built once, because the explorer counts stations in Maps keyed by them; the list follows the
 // order on screen, with each station's group in the way shown and its stage in the language shown.
 const stationOf = new Map(moods.map(m => [m, {id:m.stage, name:plain(m), thumb:m.photos[0].src, get group() { return groupOf(m).key; }, get fact() { return stageFact(m); }}]));
-window.Pavoia = { get stations() { return shown.map(m => stationOf.get(m)); }, getState: () => ({track, stage:currentMood.stage, name:plain(currentMood), album:albumOf(currentMood), language, wanted, playbackState, playbackText, dataFresh}),
+// getState() is about the radio, the station tuned; viewing, viewingTrack and apart are about the station shown.
+window.Pavoia = { get stations() { return shown.map(m => stationOf.get(m)); },
+  getState: () => ({track, stage:tunedMood.stage, name:plain(tunedMood), album:albumOf(tunedMood), language, wanted, playbackState, playbackText, dataFresh,
+    viewing:currentMood.stage, viewingTrack:airOf(currentMood).fresh ? airOf(currentMood).track : null, apart:apart()}),
   play, pause, renderScene, toggle, tune };

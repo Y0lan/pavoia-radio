@@ -279,19 +279,22 @@
   function renderPlayer() {
     const s=radio.getState(),t=s.track,e=enriched?.entity,all=enriched?.included||[];
     const cover=e?.image||t?.coverUrl;
+    // The hero shows the station shown: while the radio plays another, its sleeve and portrait are the ones that station
+    // has on air, and the bar keeps the radio's.
+    const heroCover=s.apart?s.viewingTrack?.coverUrl:cover;
     const people=all.filter(v=>v.type==='artist'&&entityID(v.id)&&(e?.connections||[]).some(c=>c.id===v.id&&['primary','featured','remixer'].includes(c.relation)));
     const portraits=people.filter(a=>a.image);
-    image($('hero-cover'),cover,word('cover'));
+    image($('hero-cover'),heroCover,word('cover'));
     // Without a cover the bar shows the stage, so the record cell never starts on an empty square.
     const dock=$('dock-cover'),thumb=radio.stations.find(v=>v.id===s.stage).thumb;
     if(imagePath(cover))image(dock,cover,word('cover'));
     else if(dock.getAttribute('src')!==thumb){dock.onload=dock.onerror=null;dock.alt='';dock.src=thumb;dock.hidden=false;}
-    image($('painted-artist'),portraits[0]?.image||t?.artistImageUrl,'');
-    const key=JSON.stringify([s.stage,s.language,t,enriched]);
+    image($('painted-artist'),s.apart?s.viewingTrack?.artistImageUrl:portraits[0]?.image||t?.artistImageUrl,'');
+    const key=JSON.stringify([s.stage,s.viewing,s.language,t,enriched]);
     // Playback and audience updates must not replace focused record controls.
     if (key !== renderedPlayer) {
       renderedPlayer=key;
-      const pl=playlists.find(p=>p[0]===s.stage);
+      const pl=playlists.find(p=>p[0]===s.viewing);
       $('stage-spotify').hidden=!pl;
       if(pl){$('stage-spotify').href='https://open.spotify.com/playlist/'+pl[2];}
       const root=nowID();
@@ -1607,7 +1610,7 @@
   const aliases=new Map();
   // Where an address leads, read from it alone: its section, and a record by its id or its name, or the stage, the side,
   // the day, the order, the filter and the mark of History, Statistics or the Index; and the one address of that place.
-  // A bare or unknown stage is the one on air, but in the Index All stages, and the whole library is All stages, which
+  // A bare or unknown stage is the one shown, but in the Index All stages, and the whole library is All stages, which
   // holds every playlist. A day that is not a real one before today is none, an unknown side is Artists, a mark not of
   // the order of the address is none, and other parameters go. A record keeps its address, or takes the one its old
   // address led to; an address outside the explorer has no section and stays as it is. It writes nothing.
@@ -1623,7 +1626,7 @@
     if(!['explore','history','statistics','index'].includes(section)||(section==='explore'&&parts.length>1&&!id&&!name))return {section:'',address:hash};
     if(section==='explore')return {section,type:first,id,name,typed:query.get('q')||'',address:aliases.get(hash)||hash};
     const statistics=section==='statistics',index=section==='index',stage=index?second:first,known=[...radio.stations.map(s=>s.id),...index?[]:['radio']].includes(stage);
-    const scope=known?stage:index||statistics&&first==='library'?'radio':radio.getState().stage;
+    const scope=known?stage:index||statistics&&first==='library'?'radio':radio.getState().viewing;
     const kind=index?first==='labels'?'labels':'artists':'';
     const day=section==='history'&&scope!=='radio'&&pastDay(second||'')?second:'';
     const by=index?query.get('by')==='tracks'?'tracks':'name':'';
