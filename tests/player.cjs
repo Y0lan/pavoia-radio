@@ -76,6 +76,12 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
       if(/^[a-z]+$/.test(selector))return this.descendants().find(c=>c.localName===selector)||null;
       const kind=/data-kind="([^"]+)"/.exec(selector)?.[1];return this.children.find(c=>c.dataset?.kind===kind)||null;
     }
+    // Every descendant of a tag or a class, with an attribute when one is named: a, .region, .region[data-open].
+    querySelectorAll(selector){
+      const [,tag,name,attr]=/^([a-z]*)(?:\.([\w-]+))?(?:\[([\w-]+)\])?$/.exec(selector)||[];
+      if(tag===undefined)throw new Error('the harness reads no selector '+selector);
+      return this.descendants().filter(c=>(!tag||c.localName===tag)&&(!name||c.className?.split(' ').includes(name))&&(!attr||Boolean(c.attrs)&&attr in c.attrs));
+    }
     focus(options){document.activeElement=this;this.focusOptions=options;}
     select(){this.selected=true;}
     scrollIntoView(options){this.scrolled=options;}
@@ -2944,6 +2950,9 @@ test('a record opened from the Index comes back through its tab to the same row,
  routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
  assert.deepEqual([e.location.hash,e.namesRequests.length-asked,e.document.activeElement===row,explorer.scrollTop,row.getBoundingClientRect().top,e.entries().length,countsOf(e).radio],
   ['#index/artists/bermuda-day?by=tracks',0,true,700,300,kept+2,'14'],'the same rows, the row where it stood, focused, and the stage bar\'s counts');
+ // Back does the same.
+ follow(e,row);await flush();e.history.go(-1);await flush();
+ assert.deepEqual([e.location.hash,e.namesRequests.length-asked,e.document.activeElement===row,explorer.scrollTop,row.getBoundingClientRect().top],['#index/artists/bermuda-day?by=tracks',0,true,700,300],'and so does Back');
  e.window.emit('popstate');explorer.scrollTop=10;e.window.emit('hashchange');await flush();
  assert.equal(explorer.scrollTop,10,'the place is used once: the hashchange after a browser move restores nothing');
  // A window made shorter while the record showed: the row stays in view, above the dialog's bottom.
@@ -4326,4 +4335,226 @@ test('an address typed short restores once, and a push the browser refuses keeps
  assert.deepEqual([titleShown(f),f.location.hash,f.history.state.depth,f.position(),f.entries().length],['Name art_000000000003','#explore/art_000000000003',depth,at,entries],'the place opens in the entry shown, at the same depth');
  f.history.pushState=push;f.elements['explorer-close'].emit('click');await flush();
  assert.deepEqual([f.elements.explorer.open,f.position(),f.location.hash],[false,0,''],'✕ goes back to the page entry in one step');
+});
+
+// Explore plan step 4: Back and Forward return to the place left. A record comes back whole in one paint, at the scroll
+// it had, with the regions that were open, and focus on the link that was followed; until then the last view stays.
+const regionOf=(e,key)=>byClass(inspector(e),'region').find(r=>r.dataset.key===key);
+// A row of the record shown, as a browser finds its region from it.
+const rowTo=(e,href,key)=>{const row=byClass(key?regionOf(e,key):inspector(e),'row').find(a=>a.getAttribute('href')===href),region=byClass(inspector(e),'region').find(r=>r.descendants().includes(row));
+ row.closest=selector=>selector==='.region'?region:null;return row;};
+// Each state the record passes through, one microtask after another, until it settles: one paint is two states, the
+// last view and the place.
+const states=async read=>{const seen=[];for(let i=0;i<64;i++){const s=JSON.stringify(read());if(seen.at(-1)!==s)seen.push(s);await Promise.resolve();}return seen.map(s=>JSON.parse(s));};
+const painted=e=>()=>({title:titleShown(e),regions:byClass(inspector(e),'region').length>0,top:e.elements.explorer.scrollTop});
+// The explorer as index.html nests it: the search field, the music view, the results and the record are inside it, so
+// focus on a record's link or title is focus in the explorer, and the player bar is outside.
+const nested4=e=>{const el=e.elements;el['explore-workspace'].append(inspector(e));el.explorer.append(el['discovery-query'],el['music-view'],el['discovery-results'],el['explore-workspace']);return e;};
+// Recondite, whose naming fetches Eulberg: an answer that failed is not kept, so Back asks again, and a test holds it.
+const recondite4=async()=>{
+ const e=nested4(setup({journey:true}));await flush();const data=hood(),gate={hold:false,fail:false,release:null};
+ e.discovery=url=>{const key=url.split('/').pop();if(url.includes('/search?'))return {items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'},{id:'art_0123456789ac',type:'artist',title:'Jimi Two'}]};
+  if(key==='art_000000000101'&&gate.hold)return new Promise(resolve=>{gate.release=()=>resolve(data[key]);});if(key==='art_000000000101'&&gate.fail)return null;return data[key]||entity(key);};
+ return {e,data,gate};
+};
+
+test('Back to a record brings back its scroll and focuses the link that was followed, in one paint',async()=>{
+ const {e}=await recondite4();const explorer=e.elements.explorer,eulberg='#explore/art_000000000101';
+ routeTo(e,'#explore/art_000000000001');await flush();explorer.scrollTop=600;
+ const more=()=>byClass(inspector(e),'bio-foot')[0]?.children[0];more().emit('click');
+ follow(e,rowTo(e,eulberg,'similar'));await flush();
+ assert.deepEqual([titleShown(e),explorer.scrollTop],['Dominik Eulberg',0],'a link opens the next record at its title');
+ e.history.go(-1);const seen=await states(painted(e));
+ assert.deepEqual(seen,[{title:'Dominik Eulberg',regions:true,top:0},{title:'Recondite',regions:true,top:600}],'the header, the regions and the scroll arrive together');
+ const focus=e.document.activeElement;
+ assert.deepEqual([focus.getAttribute?.('href'),regionOf(e,'similar').contains(focus),e.history.state.top,e.history.state.next,e.history.state.region],[eulberg,true,600,eulberg,'similar'],'focus is on the link followed, in its region; the place is on its entry too');
+ assert.deepEqual([more().getAttribute('aria-expanded'),more().textContent,more().hidden],['true','Less',false],'the biography opened stays open');
+});
+
+test('Forward to a record brings back its scroll, in one paint',async()=>{
+ const {e}=await recondite4();const explorer=e.elements.explorer;
+ routeTo(e,'#explore/art_000000000001');await flush();follow(e,rowTo(e,'#explore/art_000000000101','similar'));await flush();
+ explorer.scrollTop=400;e.history.go(-1);await flush();
+ e.history.go(1);const seen=await states(painted(e));
+ assert.deepEqual(seen,[{title:'Recondite',regions:true,top:0},{title:'Dominik Eulberg',regions:true,top:400}],'Eulberg comes back whole at 400 px, in one paint');
+ assert.equal(e.document.activeElement,explorer,'left by Back, it names no link, and its title is 400 px up: the explorer takes focus, so the first Tab keeps the scroll');
+ // The same move back to a record left at its top: its title shows, and takes focus.
+ explorer.scrollTop=0;e.history.go(-1);await flush();e.history.go(1);await flush();
+ assert.deepEqual([explorer.scrollTop,e.document.activeElement===inspector(e).descendants().find(n=>n.localName==='h3')],[0,true],'at 0 px the title shows: focus is on it');
+});
+
+test('Show all, then a link from row 8, then Back, shows the region whole at the same scroll, focused on row 8',async()=>{
+ const e=nested4(setup({journey:true}));await flush();const explorer=e.elements.explorer,T=n=>id('trk',n);
+ const tracks=Array.from({length:8},(_,i)=>rec(T(i+1),'Track '+(i+1),[[id('art',1),'primary']],{artist:'Recondite',durationMs:300000,playlists:[{code:'LIF',station:'Lost in Feelings'}]}));
+ const similar=Array.from({length:7},(_,i)=>rec(id('art',101+i),'Similar '+(i+1),[],{trackCount:7-i}));
+ e.discovery=url=>url.endsWith('/art_000000000001')?{entity:rec(id('art',1),'Recondite',[...tracks.map(t=>[t.id,'track']),...similar.map(a=>[a.id,'similar'])],{trackCount:8}),included:[...tracks,...similar]}:entity(url.split('/').pop(),'track');
+ routeTo(e,'#explore/art_000000000001');await flush();
+ const shown=()=>[byClass(regionOf(e,'onRadio'),'row').length,'data-open' in regionOf(e,'onRadio').attrs,byClass(regionOf(e,'onRadio'),'text-button').length];
+ assert.deepEqual(shown(),[6,false,1],'six rows, then Show all');
+ byClass(regionOf(e,'onRadio'),'text-button')[0].emit('click');
+ assert.deepEqual(shown(),[8,true,0],'Show all shows them whole and marks the region open');
+ byClass(regionOf(e,'similar'),'text-button')[0].emit('click');
+ explorer.scrollTop=900;follow(e,rowTo(e,'#explore/'+T(8),'onRadio'));await flush();
+ assert.deepEqual([titleShown(e),explorer.scrollTop],['Track 8',0]);
+ e.history.go(-1);await flush();
+ assert.deepEqual([titleShown(e),shown(),explorer.scrollTop,e.document.activeElement.getAttribute?.('href'),regionOf(e,'onRadio').contains(e.document.activeElement)],['Recondite',[8,true,0],900,'#explore/'+T(8),true],'the region whole, at 900 px, focus on row 8');
+ assert.deepEqual([byClass(regionOf(e,'similar'),'row').length,'data-open' in regionOf(e,'similar').attrs,byClass(regionOf(e,'similar'),'text-button').length],[7,true,0],'and Similar artists, opened too, is whole as well');
+});
+
+test('Back to a record no longer cached keeps the last view dimmed until the body paints',async()=>{
+ const e=setup({journey:true});await flush();const workspace=e.elements['explore-workspace'];let release=null,held=false;
+ e.discovery=url=>{const key=url.split('/').pop();return key==='art_000000000001'&&held?new Promise(resolve=>{release=()=>resolve(entity(key));}):entity(key);};
+ // 17 records: the explorer keeps the last 16 payloads, so the first one's is gone, and only its record stays.
+ const ids=Array.from({length:17},(_,i)=>'art_'+String(i+1).padStart(12,'0'));await walk(e,ids);held=true;
+ e.history.go(-16);await flush();
+ assert.deepEqual([e.location.hash,titleShown(e),workspace.getAttribute('aria-busy'),workspace.inert,workspace.hidden,e.discoveryRequests.at(-1).url],['#explore/art_000000000001','Name art_000000000017','true',true,false,'/api/discovery/entity/art_000000000001'],'the last record stays, dimmed and out of reach, while the payload loads');
+ release();await flush();
+ assert.deepEqual([titleShown(e),workspace.getAttribute('aria-busy'),workspace.inert],['Name art_000000000001',null,false],'then the record paints, and the explorer is in reach again');
+});
+
+test('a deferred Back paint starts the 2.5 s deadline',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;const workspace=e.elements['explore-workspace'];
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#explore/art_000000000300');await flush();
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ assert.deepEqual([titleShown(e),workspace.getAttribute('aria-busy'),[...e.timers.values()].filter(t=>t.delay===2500).length],['Name art_000000000300','true',1],'the naming answer waits, and the deadline runs from the start');
+ e.fire(2500);await flush();
+ assert.deepEqual([titleShown(e),byClass(inspector(e),'region').length>0,workspace.getAttribute('aria-busy')],['Recondite',true,null],'2.5 s later the header and the body paint, with the records at hand');
+ gate.release();await flush();
+ assert.equal([...e.timers.values()].filter(t=>t.delay===10000).length,0,'and the 10 s limit goes once the naming answer settles');
+});
+
+test('Back from the Index to a record never shows an empty explorer',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;e.names={artists:artistNames(),labels:labelNames()};const music=e.elements['music-view'],workspace=e.elements['explore-workspace'];
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#index/artists');await flush();
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ assert.deepEqual([music.hidden,music.inert,music.getAttribute('aria-busy'),workspace.hidden,e.elements['discovery-status'].textContent],[false,true,'true',true,''],'the Index stays, dimmed and out of reach, with no Loading line');
+ assert.match(cssRules().get('#music-view[aria-busy=true], #discovery-results[aria-busy=true]'),/opacity:\.45; transition:opacity var\(--panel\) var\(--ease\)/,'dimmed as a hop dims the last record');
+ gate.release();await flush();
+ assert.deepEqual([music.hidden,music.inert,music.getAttribute('aria-busy'),workspace.hidden,titleShown(e)],[true,false,null,false,'Recondite'],'then the record shows in its place');
+});
+
+test('Back from the search results to a record never shows an empty explorer',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;const results=e.elements['discovery-results'],workspace=e.elements['explore-workspace'],query=e.elements['discovery-query'];
+ routeTo(e,'#explore/art_000000000001');await flush();query.value='jimi';query.emit('input');e.fire(300);await flush();
+ assert.deepEqual([e.location.hash,results.hidden,workspace.hidden],['#explore?q=jimi',false,true]);
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ assert.deepEqual([results.hidden,results.inert,results.getAttribute('aria-busy'),workspace.hidden],[false,true,'true',true],'the results stay, dimmed and out of reach');
+ gate.release();await flush();
+ assert.deepEqual([results.hidden,results.inert,results.getAttribute('aria-busy'),workspace.hidden,titleShown(e)],[true,false,null,false,'Recondite'],'then the record shows in their place');
+});
+
+test('a language switch or the 1100 px crossing during a deferred Back paint draws nothing early',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#explore/art_000000000300');await flush();
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ const before=[...inspector(e).descendants()];
+ e.setLanguage('de');e.queries.get('(min-width:1100px)').change(true);await flush();
+ assert.ok(sameRows(inspector(e).descendants(),before),'the last record stays as it was');
+ gate.release();await flush();
+ assert.deepEqual([titleShown(e),textOf(inspector(e).descendants().find(n=>cls(n)==='eyebrow')),Boolean(byClass(inspector(e),'neighbourhood').length)],['Recondite','Künstler',true],'then the record paints once, in German, as a map');
+});
+
+test('Back to the search page shows the same results at the same scroll, focused on the result opened',async()=>{
+ const {e}=await recondite4();const explorer=e.elements.explorer,results=e.elements['discovery-results'],query=e.elements['discovery-query'];
+ routeTo(e,'#explore/art_000000000001');await flush();query.value='jimi';query.emit('input');e.fire(300);await flush();
+ const rows=byClass(results,'row');explorer.scrollTop=300;follow(e,rows[1]);await flush();
+ assert.deepEqual([e.location.hash,titleShown(e),explorer.scrollTop],['#explore/art_0123456789ac','Name art_0123456789ac',0]);
+ e.history.go(-1);await flush();
+ assert.deepEqual([e.location.hash,results.hidden,sameRows(byClass(results,'row'),rows),explorer.scrollTop,e.document.activeElement===rows[1]],['#explore?q=jimi',false,true,300,true],'the same rows, at 300 px, focus on the one opened');
+});
+
+test('Forward to a record whose payload fails hides the search results kept on screen, and says it is unavailable',async()=>{
+ const {e}=await recondite4();const results=e.elements['discovery-results'],workspace=e.elements['explore-workspace'],query=e.elements['discovery-query'],status=e.elements['discovery-status'];
+ const old=e.discovery;e.discovery=url=>url.endsWith('/art_0123456789ac')?null:old(url);
+ routeTo(e,'#explore/art_000000000001');await flush();query.value='jimi';query.emit('input');e.fire(300);await flush();
+ follow(e,byClass(results,'row')[1]);await flush();
+ const unavailable=['#explore/art_0123456789ac',true,false,null,true,'These details are unavailable. Try another record or search again.'];
+ const seen=()=>[e.location.hash,results.hidden,results.inert,results.getAttribute('aria-busy'),workspace.hidden,textOf(status)];
+ assert.deepEqual(seen(),unavailable,'a hop hides the results and says the record is unavailable');
+ e.history.go(-1);await flush();
+ assert.deepEqual([e.location.hash,results.hidden],['#explore?q=jimi',false],'Back shows the results again');
+ e.history.go(1);await flush();
+ assert.deepEqual(seen(),unavailable,'Forward hides them as the hop did, with nothing dimmed left behind');
+});
+
+test('Back or Forward with focus on the player keeps it there; focus elsewhere in the explorer goes to the place',async()=>{
+ const {e}=await recondite4();const title=()=>inspector(e).descendants().find(n=>n.localName==='h3');
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#explore/art_000000000300');await flush();
+ // The arrows step the station unless a range has focus: the volume keeps the keys it was given.
+ for(const name of ['volume','play']){
+  const control=e.elements[name];control.focus();e.history.go(-1);await flush();
+  assert.deepEqual([titleShown(e),e.document.activeElement===control],['Recondite',true],name+' keeps focus on Back');
+  e.history.go(1);await flush();
+  assert.deepEqual([titleShown(e),e.document.activeElement===control],['Name art_000000000300',true],name+' keeps focus on Forward');
+ }
+ e.elements['discovery-query'].focus();e.history.go(-1);await flush();
+ assert.deepEqual([titleShown(e),e.document.activeElement===title()],['Recondite',true],'from the search field, focus goes to the record');
+});
+
+test('Back during a hop to a record not at hand keeps no scroll for it',async()=>{
+ const {e}=await recondite4();const explorer=e.elements.explorer,old=e.discovery;let release=null,hold=false;
+ e.discovery=url=>url.endsWith('/art_000000000300')&&hold?new Promise(resolve=>{release=()=>resolve(old(url));}):old(url);
+ routeTo(e,'#explore/art_000000000001');await flush();explorer.scrollTop=600;
+ hold=true;routeTo(e,'#explore/art_000000000300');await flush();
+ assert.deepEqual([titleShown(e),e.elements['explore-workspace'].getAttribute('aria-busy')],['Recondite','true'],'Recondite stays, dimmed, while the next record loads');
+ e.history.go(-1);await flush();hold=false;release();await flush();
+ assert.deepEqual([titleShown(e),explorer.scrollTop],['Recondite',600]);
+ e.history.go(1);await flush();
+ assert.deepEqual([e.location.hash,titleShown(e),explorer.scrollTop],['#explore/art_000000000300','Name art_000000000300',0],'the record never shown opens at its title, not at the scroll of the one dimmed over it');
+});
+
+test('a second Back while a place paint waits keeps the place of the record that waits',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;const explorer=e.elements.explorer,query=e.elements['discovery-query'];
+ routeTo(e,'#explore/art_000000000001');await flush();explorer.scrollTop=500;
+ query.value='jimi';query.emit('input');e.fire(300);await flush();explorer.scrollTop=300;
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ assert.deepEqual([e.location.hash,e.elements['discovery-results'].getAttribute('aria-busy')],['#explore/art_000000000001','true'],'Recondite waits, the results dimmed at 300 px');
+ e.history.go(-1);await flush();
+ assert.equal(e.elements.explorer.open,false,'a second Back leaves the explorer');
+ gate.hold=false;gate.release();e.history.go(1);await flush();
+ assert.deepEqual([titleShown(e),explorer.scrollTop],['Recondite',500],'Forward opens Recondite at its own 500 px, not at the results\' 300 px');
+});
+
+test('✕ from the Index, then Forward, never shows the last visit\'s Index',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;e.names={artists:artistNames(),labels:labelNames()};const music=e.elements['music-view'],workspace=e.elements['explore-workspace'];
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#index/artists');await flush();
+ e.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual([e.elements.explorer.open,e.location.hash],[false,'']);
+ gate.fail=false;gate.hold=true;e.history.go(1);await flush();
+ assert.deepEqual([e.location.hash,music.hidden,music.inert,music.getAttribute('aria-busy'),workspace.hidden,e.elements['discovery-status'].textContent],['#explore/art_000000000001',true,false,null,true,'Loading the connections…'],'a new visit says it is loading, with no Index dimmed behind');
+ gate.release();await flush();
+ assert.deepEqual([titleShown(e),workspace.hidden,e.elements['discovery-status'].textContent],['Recondite',false,'']);
+});
+
+test('after a reload, Back brings a record back at the place written on its entry',async()=>{
+ const old=n=>({explorer:1,seen:1,base:1,depth:n,owned:1,key:'1:'+(n+1)}),data=hood(),eulberg='#explore/art_000000000101';
+ const e=nested4(setup({journey:true,hash:eulberg,state:old(1),below:[{hash:''},{hash:'#explore/art_000000000001',state:{...old(0),top:600,next:eulberg,region:'similar'}}]}));
+ // The page loads before the test answers for records, so Eulberg says it is unavailable; Recondite answers.
+ e.discovery=url=>data[url.split('/').pop()]||entity(url.split('/').pop());await flush();
+ e.history.go(-1);await flush();
+ const focus=e.document.activeElement;
+ assert.deepEqual([titleShown(e),e.elements.explorer.scrollTop,focus.getAttribute?.('href'),regionOf(e,'similar').contains(focus)],['Recondite',600,eulberg,true],'the page life before the reload left Recondite at 600 px, by Eulberg');
+});
+
+test('Back to a record at hand whose payload fails opens it at its title, at 0 px',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;const explorer=e.elements.explorer,workspace=e.elements['explore-workspace'];
+ routeTo(e,'#explore/art_000000000001');await flush();follow(e,rowTo(e,'#explore/art_000000000101','similar'));await flush();
+ assert.equal(titleShown(e),'Dominik Eulberg','its header from the copy Recondite brought, its payload failed');
+ explorer.scrollTop=600;routeTo(e,'#explore/art_000000000300');await flush();
+ e.history.go(-1);await flush();
+ assert.deepEqual([titleShown(e),explorer.scrollTop,e.document.activeElement===inspector(e).descendants().find(n=>n.localName==='h3'),workspace.getAttribute('aria-busy')],['Dominik Eulberg',0,true,null],'it fails again: the record opens at its title, as a hop opens it');
+});
+
+test('Back to a track drawn from an included copy paints its header and its body once, preview included',async()=>{
+ const e=nested4(setup({journey:true}));await flush();const data=hood(),T1='trk_000000000001',T2='trk_000000000002';let fail=true,release=null;
+ // Its own payload brings a preview and its artist, which the copy in Recondite's payload lacks.
+ const own={entity:{...data.art_000000000001.included.find(r=>r.id===T1),previewUrl:'/api/discovery/preview/'+T1,connections:[{id:'art_000000000001',relation:'primary'}]},included:[data.art_000000000001.entity]};
+ e.discovery=url=>{const key=url.split('/').pop();if(key===T1)return fail?null:own;if(key===T2)return new Promise(resolve=>{release=()=>resolve(entity(T2,'track'));});return data[key]||entity(key);};
+ routeTo(e,'#explore/art_000000000001');await flush();routeTo(e,'#explore/'+T1);await flush();
+ // The next track's header paints from its copy too, and its body waits.
+ routeTo(e,'#explore/'+T2);await flush();
+ assert.deepEqual([titleShown(e),byClass(inspector(e),'region').length],['Track 2',0]);
+ fail=false;e.history.go(-1);const seen=await states(()=>({title:titleShown(e),regions:byClass(inspector(e),'region').length>0,preview:byClass(inspector(e),'preview').length>0}));
+ assert.deepEqual(seen.map(s=>s.title+(s.regions?' whole':'')),['Track 2','Track 1 whole'],'the last header stays until Track 1 paints whole, never its header alone');
+ release();await flush();
 });

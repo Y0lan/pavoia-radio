@@ -351,6 +351,9 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
 .explore-workspace { margin-top:var(--s5); }
 /* A hop keeps the last record in place, dimmed, until the next one is drawn. */
 .explore-workspace[aria-busy=true] { opacity:.45; transition:opacity var(--panel) var(--ease); }
+/* Back and Forward to a record keep the last tab or the search results in place, dimmed the same way, until the
+   record is drawn whole. */
+#music-view[aria-busy=true], #discovery-results[aria-busy=true] { opacity:.45; transition:opacity var(--panel) var(--ease); }
 /* The profile: the trail across the top, then a picture that holds its box beside the type, the name and its
    facts, all from the top, so the title stays put from record to record. */
 .entity-heading { display:grid; grid-template-columns:120px minmax(0,1fr); align-items:start; gap:var(--s4); }

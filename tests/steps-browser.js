@@ -2,7 +2,8 @@
 // Back and Forward walk the visit, and ✕ or Escape leave all of it in one press, with no reload. Part one needs no
 // sound: it blocks the stream and the previews, so it never counts as a listener, and it runs on serve.py. At 1440x900
 // and at 390x844 (a phone) it walks the records and the Index, then proves a typed address, a station change deep in a
-// visit, a link to the History place shown, the search, and 60 hops against the browser's 50 kept entries. Part two
+// visit, a link to the History place shown, the search, and 60 hops against the browser's 50 kept entries; then that
+// Back and Forward return to the place left, a record and the Index, each in one frame (explore plan step 4). Part two
 // plays, so it runs only on the fake preview, after GET /__mode?set=ok answered ok; elsewhere it stops before any
 // stream request and the result says so. The discovery service does not run on a developer machine, so the six
 // records, the search answer, the names and the radio answers are inline: each page opens in a new browser context,
@@ -27,11 +28,22 @@ async page => {
     [ibiza]:{id:ibiza,type:'release',title:'Timeless Ibiza',artist:'Morttagua',releaseDate:'2022-06-06',connections:[{id:morttagua,relation:'primary'},{id:aaron,relation:'primary'}]},
     [aaron]:{id:aaron,type:'artist',title:'Aaron Suiss',bio:'Aaron Suiss is a producer.',trackCount:0,connections:[{id:ibiza,relation:'release'},{id:aikon,relation:'similar'}]},
     [aikon]:{id:aikon,type:'artist',title:'AIKON',bio:'AIKON is a producer.',trackCount:0,connections:[{id:aaron,relation:'similar'}]}};
+  // Super Flu, similar to Maceo Plex, has twelve tracks on Night in Motion: open whole, his record is taller than the
+  // window, so a Back to it has a scroll to bring back. He is also similar to Flu Friend, whose own record names a third
+  // artist that no answer includes: each time Super Flu opens, his naming asks for Flu Friend's record, which answers
+  // 404 after 400 ms, so even a Back to him waits for his body over many frames.
+  const superflu='art_56f6aff9324c',flu=n=>'trk_5f00000000'+String(n).padStart(2,'0'),friend='art_5f0000000098',unnamed='art_5f0000000099';
+  docs[superflu]={id:superflu,type:'artist',title:'Super Flu',bio:'Super Flu is a duo.',trackCount:12,
+    connections:[...Array.from({length:12},(_,i)=>({id:flu(i+1),relation:'track'})),{id:maceo,relation:'similar'},{id:friend,relation:'similar'},{id:unnamed,relation:'similar'}]};
+  docs[friend]={id:friend,type:'artist',title:'Flu Friend',trackCount:0,connections:[{id:unnamed,relation:'similar'}]};
+  for(let n=1;n<=12;n++)docs[flu(n)]={id:flu(n),type:'track',title:'Flu Track '+n,artist:'Super Flu',album:'',releaseDate:'2020-01-01',durationMs:300000+n*1000,plexId:String(900100+n),
+    playlists:[{code:'NIM',station:'Night in Motion'}],connections:[{id:superflu,relation:'primary'}]};
   for(const d of Object.values(docs))Object.assign(d,{image:media,playlists:d.playlists||[]});
-  const answer=id=>({entity:docs[id],included:docs[id].connections.map(c=>docs[c.id])});
+  const answer=id=>({entity:docs[id],included:docs[id].connections.map(c=>docs[c.id]).filter(Boolean)});
   const search={items:[{id:maceo,type:'artist',title:'Maceo Plex',image:media},{id:track,type:'track',title:'Conjure Balearia',artist:'Maceo Plex',image:media}]};
-  const names={kind:'artists',updatedAt:'2026-11-01T00:00:00Z',total:6,items:[['Aaron Suiss',aaron,3],['AIKON',aikon,22],['Maceo Plex',maceo,16],['Morttagua',morttagua,11],['Bermuda Kin',undefined,2],['Zeta Kin',undefined,1]]
-    .map(([name,id,count])=>({name,id,count,stages:{'palac-dance':count}}))};
+  // 120 names before AIKON make the Index taller than the window, so it has a place to come back to.
+  const names={kind:'artists',updatedAt:'2026-11-01T00:00:00Z',total:126,items:[['Aaron Suiss',aaron,3],['AIKON',aikon,22],['Maceo Plex',maceo,16],['Morttagua',morttagua,11],['Bermuda Kin',undefined,2],['Zeta Kin',undefined,1],
+    ...Array.from({length:120},(_,i)=>['Aa Kin '+String(i+1).padStart(3,'0'),undefined,1])].map(([name,id,count])=>({name,id,count,stages:{'palac-dance':count}}))};
   // Every station plays a track of its own; Night in Motion (palac-dance) plays Conjure Balearia. History lists three plays.
   const stations=['ambiance','bermuda-day','bermuda-evening','closing','essentials','etage-zero','fontanna','palac-dance','palac-feel'];
   const radioAnswer=id=>{const now=Date.now(),i=stations.indexOf(id),mine=id==='palac-dance';
@@ -49,6 +61,7 @@ async page => {
       const url=new URL(route.request().url()),path=url.pathname,id=decodeURIComponent(path.split('/').pop());
       if(path.startsWith('/api/discovery/preview/')||path.startsWith('/api/discovery/media/'))return route.abort();
       if(path==='/api/discovery/search'){searches++;return route.fulfill({json:search});}
+      if(id===friend)return new Promise(done=>setTimeout(done,400)).then(()=>route.fulfill({status:404,contentType:'text/plain',body:'no record'}));
       if(path.startsWith('/api/discovery/track/'))return id==='900001'?route.fulfill({json:answer(track)}):route.fulfill({status:404,contentType:'text/plain',body:'no record'});
       return docs[id]?route.fulfill({json:answer(id)}):route.fulfill({status:404,contentType:'text/plain',body:'no record'});
     });
@@ -75,6 +88,19 @@ async page => {
   const credit=async p=>{const link=p.locator('#credited-artists a.artist-credit[href="#explore/'+maceo+'"]');await link.waitFor({timeout:15000});await link.click();await record(p,'Maceo Plex');};
   const spy=p=>p.evaluate(()=>{window.__goes=[];if(history.go.__spied)return;const go=history.go.bind(history),spied=n=>{window.__goes.push(n);go(n);};spied.__spied=true;history.go=spied;});
   const goes=p=>p.evaluate(()=>window.__goes);
+  // Every frame from now on, read in requestAnimationFrame before it paints: the record's title, whether its regions
+  // are there, the scroll, and which view shows. frames() counts the frames from the first one that shows the place
+  // to the one at its final scroll: a place that paints whole at once counts 1. Until it shows, the last view must.
+  const sample=p=>p.evaluate(()=>{window.__frames=[];const d=document.getElementById('explorer');let n=0;
+    const tick=()=>{const w=document.getElementById('explore-workspace'),v=document.getElementById('music-view'),r=document.getElementById('discovery-results');
+      window.__frames.push({h3:w.hidden?null:document.querySelector('#entity-inspector h3')?.textContent||null,regions:!w.hidden&&Boolean(document.querySelector('#entity-inspector .region')),top:Math.round(d.scrollTop),view:v.hidden?null:v.dataset.view,ws:!w.hidden,res:!r.hidden});
+      if(++n<120)requestAnimationFrame(tick);};
+    requestAnimationFrame(tick);});
+  const frames=async(p,want)=>{await p.waitForTimeout(150);const f=await p.evaluate(()=>window.__frames.slice()),shows=x=>want.title?x.h3===want.title:x.view===want.view;
+    const first=f.findIndex(shows),last=f.findIndex(x=>shows(x)&&Math.abs(x.top-want.top)<=2&&(!want.title||x.regions));
+    return {count:first<0||last<0?null:last-first+1,waited:first,empty:f.slice(0,first<0?f.length:first).filter(x=>!x.view&&!x.ws&&!x.res).length};};
+  const place=p=>p.evaluate(()=>{const a=document.activeElement,d=document.getElementById('explorer');return {top:Math.round(d.scrollTop),href:a?.getAttribute('href')||a?.localName,region:a?.closest('.region')?.dataset.key||null,
+    y:Math.round(a.getBoundingClientRect().top),open:[...document.querySelectorAll('#entity-inspector .region[data-open]')].map(n=>n.dataset.key)};});
   const walk={};
 
   // Part one, at both widths.
@@ -156,6 +182,56 @@ async page => {
       assert(JSON.stringify(await goes(p))==='[-41]'&&most===before.length+41&&!after.hash&&!after.open&&after.at===before.at&&after.mark===1,'60 hops then ✕ at '+width+' px: '+JSON.stringify({most,goes:await goes(p),after,before}));
       await p.goForward();await record(p,'Maceo Plex');
       walk['hops'+width]={most,goes:await goes(p),before:before.at,after:after.at};
+      await ctx.close();
+    }
+
+    // Back and Forward return to the place left (explore plan step 4), each in one paint. Super Flu, opened whole and
+    // scrolled, then a track: Back brings him back at that scroll, with focus on the track followed; Forward brings the
+    // track back at its title, and a Back with focus on the player bar leaves focus there. The Index, scrolled, then AIKON: Back brings the Index back at that scroll, with focus
+    // on AIKON's row at the same height. Back from the Index to Super Flu never leaves the explorer empty. A new hop by a
+    // link still starts at its title.
+    {
+      const {ctx,p}=await open({width,height,phone});
+      await p.goto(origin+'/?station=palac-dance');await p.locator('#language [value=en]').dispatchEvent('click');
+      await p.evaluate(href=>{const a=document.createElement('a');a.href=href;document.body.append(a);a.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));a.remove();},'#explore/'+superflu);
+      await record(p,'Super Flu');
+      await p.locator('#entity-inspector .region[data-key=onRadio] > button.text-button').click();
+      const track=p.locator('#entity-inspector .region[data-key=onRadio] a.row[href="#explore/'+flu(10)+'"]');
+      await track.evaluate(a=>{const d=document.getElementById('explorer');d.scrollTop+=a.getBoundingClientRect().top-d.getBoundingClientRect().top-160;});await p.waitForTimeout(100);
+      const left=await place(p);assert(left.top>=100,'Super Flu is not taller than the window at '+width+' px: '+JSON.stringify(left));
+      await track.click();await record(p,'Flu Track 10');
+      const hop=await place(p);assert(hop.top===0&&hop.href==='h3','a hop by a link must start at its title at '+width+' px: '+JSON.stringify(hop));
+      await sample(p);await p.goBack();await record(p,'Super Flu');const back=await place(p),backFrames=await frames(p,{title:'Super Flu',top:left.top});
+      assert(Math.abs(back.top-left.top)<=2&&back.href==='#explore/'+flu(10)&&back.region==='onRadio'&&back.open.includes('onRadio')&&backFrames.count===1&&!backFrames.empty,
+        'Back to Super Flu at '+width+' px: '+JSON.stringify({left,back,backFrames}));
+      await sample(p);await p.goForward();await record(p,'Flu Track 10');const forward=await place(p),forwardFrames=await frames(p,{title:'Flu Track 10',top:0});
+      assert(forward.top===0&&forwardFrames.count===1&&!forwardFrames.empty,'Forward to the track at '+width+' px: '+JSON.stringify({forward,forwardFrames}));
+      // Focus on the player bar stays there through Back: on the volume, the next arrow sets the volume, not the station.
+      const control=phone?'#play':'#volume';await p.locator(control).focus();
+      await p.goBack();await record(p,'Super Flu');
+      if(!phone)await p.keyboard.press('ArrowRight');
+      const kept=await p.evaluate(()=>({focus:document.activeElement?.id,station:new URLSearchParams(location.search).get('station')}));
+      assert(kept.focus===control.slice(1)&&kept.station==='palac-dance','Back with focus on '+control+' at '+width+' px: '+JSON.stringify(kept));
+      // The Index from Super Flu, scrolled so AIKON stands 300 px down, then AIKON. The tab is clicked where it stands:
+      // a pointer click would first scroll the explorer to bring the sticky tab into view.
+      await p.locator('#index-tab').dispatchEvent('click');await tab(p,'index','#music-content a.row');
+      const aikonRow=p.locator('#music-content a.row[href="#explore/'+aikon+'"]');
+      await aikonRow.evaluate(a=>{const d=document.getElementById('explorer');d.scrollTop+=a.getBoundingClientRect().top-d.getBoundingClientRect().top-300;});await p.waitForTimeout(400);
+      const index=await p.evaluate(sel=>({top:Math.round(document.getElementById('explorer').scrollTop),y:Math.round(document.querySelector(sel).getBoundingClientRect().top)}),'#music-content a.row[href="#explore/'+aikon+'"]');
+      assert(index.top>=100,'the Index is not taller than the window at '+width+' px: '+JSON.stringify(index));
+      await aikonRow.click();await record(p,'AIKON');
+      await sample(p);await p.goBack();await tab(p,'index','#music-content a.row');const indexBack=await place(p),indexFrames=await frames(p,{view:'index',top:index.top});
+      assert(Math.abs(indexBack.top-index.top)<=2&&indexBack.href==='#explore/'+aikon&&Math.abs(indexBack.y-index.y)<=2&&indexFrames.count===1,'Back to the Index at '+width+' px: '+JSON.stringify({index,indexBack,indexFrames}));
+      // Back from the Index to Super Flu: the Index stays until Super Flu paints whole, at the scroll he had.
+      await sample(p);await p.goBack();await record(p,'Super Flu');const fromIndex=await frames(p,{title:'Super Flu',top:left.top}),again=await place(p);
+      assert(fromIndex.count===1&&fromIndex.waited>=5&&fromIndex.empty===0&&Math.abs(again.top-left.top)<=2,'Back from the Index to Super Flu at '+width+' px: '+JSON.stringify({fromIndex,again}));
+      // He left Super Flu by a tab, so no link of his record is kept, and his title is far up: focus goes to a link
+      // that shows whole, so the first Tab keeps the record where it is.
+      const held=await p.evaluate(()=>{const a=document.activeElement,d=document.getElementById('explorer'),box=a.getBoundingClientRect(),bar=Math.max(d.querySelector('.explorer-top').getBoundingClientRect().bottom,d.getBoundingClientRect().top);
+        return {inRecord:Boolean(a.closest('#entity-inspector')),whole:box.top>=bar-0.5&&box.bottom<=d.getBoundingClientRect().bottom+0.5};});
+      assert(held.inRecord&&held.whole,'Back from the Index to Super Flu put focus on something out of view at '+width+' px: '+JSON.stringify(held));
+      await p.keyboard.press('Tab');const tabbed=await place(p);assert(Math.abs(tabbed.top-left.top)<=120,'the first Tab lost the scroll at '+width+' px: '+JSON.stringify({tabbed,left}));
+      walk['place'+width]={left,hop,back,backFrames,forward,forwardFrames,kept,index,indexBack,indexFrames,fromIndex,again};
       await ctx.close();
     }
   }

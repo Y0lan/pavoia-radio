@@ -152,18 +152,20 @@
   // it holds the 14 closest at once, the most a side shows, each knowing the name it hangs from. A region whose every
   // name has a place of its own links there instead of Show all, and on the map from its count. A count in words, such
   // as "13 of 39", reads as given. A name that opens a group, such as a track's release, carries the group's line over
-  // its row, in the same item.
-  function regionSection(key,items,empty,prefix='r',map=false,count=items.length,all=null) {
+  // its row, in the same item. A region shown whole (open), by its Show all or when Back returns to it so, carries
+  // data-open.
+  function regionSection(key,items,empty,prefix='r',map=false,count=items.length,all=null,open=false) {
     const section=node('section','region'),heading=node('h4','',word(key)),list=node('ol'),rows=part=>part.map(i=>{const li=node('li');li.dataset.id=i.id;if(i.via)li.dataset.via=i.via;if(i.group)li.append(node('p','release-line',i.group));li.append(door(i,i.line,i.fact));return li;});
     heading.id=prefix+'-'+key;section.setAttribute('aria-labelledby',heading.id);section.dataset.key=key;
     if(count!==null){const n=node('small','',map&&all?'':typeof count==='string'?count:number(count));if(map&&all){const a=node('a','',number(count));a.href=all.getAttribute('href');a.setAttribute('aria-label',all.textContent);n.append(a);}heading.append(' ',n);}
     section.append(heading);
     if(!items.length){section.append(node('p','collection-note',word(empty)));return section;}
-    list.append(...rows(items.slice(0,map?14:6)));section.append(list);
-    if(map)return section;
+    const whole=open&&!map&&!all&&items.length>6;if(whole)section.setAttribute('data-open','');
+    list.append(...rows(items.slice(0,map?14:whole?Infinity:6)));section.append(list);
+    if(map||whole)return section;
     // The button goes once used, so focus moves on to the first row it showed, never to the page, nor to a group's line.
     // Under a count in words, such as 13 of 39, it does not say all: it shows the ones listed.
-    if(items.length>6){const more=all||action(word(typeof count==='string'?'showListed':'showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();rest[0].querySelector('.row').focus();},'text-button');section.append(more);}
+    if(items.length>6){const more=all||action(word(typeof count==='string'?'showListed':'showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();section.setAttribute('data-open','');rest[0].querySelector('.row').focus();},'text-button');section.append(more);}
     return section;
   }
   // {names}: "A", "A and B", or "A, B and 3 more", in the listener's language.
@@ -199,23 +201,48 @@
   // life that wrote the first one (base), the life that wrote the entry before it (backLife) and its own key.
   const life=performance.timeOrigin||Date.now();
   let landing=false,closing=false,pushes=0,restored='';
+  // The place each entry of the visit was left at, by its key: in memory, since a Back or a Forward cannot write the entry
+  // it leaves, and on the entry itself for a reload. The entry shown, a browser move under way, a place paint waiting for
+  // its record, and the link the listener followed.
+  const places=new Map();
+  let shown={depth:0,key:''},moving=false,pending=false,followed=null;
   // Every history write of a move goes through here: Safari throws after 100 writes in 30 s, and the place
   // opens all the same.
   const writeState=(method,state,url)=>{try{history[method](state,'',url);return true;}catch{return false;}};
+  // A record or the search page, once it shows whole, is a place to come back to: how far it was scrolled, the link it
+  // was left by (next) and that link's region, the regions shown whole and an opened biography. A browser move names no
+  // link, so the one it was left by before stays. It returns the place, or nothing for a tab, which keeps its own.
+  function leave(next) {
+    const workspace=$('explore-workspace'),record=!workspace.hidden&&!workspace.getAttribute('aria-busy');
+    if(view!=='explore'||pending||!shown.key||!(record||!$('discovery-results').hidden))return null;
+    const old=places.get(shown.key)||{},panel=$('entity-inspector');
+    const place={top:dialog.scrollTop,next:next===undefined?old.next||'':next,region:next===undefined?old.region||'':followed?.closest?.('.region')?.dataset.key||'',
+      open:record?[...panel.querySelectorAll('.region[data-open]')].map(n=>n.dataset.key):[],more:record&&panel.querySelector('.bio-foot')?.querySelector('button')?.getAttribute('aria-expanded')==='true'};
+    places.delete(shown.key);places.set(shown.key,place);if(places.size>64)places.delete(places.keys().next().value);
+    return place;
+  }
+  // The entry shown, after a move or a write.
+  const mark=()=>{const s=history.state||{};shown={depth:s.depth||0,key:s.key||''};};
+  // An entry's state without the place it was left at, which never passes on to the next place.
+  const unplaced=({top,next,region,open,more,...s}={})=>s;
   // The one place that adds an entry. Opening the explorer starts a visit at depth 0, owned; a move inside
   // goes one deeper. At depth 40 a move replaces the entry, so a visit holds 41 entries at most and the page
   // entry stays in the browser's history (Chromium keeps 50), where ✕ reaches it. An entry that cannot be
   // pushed is replaced, as a move at depth 40 is, and when that fails too the move goes on.
   function push(to) {
-    const s=history.state||{},key=life+':'+(++pushes),depth=s.depth||0;
+    // The place left goes on its entry too, for a reload; at depth 40 that entry is about to be replaced.
+    const left=leave(to),s=unplaced(history.state||{}),key=life+':'+(++pushes),depth=s.depth||0;
+    if(left&&dialog.open&&depth<40)writeState('replaceState',{...s,...left});
     const stay=dialog.open?{...s,seen:life,key}:{...s,explorer:life,seen:life,base:life,depth:0,owned:0,key};
-    if(dialog.open&&depth>=40){writeState('replaceState',stay,to);return;}
+    if(dialog.open&&depth>=40){writeState('replaceState',stay,to);mark();return;}
     const next=dialog.open?{explorer:life,seen:life,base:s.base??null,depth:depth+1,owned:s.owned?1:0,key,backLife:s.seen??null}:{explorer:life,seen:life,base:life,depth:0,owned:1,key};
     if(!writeState('pushState',next,to))writeState('replaceState',stay,to);
+    mark();
   }
-  // A new visit starts with an empty trail and a fresh History, and never shows the last visit's record while the first loads.
+  // A new visit starts with an empty trail and a fresh History, and never shows the last visit's record, results or tab
+  // while the first place loads.
   // The dialog takes focus itself, not its first tab, which would show a ring on a page just loaded.
-  function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=true;delete $('music-content').dataset.key;dialog.show();dialog.focus({preventScroll:true});for(const n of behind)n.inert=true;}
+  function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=$('discovery-results').hidden=$('music-view').hidden=true;delete $('music-content').dataset.key;dialog.show();dialog.focus({preventScroll:true});for(const n of behind)n.inert=true;}
   // The record on air, as the roots know it, or as the radio does until they answer.
   const nowID=()=>{const t=radio.getState().track;return enriched?.entity.id||(t?'plex_'+t.id:'');};
   async function request(path,signal) {
@@ -338,20 +365,26 @@
   // with its payload. The regions, About and On the radio come once: when the payload, the credited artists and the
   // naming fetch have answered, or 2.5 s after the header at most, with the records at hand. Later answers only fill
   // the caches.
-  async function loadEntity(id) {
-    const from=glide;setView('explore');if(preview)finishPreview();
-    selected=null;hop?.abort();const controller=new AbortController();hop=controller;
+  // Back and Forward give a place (place mode): the view shown stays, dimmed and out of reach, and the record paints
+  // once, whole, at the place it was left. The deadline starts at once then, since no header paints before the body.
+  async function loadEntity(id,place=null) {
+    const from=place?null:glide,workspace=$('explore-workspace'),last=place&&[$('music-view'),$('discovery-results'),workspace].find(n=>!n.hidden);
+    if(last)leaveView('explore');else setView('explore');
+    if(preview)finishPreview();
+    selected=null;hop?.abort();const controller=new AbortController();hop=controller;pending=Boolean(place);
     // A record opened from a focused result, a History row or a name in the last record, or reached by Back from a
     // tab's field or link, keeps focus visible and off the field: on the explorer while it loads, then on the record's
-    // title. Touch screens open no keyboard.
-    const workspace=$('explore-workspace');
+    // title, or on the link it was left by. Touch screens open no keyboard. Focus elsewhere in the explorer, such as on a
+    // tab or in the search field, goes to the place too; outside it, the player or the volume keeps the keys.
     if([$('discovery-results'),$('music-view'),workspace].some(n=>n.contains(document.activeElement)))dialog.focus({preventScroll:true});
-    $('discovery-results').hidden=true;
+    const had=dialog.contains(document.activeElement)?document.activeElement:dialog;
+    if(last){last.setAttribute('aria-busy','true');last.inert=true;}else $('discovery-results').hidden=true;
     // Every request of the hop shares its controller: the next hop, a tab or closing the explorer drops them all.
     const timeout=setTimeout(()=>controller.abort(),10000),fetched=async id=>cached(id)||request('/api/discovery/entity/'+id,controller.signal);
     let wake,start,painted=null;const deadline=new Promise(resolve=>{start=()=>{wake=setTimeout(resolve,2500);};});
     const header=e=>{
       selected=e;
+      if(place)return start();
       const paint=()=>{
         if(hop!==controller)return;
         $('discovery-status').textContent='';workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=false;renderEntity(selected);dialog.scrollTop=0;
@@ -371,14 +404,32 @@
     if(records.has(id))header(records.get(id));
     // Without it, the last record stays in place, dimmed and out of reach, so its preview cannot start; only a
     // first load says it is loading.
-    else{$('discovery-status').textContent=workspace.hidden?word('loading'):'';if(!workspace.hidden){workspace.setAttribute('aria-busy','true');workspace.inert=true;}}
+    else if(!place){$('discovery-status').textContent=workspace.hidden?word('loading'):'';if(!workspace.hidden){workspace.setAttribute('aria-busy','true');workspace.inert=true;}}
+    if(place&&!last)$('discovery-status').textContent=word('loading');
+    // The place paints in one task: the view, the header and the body with the regions that were shown whole and the
+    // biography that was opened, then the scroll, then focus on the link it was left by, in its region or elsewhere,
+    // or on the title, unless the listener moved focus meanwhile. A record whose payload failed opens at its title.
+    // The view kept on screen gives way: the record's view shows, and the search results go, as a hop hides them.
+    const reveal=()=>{showView('explore');$('discovery-results').hidden=true;};
+    const arrive=(at=place)=>{
+      reveal();$('discovery-status').textContent='';workspace.hidden=false;
+      renderEntity(selected);renderBody(selected,at.open,at.more);dialog.scrollTop=at.top;
+      const panel=$('entity-inspector'),left=a=>a.getAttribute('href')===at.next&&!a.closest?.('.entity-trail'),region=[...panel.querySelectorAll('.region')].find(n=>n.dataset.key===at.region);
+      const link=at.next&&([...region?.querySelectorAll('a')||[]].find(left)||[...panel.querySelectorAll('a')].find(left));
+      // Focus goes to the link followed. With none, it goes to the title where the title shows. A title scrolled out
+      // of view would bring the record back to its top at the first Tab, so focus then goes to the first link that
+      // shows whole in the explorer, under its bar where the bar stays, or to the explorer itself.
+      const frame=dialog.getBoundingClientRect?.(),bar=Math.max(dialog.querySelector('.explorer-top')?.getBoundingClientRect?.().bottom??0,frame?.top??0),end=frame?.bottom??0;
+      const inView=at.top>0&&[...panel.querySelectorAll('a')].find(a=>{const box=a.getBoundingClientRect?.();return a.getAttribute('href')&&box&&box.height>0&&box.top>=bar&&box.bottom<=end;});
+      if([dialog,document.body,had].includes(document.activeElement))(link||(at.top>0?inView||dialog:recordTitle)).focus({preventScroll:true});
+    };
     // Its payload, the credited artists of a track or a small release, then the fewest neighbours that name the rest.
     const named=(async()=>{
       const data=await fetched(id),e=data.entity;if(hop!==controller)return;
       if(id!==e.id){aliases.set('#explore/'+id,'#explore/'+e.id);history.replaceState(history.state,'','#explore/'+e.id);radio.renderScene();}
       // A header drawn from an included copy has no preview: the record's own payload draws it again, before the body,
       // and focus in it stays on the title.
-      if(selected&&e.previewUrl&&!selected.previewUrl&&!bodyShown){const held=$('entity-inspector').contains(document.activeElement);renderEntity(e);if(held)recordTitle.focus({preventScroll:true});}
+      if(!place&&selected&&e.previewUrl&&!selected.previewUrl&&!bodyShown){const held=$('entity-inspector').contains(document.activeElement);renderEntity(e);if(held)recordTitle.focus({preventScroll:true});}
       if(selected)selected=e;else header(e);
       const ours=[data,...(await Promise.all(near.credited(e).map(a=>fetched(a).catch(()=>null)))).filter(Boolean)];
       const pool=new Map(ours.flatMap(p=>[p.entity,...p.included]).map(r=>[r.id,r]));
@@ -387,10 +438,11 @@
     // An answer that fails after the body painted changes nothing. The 10 s limit holds until every request of the hop
     // settles, the naming ones still out when the deadline painted the body too.
     named.catch(()=>{}).then(()=>clearTimeout(timeout));
-    try{await Promise.race([named,deadline]);if(painted)await painted;if(hop===controller)renderBody(selected);}
+    try{await Promise.race([named,deadline]);if(painted)await painted;if(hop===controller){if(place)arrive();else renderBody(selected);}}
     // A payload that fails after its header showed from a record at hand is as late as one past the deadline: the header
     // stays, in the trail and with focus, and the body paints with the records at hand.
-    catch{if(painted)await painted;if(hop===controller){if(selected)renderBody(selected);else{workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}}
+    catch{if(painted)await painted;if(hop===controller){if(selected){if(place)arrive({top:0,next:'',region:'',open:[],more:false});else renderBody(selected);}
+      else{if(place)reveal();workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}}
     finally{clearTimeout(wake);}
   }
   radio.openTrack=id=>{if(entityID('plex_'+id))go('#explore/plex_'+id);};
@@ -489,7 +541,8 @@
   const empties={similar:'noSimilar',similarLabels:'noSimilarLabels',similarReleases:'noSimilarReleases'};
   // The body, painted once: the regions as lists, closest first, then About and On the radio, in the same grid so they
   // sit on the regions' columns. On a phone, where the grid is one column, On the radio comes first.
-  function renderBody(e) {
+  // Back and Forward draw it with the regions that were shown whole (open) and the biography that was opened (expand).
+  function renderBody(e,open=[],expand=false) {
     const panel=$('entity-inspector'),found=near.regions(e,records),map=panel.querySelector('.neighbourhood'),grid=node('div','regions'),line=panel.querySelector('.entity-line');
     bodyShown=true;
     // The line fills in with what the payload brought, such as an artist's stages, unless the listener is in it.
@@ -497,7 +550,7 @@
     // Its tracks on the radio, by release, each with where it plays and how long it lasts. An artist or a release whose
     // record holds fewer tracks than it counts is cut: it says how many of them it lists, and that the rest is not here.
     const played=radioTracks(e),cut=['artist','release'].includes(e.type)&&payloads.has(e.id)&&e.trackCount>played.length;
-    const radioList=(played.length||cut)&&regionSection('onRadio',played,'tracksNone','r',false,cut?word('nOfTotal').replace('{n}',number(played.length)).replace('{total}',number(e.trackCount)):played.length);
+    const radioList=(played.length||cut)&&regionSection('onRadio',played,'tracksNone','r',false,cut?word('nOfTotal').replace('{n}',number(played.length)).replace('{total}',number(e.trackCount)):played.length,null,open.includes('onRadio'));
     if(radioList&&cut&&played.length)radioList.append(node('p','collection-note',word('tracksCut')));
     // A listener opens an artist to see where his tracks play. On a phone that would come last, under every other list,
     // so there it comes first. With two columns or more it stays beside About, in the last column, where it fills
@@ -510,7 +563,7 @@
     if(found.every(r=>!r.total)&&!played.length&&!cut){if(!e.basicDetails)recordTitle.parentNode.append(node('p','collection-note',word('nothingLinked').replace('{title}',e.title)));}
     else for(const r of found){
       const empty=e.type==='label'&&r.key==='releases'?'noLabelReleases':empties[r.key];
-      if(r.items.length||(empty&&!r.total))(map||grid).append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty,'r',Boolean(map)));
+      if(r.items.length||(empty&&!r.total))(map||grid).append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty,'r',Boolean(map),undefined,null,open.includes(r.key)));
     }
     const about=node('section','record-about'),title=node('h4','',word('about').replace('{title}',e.title)),shown=sites(e.links||[]);
     title.id='r-about';about.setAttribute('aria-labelledby',title.id);about.append(title);
@@ -521,7 +574,7 @@
       text=node('p','',e.bio);text.lang='en';
       // Closed again, it may fit now, after the window grew while it was open: its height does not change then.
       more=action(word('more'),()=>{const open=more.getAttribute('aria-expanded')!=='true';more.setAttribute('aria-expanded',open);more.textContent=word(open?'less':'more');fit();},'text-button');
-      more.setAttribute('aria-expanded','false');more.hidden=true;
+      more.setAttribute('aria-expanded',expand);more.hidden=!expand;if(expand)more.textContent=word('less');
       // The source links once: in the links line when it is there, or here.
       const credit=node('span','',radio.getState().language==='de'?word('bioEnglish'):'');
       if(name)credit.append((credit.textContent?' · ':'')+word('bioFrom')+' ',source&&!shown.some(l=>l.url===source)?link(name,source):name);
@@ -543,8 +596,9 @@
     }
   }
   // The header and, once painted, the body again: in another language, or switched between the map and the list.
-  // A stage place in Statistics is drawn again from the numbers it showed.
-  const redraw=()=>{if(view==='statistics'){if(shownStage)renderStage(...shownStage);return;}if(!selected)return;const body=bodyShown;renderEntity(selected);if(body)renderBody(selected);};
+  // A stage place in Statistics is drawn again from the numbers it showed. A place paint that waits draws the right
+  // one itself.
+  const redraw=()=>{if(pending)return;if(view==='statistics'){if(shownStage)renderStage(...shownStage);return;}if(!selected)return;const body=bodyShown;renderEntity(selected);if(body)renderBody(selected);};
   // Under the map, a caption says what the map means, or why the name in focus is there, and offers the list; over
   // the list, it offers the map. The caption's words repeat the names' links, so screen readers skip them.
   function drawMap(panel,map,e) {
@@ -682,7 +736,7 @@
   const found=n=>n>=40?word('firstResults'):n?node('span','visually-hidden',number(n)+' '+word(n===1?'result':'results')):word('empty');
   async function search() {
     clearTimeout(typing);selected=null;hop?.abort();const c=new AbortController(),query=$('discovery-query').value;hop=c;
-    searchPage(query);
+    searchPage(query);settle();
     $('discovery-status').textContent=word('loading');hideRecord();
     const timeout=setTimeout(()=>c.abort(),10000);
     try {const res=await fetch('/api/discovery/search?q='+encodeURIComponent(query),{signal:c.signal});if(!res.ok)throw new Error();
@@ -760,7 +814,7 @@
     if(nav?.canGoBack===false||n>=history.length)return false;
     return s.base===life;
   }
-  function shut(){closing=false;halt();finishPreview();for(const n of behind)n.inert=false;dialog.close();}
+  function shut(){closing=false;halt();settle();finishPreview();for(const n of behind)n.inert=false;dialog.close();}
   $('explorer-close').addEventListener('click',close);
   // Explorer links, in the explorer or the player bar, go through go(). Ctrl, Cmd, Shift and middle
   // clicks keep opening them in a new tab or window.
@@ -774,7 +828,8 @@
     if(list.contains(link)){if(list.getAttribute('aria-busy'))return;clicked=link;}
     // The picture of a pictured name on the map, for loadEntity() to glide into the middle.
     glide=link.closest?.('.neighbourhood li[data-ring=r1]')?.querySelector('.picture')||null;
-    go(href);glide=null;
+    // The link followed, for the place left to keep.
+    followed=link;go(href);glide=followed=null;
   });
   // Escape over the modal stations sheet closes that sheet only. Closing keeps the typed query, which
   // Escape would otherwise clear in the search field.
@@ -851,7 +906,9 @@
     if(view==='index')countStages();else centre();
     if(held)stageRow.querySelector('[aria-current]').focus({preventScroll:true});
   }
-  function setView(next) {
+  // Leaving a view keeps its place and stops its work; showing one sets what shows. A move by Back or Forward to a record
+  // leaves at once and shows when the record paints.
+  function leaveView(next) {
     // Leaving History or the Index keeps its place: the row opened from it, and how far History was scrolled or how high
     // the Index's row stood. That is the row clicked, by pointer, touch or Enter, when it links to the place the explorer
     // went, by that place's address or by an old one (a plex_ link or a name, opened before): a track played twice links
@@ -866,6 +923,11 @@
     // On air now keeps its requests when a second restore() of one browser move finds it still shown.
     if(!(view==='history'&&next==='history'&&musicScope==='radio'))stopAir();
     view=next;clearTimeout(typing);musicRequest?.abort();musicRequest=null;naming?.abort();paging?.abort();paging=null;
+  }
+  // The views a place paint kept on screen come back into reach, and no paint waits any more.
+  function settle() {pending=false;for(const n of [$('music-view'),$('discovery-results'),$('explore-workspace')]){n.removeAttribute('aria-busy');n.inert=false;}}
+  function showView(next) {
+    settle();
     $('music-view').hidden=next==='explore';$('music-view').dataset.view=next;$('index-head').hidden=$('index-rail').hidden=next!=='index';$('discovery-search').hidden=next!=='explore';
     $('discovery-status').hidden=next!=='explore';
     for(const link of document.querySelectorAll('.explorer-nav a')) {
@@ -879,6 +941,7 @@
       $('history-day-label').hidden=next!=='history';$('history-day-label').toggleAttribute('data-off',live);if($('history-day').max!==today())$('history-day').max=today();if(next!=='history'||live)$('history-more').hidden=true;fillRow();
     }
   }
+  function setView(next) {leaveView(next);showView(next);}
   async function readJSON(path,signal) {
     const response=await fetch(path,{signal,cache:'no-cache'});
     if(!response.ok)throw new Error('unavailable');return response.json();
@@ -1569,16 +1632,21 @@
     const mark=index&&markList(by).includes(query.get('at'))?query.get('at'):'';
     return {section,scope,kind,day,by,q,mark,address:section==='history'?historyAt(scope,day):index?indexAt({kind,scope,by,q,at:mark}):'#statistics/'+scope};
   }
+  // The place an entry was left at: the one kept in memory, or the one written on the entry for a reload, or its top.
+  const placeFor=s=>places.get(s?.key)||{top:s?.top||0,next:s?.next||'',region:s?.region||'',open:s?.open||[],more:Boolean(s?.more)};
   function restore(hash=location.hash){
     landing=false;
     const place=placeOf(hash),{section,type,id,name}=place;
+    // Back and Forward return to an entry of a visit, at the place it was left; an address the browser adds, typed or
+    // followed outside the page, is a new place.
+    const returning=moving&&Boolean(history.state?.explorer);
     if(!section){if(dialog.open)shut();return;}
     // Going back landed on another explorer entry, so the page was not right under: close in place.
     if(closing){shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();return;}
     // An entry the browser added itself, such as a typed URL, may not sit right above the page.
-    if(!history.state?.explorer)writeState('replaceState',{...history.state,explorer:true,seen:life,base:life,depth:0,owned:0});
+    if(!history.state?.explorer)writeState('replaceState',{...history.state,explorer:true,seen:life,base:life,depth:0,owned:0,key:life+':'+(++pushes)});
     open();
-    if(id)return loadEntity(id);
+    if(id)return returning?loadEntity(id,placeFor(history.state)):loadEntity(id);
     if(name)return byName(type,name);
     // History, Statistics and the Index read their place from the address, which is rewritten to its one form, and the
     // tab keeps it.
@@ -1616,6 +1684,11 @@
     const again=Boolean(typed.trim())&&typed===shownQuery&&$('discovery-results').children.length>0;
     $('discovery-results').hidden=!again;$('discovery-status').replaceChildren(again?found(shownCount):'');
     if(finePointer.matches)$('discovery-query').focus();
+    // Back or Forward to the same results brings back their scroll, with focus on the result that was opened.
+    if(again&&returning){
+      const {top,next}=placeFor(history.state),opened=[...$('discovery-results').querySelectorAll('a')].find(a=>a.getAttribute('href')===next);
+      dialog.scrollTop=top;opened?.focus({preventScroll:true});
+    }
     if(again)return;
     if(typed.trim())search();
     else if(entityID(nowID())){history.replaceState(history.state,'','#explore/'+nowID());loadEntity(nowID());}
@@ -1627,12 +1700,15 @@
   for(const query of [wide,phone])query.addEventListener('change',()=>{const held=$(view==='explore'?'entity-inspector':'music-content').contains(document.activeElement);redraw();if(held&&(view==='explore'?selected!==null:shownStage!==null))recordTitle.focus({preventScroll:true});});
   // A browser move fires popstate, then hashchange when the hash differs: it restores once. A hash written with no
   // popstate still restores.
-  window.addEventListener('popstate',()=>{restore();restored=location.href;});
-  window.addEventListener('hashchange',()=>{const same=location.href===restored;restored='';if(!same)restore();});
+  // The place left is kept first, while it still shows.
+  // A move that took away the element in focus hands focus to the explorer, never to the page under it.
+  window.addEventListener('popstate',()=>{leave();moving=true;try{restore();}finally{moving=false;}mark();restored=location.href;if(dialog.open&&document.activeElement===document.body)dialog.focus({preventScroll:true});});
+  window.addEventListener('hashchange',()=>{const same=location.href===restored;restored='';if(!same){restore();mark();}});
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
-    // A record that has left the air loses its red dot in place; nothing else on the page moves.
-    if(selected&&selected.id!==enriched?.entity.id)$('entity-inspector').querySelector('.on-air')?.remove();
+    // A record that has left the air loses its red dot in place; nothing else on the page moves. While a place paint
+    // waits, the record shown is still the last one, and keeps its dot until the paint.
+    if(selected&&!pending&&selected.id!==enriched?.entity.id)$('entity-inspector').querySelector('.on-air')?.remove();
     stageAir();followRadio();markAir();
     if(landing&&!closing&&radio.getState().dataFresh&&(entityID(nowID())||!$('discovery-status').textContent)){landing=false;if(dialog.open&&location.hash==='#explore'&&!$('discovery-query').value.trim())restore();}});
-  currentLanguage=radio.getState().language;localise();enrich();restore();setInterval(clock,1000);
+  currentLanguage=radio.getState().language;localise();enrich();restore();mark();setInterval(clock,1000);
 })();
