@@ -82,6 +82,8 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
       if(tag===undefined)throw new Error('the harness reads no selector '+selector);
       return this.descendants().filter(c=>(!tag||c.localName===tag)&&(!name||c.className?.split(' ').includes(name))&&(!attr||Boolean(c.attrs)&&attr in c.attrs));
     }
+    // The nearest of itself and its ancestors with a class (.name), as a browser finds it; any other selector finds none.
+    closest(selector){if(!/^\.[\w-]+$/.test(selector))return null;for(let n=this;n;n=n.parent)if(n.className?.split(' ').includes(selector.slice(1)))return n;return null;}
     focus(options){document.activeElement=this;this.focusOptions=options;}
     select(){this.selected=true;}
     scrollIntoView(options){this.scrolled=options;}
@@ -2152,7 +2154,7 @@ test('a record shown from a name at hand stays when its own payload fails, and i
  // Extrawelt came in Recondite's payload; its own fails.
  follow(e,byClass(inspector(e),'row').find(a=>a.getAttribute('href')==='#explore/art_000000000102'));await flush();
  const title=inspector(e).descendants().find(n=>n.localName==='h3');
- assert.deepEqual([title.textContent,e.document.activeElement===title,e.elements['explore-workspace'].hidden,e.elements['discovery-status'].textContent,textOf(byClass(inspector(e),'entity-trail')[0])],['Extrawelt',true,false,'','Recondite / Extrawelt'],'the header, its focus and its place in the trail stay');
+ assert.deepEqual([title.textContent,e.document.activeElement===title,e.elements['explore-workspace'].hidden,e.elements['discovery-status'].textContent,textOf(byClass(inspector(e),'entity-trail')[0])],['Extrawelt',true,false,'','Recondite'],'the header, its focus and its line back to Recondite stay');
  assert.deepEqual(regionsOf(e),[['Similar artists 1','art_000000000201|Marek HemmannSimilar to Extrawelt|3 tracks'],['Releases 1','rel_000000000003|Shared EP|2020']],'as at the deadline');
  e.discovery=()=>null;routeTo(e,'#explore/art_000000000999');await flush();
  assert.deepEqual([e.elements['explore-workspace'].hidden,e.elements['discovery-status'].textContent],[true,'These details are unavailable. Try another record or search again.'],'a record with nothing at hand still says it is unavailable');
@@ -2289,7 +2291,7 @@ test('the biography reads open, offers More only when it is cut, and credits its
  more().emit('click');assert.deepEqual([more().textContent,more().getAttribute('aria-expanded')],['More','false']);
  await show(recondite({bio:'Fits in four lines on a wide screen.'}));
  const watch=e.observers.at(-1),text=bio().children[0];
- assert.deepEqual([more().hidden,watch.targets,e.observers.slice(0,-1).every(o=>o.targets.every(t=>cls(t)==='entity-trail'&&inspector(e).contains(t)))],[true,[text],true],'the biography on screen is the only one watched, beside the trail on screen');
+ assert.deepEqual([more().hidden,watch.targets,e.observers.filter(o=>o.targets.length).map(o=>o.targets)],[true,[text],[[text]]],'the biography on screen is the only one watched; nothing watches the line');
  Object.defineProperty(e.Element.prototype,'clientHeight',{configurable:true,get(){return 20;}});watch.fn();
  assert.equal(more().hidden,false,'a narrower window or a turned phone cuts it, and More appears');
  more().emit('click');Object.defineProperty(e.Element.prototype,'clientHeight',{configurable:true,get(){return 100;}});watch.fn();
@@ -2410,25 +2412,203 @@ test('every name in the player bar is a link the explorer routes, and openTrack 
  assert.match(cssRules().get('.player .label-note a'),/min-height:24px/);
 });
 
-test('the trail steps back through the records of this visit',async()=>{
+test('the line names the place before and the place after, and its links step with history.go',async()=>{
  const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
  const open=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
- const trail=()=>byClass(inspector(e),'entity-trail')[0];
- open('#explore/art_000000000001');await flush();assert.equal(trail(),undefined,'one record, no trail');
+ const line=()=>byClass(inspector(e),'entity-trail')[0],links=()=>line().children,read=()=>links().map(a=>[a.getAttribute('href'),a.attrs['aria-label'],textOf(a),a.dataset.step]);
+ const asked=[],go=e.history.go;e.history.go=function(n){asked.push(n);return go.call(this,n);};
+ open('#explore/art_000000000001');await flush();assert.equal(line(),undefined,'the first record of a visit has no line');
  for(const n of [2,3]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
- const steps=()=>trail().children.filter(n=>n.attrs['aria-hidden']!=='true');
- assert.deepEqual([trail().localName,trail().attrs['aria-label'],textOf(trail())],['nav','Path','Name art_000000000001 / Name art_000000000002 / Name art_000000000003']);
- assert.ok(byClass(inspector(e),'entity-heading')[0].children[0]===trail(),'the header\'s first line, out of the title column');
- assert.match(cssRules().get('.entity-trail'),/grid-column:1 \/ -1; display:flex; gap:var\(--s1\); white-space:nowrap;/,'across the picture and the title, on one line');
- assert.doesNotMatch(cssRules().get('.entity-trail'),/overflow/,'the line clips nothing: a focused link keeps its whole ring, and focus cannot scroll the line blank');
- assert.match(cssRules().get('.entity-trail > :is(a, [aria-current])'),/min-width:0; overflow:hidden; text-overflow:ellipsis;/,'each step cuts its own name short, so every link keeps words to show');
- assert.deepEqual(steps().map(n=>[n.localName,n.getAttribute('href'),n.attrs['aria-current']]),[['a','#explore/art_000000000001',undefined],['a','#explore/art_000000000002',undefined],['span',null,'page']],'the current record is not a link');
- for(const n of [4,5,6]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
- assert.deepEqual(steps().map(n=>n.textContent),['Name art_000000000003','Name art_000000000004','Name art_000000000005','Name art_000000000006'],'the last four');
- follow(e,steps()[1]);await flush();
- assert.deepEqual([e.location.hash,e.entries().length,steps().map(n=>n.textContent)],['#explore/art_000000000004',8,['Name art_000000000001','Name art_000000000002','Name art_000000000003','Name art_000000000004']],'going back cuts the trail there, in one entry more, as any link');
- e.elements['explorer-close'].emit('click');await flush();open('#explore/art_000000000009');await flush();assert.equal(trail(),undefined,'a new visit starts a new trail');
- assert.match(cssRules().get('.entity-trail'),/font-size:12px;.*color:var\(--soft\)/);assert.match(cssRules().get('.entity-trail [aria-current]'),/color:var\(--cream\)/);
+ assert.deepEqual([line().localName,line().attrs['aria-label'],read()],['nav','Back and forward',[['#explore/art_000000000002','Back to Name art_000000000002','Name art_000000000002','-1']]],'after two hops, one link back, named for the record before');
+ assert.ok(byClass(inspector(e),'entity-heading')[0].children[0]===line(),'the header\'s first line, out of the title column');
+ const [glyph,name]=links()[0].children;
+ assert.deepEqual([glyph.attrs.viewBox,glyph.attrs['aria-hidden'],glyph.children[0].attrs.d,name.localName],['0 0 24 14','true','m5 3-4 4 4 4M2 7h20','span'],'the arrow is hidden, then the name in its own span');
+ e.history.go(-1);await flush();asked.length=0;
+ assert.deepEqual(read(),[['#explore/art_000000000001','Back to Name art_000000000001','Name art_000000000001','-1'],['#explore/art_000000000003','Forward to Name art_000000000003','Name art_000000000003','1']],'after Back, a link forward too, named at once');
+ const [label,arrow]=links()[1].children;assert.deepEqual([label.localName,arrow.children[0].attrs.d],['span','m19 3 4 4-4 4M2 7h20'],'forward: the name, then the arrow');
+ const at=e.position(),count=e.entries().length;follow(e,links()[1]);await flush();
+ assert.deepEqual([e.position(),e.entries().length,e.location.hash,asked],[at+1,count,'#explore/art_000000000003',[1]],'the forward link is the browser\'s Forward: one step, no entry added');
+ follow(e,links()[0]);await flush();
+ assert.deepEqual([e.position(),e.entries().length,e.location.hash,asked],[at,count,'#explore/art_000000000002',[1,-1]],'the back link is the browser\'s Back');
+ // A link from here drops the entries ahead, and their name: a jump back over two entries cannot name the place ahead.
+ for(const n of [5,6]){follow(e,{getAttribute:()=>'#explore/art_00000000000'+n});await flush();}
+ e.history.go(-2);await flush();
+ assert.deepEqual(read().at(-1),['#explore/art_000000000005','Forward','Forward','1'],'a push forgets the name ahead; Forward says Forward when no Back named it');
+ e.elements['explorer-close'].emit('click');await flush();open('#explore/art_000000000009');await flush();assert.equal(line(),undefined,'a new visit starts with no line');
+ const rules=cssRules();
+ assert.match(rules.get('.entity-trail'),/grid-column:1 \/ -1; display:flex; justify-content:space-between; gap:var\(--s3\); white-space:nowrap; font-size:12px; line-height:1\.4; color:var\(--soft\);/,'one line across the picture and the title, Back at its start, Forward at its end');
+ assert.doesNotMatch(rules.get('.entity-trail'),/overflow/,'the line clips nothing: a focused link keeps its whole ring');
+ assert.match(rules.get('.entity-trail a'),/position:relative; display:inline-flex; align-items:center; gap:var\(--s1\); min-width:0; max-width:50%;/);
+ assert.match(rules.get('.entity-trail a::after'),/content:""; position:absolute; inset:-14px -8px;/,'a 44px target over the 17px line');
+ assert.match(rules.get('.entity-trail svg'),/flex:none; width:20px; height:12px; fill:none; stroke:currentColor; stroke-width:1\.4; stroke-linecap:round; stroke-linejoin:round;/);
+ assert.match(rules.get('.entity-trail a:is(:hover, :focus-visible)'),/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px;/);
+});
+
+test('the line comes back after a reload from history.state',async()=>{
+ const reloaded=async()=>{
+  const state={explorer:true,seen:1,base:1,depth:2,owned:1,key:'1:2',back:{title:'X'},backHref:'#explore/art_000000000001',next:'#explore/art_000000000003',ahead:{name:{title:'Y'},life:1}};
+  const e=setup({journey:true,hash:'#explore/art_000000000002',state,below:[{},{hash:'#explore/art_000000000001'}]});
+  // The page loads before the test answers for records; it reads its address again once the test answers.
+  e.discovery=url=>entity(url.split('/').pop());e.window.emit('hashchange');await flush();return e;
+ };
+ const line=e=>byClass(inspector(e),'entity-trail')[0],read=e=>line(e).children.map(a=>[a.getAttribute('href'),a.attrs['aria-label'],textOf(a)]);
+ assert.deepEqual(read(await reloaded()),[['#explore/art_000000000001','Back to X','X'],['#explore/art_000000000003','Forward to Y','Y']],'both links, named from the entry');
+ // Another page life wrote both neighbours: without the Navigation API, the links go through their addresses.
+ for(const [i,to,way] of [[1,'#explore/art_000000000003','Forward'],[0,'#explore/art_000000000001','Back']]){
+  const e=await reloaded(),asked=[];e.history.go=n=>asked.push(n);const count=e.entries().length;
+  follow(e,line(e).children[i]);await flush();
+  assert.deepEqual([e.location.hash,e.entries().length,asked],[to,count+1,[]],way+' after a reload opens its address in a new entry, never history.go');
+ }
+});
+
+test('a search and a tab are named on the line',async()=>{
+ const e=await indexed();const query=e.elements['discovery-query'],results=e.elements['discovery-results'];
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Maceo Plex'}]}:entity(url.split('/').pop());
+ const back=()=>{const a=byClass(inspector(e),'entity-trail')[0].children[0];return [textOf(a),a.attrs['aria-label']];};
+ routeTo(e,'#explore/art_000000000001');await flush();query.value='maceo';query.emit('input');e.fire(300);await flush();
+ follow(e,firstLink(results));await flush();
+ assert.deepEqual(back(),['“maceo”','Back to “maceo”'],'from a result, Back names the search in quotes');
+ routeTo(e,'#index/artists');await flush();routeTo(e,'#explore/art_000000000002');await flush();
+ assert.deepEqual(back(),['Index','Back to the Index'],'from an Index row, Back names the Index');
+ e.history.go(-1);await flush();e.history.go(-1);await flush();
+ const ahead=byClass(inspector(e),'entity-trail')[0].children.at(-1);
+ assert.deepEqual([textOf(ahead),ahead.attrs['aria-label'],ahead.getAttribute('href')],['Index','Forward to the Index','#index/artists'],'and Back to the record names the tab ahead');
+ // A tab takes its article in German, so its words are its own: zum Verlauf, zur Statistik, zum Index.
+ e.setLanguage('de');await flush();
+ const weiter=byClass(inspector(e),'entity-trail')[0].children.at(-1);
+ assert.deepEqual([textOf(weiter),weiter.attrs['aria-label']],['Index','Weiter zum Index'],'in German the tab ahead takes its article');
+ for(const [tab,en,de,shown] of [['#history','Back to History','Zurück zum Verlauf','Verlauf'],['#statistics','Back to Statistics','Zurück zur Statistik','Statistik']]){
+  e.setLanguage('en');await flush();routeTo(e,tab);await flush();routeTo(e,'#explore/art_000000000003');await flush();
+  assert.equal(back()[1],en,'from the '+tab+' tab');
+  e.setLanguage('de');await flush();assert.deepEqual(back(),[shown,de],'and in German, with its article');
+ }
+});
+
+test('a middle or Ctrl click on the line opens its address and does not step',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ for(const n of [1,2])routeTo(e,'#explore/art_00000000000'+n),await flush();
+ const link=byClass(inspector(e),'entity-trail')[0].children[0],at=e.position(),count=e.entries().length,asked=[];e.history.go=n=>asked.push(n);
+ for(const event of [{button:1},{button:0,ctrlKey:true},{button:0,metaKey:true},{button:0,shiftKey:true}]){
+  let prevented=false;e.document.emit('click',{...event,target:{closest:()=>link},preventDefault(){prevented=true;}});await flush();
+  assert.deepEqual([prevented,e.position(),e.entries().length,asked],[false,at,count,[]],JSON.stringify(event)+' leaves the link to the browser, which opens its address in a new tab');
+ }
+});
+
+test('a step on the line while ✕ is on its way changes nothing',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ for(const n of [1,2,3])routeTo(e,'#explore/art_00000000000'+n),await flush();
+ e.history.go(-1);await flush();
+ const [back,ahead]=byClass(inspector(e),'entity-trail')[0].children,count=e.entries().length,asked=[];e.history.go=n=>asked.push(n);
+ e.elements['explorer-close'].emit('click');await flush();
+ for(const link of [back,ahead]){let prevented=false;e.document.emit('click',{button:0,target:{closest:()=>link},preventDefault(){prevented=true;}});await flush();assert.equal(prevented,true,'the click is the page\'s');}
+ assert.deepEqual([asked,e.entries().length,e.location.hash],[[-2],count,'#explore/art_000000000002'],'only ✕ asked the browser to move, and no link pushed an entry');
+});
+
+test('a line link whose target the browser keeps in another document goes through its address',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ for(const n of [1,2,3])routeTo(e,'#explore/art_00000000000'+n),await flush();
+ e.history.go(-1);await flush();
+ // The entry under the one shown is in another document, as after a reload in some browsers; the one above is not.
+ const other=e.position()-1;
+ e.window.navigation={canGoBack:true,canGoForward:true,currentEntry:{get index(){return e.position();}},entries:()=>e.entries().map((hash,i)=>({url:'https://radio.test/'+hash,sameDocument:i!==other}))};
+ const asked=[],go=e.history.go;e.history.go=function(n){asked.push(n);return go.call(this,n);};
+ const [back]=byClass(inspector(e),'entity-trail')[0].children,count=e.entries().length,at=e.position();
+ follow(e,back);await flush();
+ assert.deepEqual([asked,e.location.hash,e.position(),e.entries().length],[[],'#explore/art_000000000001',at+1,count],'Back pushes its address in a new entry, which replaces the one ahead, and never loads another document');
+ e.history.go(-1);await flush();asked.length=0;
+ const ahead=byClass(inspector(e),'entity-trail')[0].children.at(-1);follow(e,ahead);await flush();
+ assert.deepEqual([asked,e.location.hash],[[1],'#explore/art_000000000001'],'a target in this document is a browser step');
+ e.window.navigation={...e.window.navigation,canGoForward:false};routeTo(e,'#explore/art_000000000004');await flush();e.history.go(-1);await flush();
+ assert.equal(byClass(inspector(e),'entity-trail')[0].children.some(a=>a.dataset.step==='1'),false,'where the browser says nothing is ahead, there is no forward link');
+});
+
+test('the line speaks the new language after a switch',async()=>{
+ const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'];
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Maceo Plex'}]}:entity(url.split('/').pop());
+ routeTo(e,'#explore/art_000000000001');await flush();query.value='maceo';query.emit('input');e.fire(300);await flush();
+ follow(e,firstLink(results));await flush();routeTo(e,'#explore/art_000000000002');await flush();e.history.go(-1);await flush();
+ e.setLanguage('de');await flush();
+ const line=byClass(inspector(e),'entity-trail')[0];
+ assert.deepEqual([line.attrs['aria-label'],...line.children.map(a=>[textOf(a),a.attrs['aria-label']])],['Zurück und weiter',['„maceo“','Zurück zu „maceo“'],['Name art_000000000002','Weiter zu Name art_000000000002']],'the tab words and the quotes change, the titles stay');
+});
+
+test('a double click on the line steps once, on the old link or on the one drawn in its place',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>entity(url.split('/').pop());
+ for(const n of [1,2])routeTo(e,'#explore/art_00000000000'+n),await flush();
+ // Every entry is in this document, as Chromium says.
+ e.window.navigation={canGoBack:true,canGoForward:true,currentEntry:{get index(){return e.position();}},entries:()=>e.entries().map(hash=>({url:'https://radio.test/'+hash,sameDocument:true}))};
+ const asked=[],go=e.history.go;e.history.go=function(n){asked.push(n);return go.call(this,n);};
+ const line=()=>byClass(inspector(e),'entity-trail')[0],click=(link,timeStamp,clientX=700)=>e.document.emit('click',{button:0,timeStamp,clientX,clientY:300,target:{closest:()=>link},preventDefault(){}});
+ // Both clicks reach the back link before the browser moves: the second one would step back out of the explorer.
+ const back=line().children[0];click(back,1000);click(back,1000);await flush();
+ assert.deepEqual([asked,e.location.hash,e.elements.explorer.open],[[-1],'#explore/art_000000000001',true],'a 0 ms double click steps back once');
+ // On the map the lone forward link stands where the back link stood: the second click of a slower double click lands on it.
+ click(line().children.at(-1),1300,710);await flush();
+ assert.deepEqual([asked,e.location.hash],[[-1],'#explore/art_000000000001'],'a click 300 ms after the step, on the same spot, changes nothing');
+ click(line().children.at(-1),1500);await flush();
+ assert.deepEqual([asked,e.location.hash],[[-1,1],'#explore/art_000000000002'],'a click 500 ms after the step steps');
+ click(line().children[0],1600,500);await flush();
+ assert.deepEqual([asked,e.location.hash],[[-1,1,-1],'#explore/art_000000000001'],'a click on another spot steps at once');
+});
+
+test('two quick Backs name the record that waits for its paint on the line ahead',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;const query=e.elements['discovery-query'];
+ routeTo(e,'#explore/art_000000000002');await flush();routeTo(e,'#explore/art_000000000001');await flush();
+ query.value='jimi';query.emit('input');e.fire(300);await flush();
+ // Back to Recondite: its naming fetch waits, so the results stay, dimmed, and the second Back comes in that time.
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ assert.deepEqual([e.location.hash,e.elements['discovery-results'].hidden,e.elements['discovery-results'].getAttribute('aria-busy')],['#explore/art_000000000001',false,'true'],'Recondite waits behind the results');
+ e.history.go(-1);await flush();
+ const ahead=byClass(inspector(e),'entity-trail')[0].children.at(-1);
+ assert.deepEqual([titleShown(e),textOf(ahead),ahead.attrs['aria-label'],ahead.getAttribute('href')],['Name art_000000000002','Recondite','Forward to Recondite','#explore/art_000000000001'],'Forward names Recondite, where it goes, not the search shown while it waited');
+});
+
+test('a move from a record that waits for its paint drops the name ahead and points Forward at the move',async()=>{
+ const {e,gate}=await recondite4();gate.fail=true;e.names={artists:artistNames(),labels:labelNames()};
+ await walk(e,['art_000000000002','art_000000000001','art_000000000003']);
+ gate.fail=false;gate.hold=true;e.history.go(-1);await flush();
+ assert.deepEqual([e.location.hash,e.history.state.ahead?.name?.title],['#explore/art_000000000001','Name art_000000000003'],'Back to Recondite names the record ahead while Recondite waits');
+ // The Index tab while Recondite waits: Recondite has no place to keep, and the record ahead is dropped.
+ routeTo(e,'#index/artists');await flush();
+ e.history.go(-2);await flush();e.history.go(1);await flush();gate.release();await flush();
+ const ahead=byClass(inspector(e),'entity-trail')[0].children.at(-1);
+ assert.deepEqual([titleShown(e),textOf(ahead),ahead.attrs['aria-label'],ahead.getAttribute('href')],['Recondite','Forward','Forward','#index/artists'],'reached by a jump, Forward does not know the Index by name, and goes there, not to the record dropped');
+});
+
+test('a name with a dollar sign reads on the line as written',async()=>{
+ const e=setup({journey:true});await flush();const query=e.elements['discovery-query'],results=e.elements['discovery-results'];
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Maceo Plex'}]}:{entity:{id:url.split('/').pop(),type:'artist',title:'Ca$&h'},included:[]};
+ const back=()=>{const a=byClass(inspector(e),'entity-trail')[0].children[0];return [textOf(a),a.attrs['aria-label']];};
+ routeTo(e,'#explore/art_000000000001');await flush();query.value="$& su$'";query.emit('input');e.fire(300);await flush();
+ follow(e,firstLink(results));await flush();
+ assert.deepEqual(back(),["“$& su$'”","Back to “$& su$'”"],'a query, as typed');
+ routeTo(e,'#explore/art_000000000002');await flush();
+ assert.deepEqual(back(),['Ca$&h','Back to Ca$&h'],'a title, as written');
+ e.setLanguage('de');await flush();assert.deepEqual(back(),['Ca$&h','Zurück zu Ca$&h'],'in German too');
+});
+
+test('Back to the first record shows its line where its top shows, and keeps the link followed where it stood where the line is out of view',async()=>{
+ const {e}=await recondite4();const explorer=e.elements.explorer,eulberg='#explore/art_000000000101',box=e.Element.prototype.getBoundingClientRect;
+ // Laid out as a browser does, in the explorer's scroll: the explorer's bar ends 64 px down, the record starts 80 px
+ // under it with its line, 17 px tall, and its title stands 200 px under that, 33 px lower when the line shows over it.
+ e.Element.prototype.getBoundingClientRect=function(){if(this===explorer)return {left:0,right:0,width:0,height:700,top:64,bottom:764};
+  const line=this.className==='entity-trail',at=this===inspector(e)||line?144:this.localName==='h3'?344+(this.parent?.parent?.children[0]?.className==='entity-trail'?33:0):null;
+  if(at===null)return box.call(this);const top=at-explorer.scrollTop,height=line?17:40;return {left:0,right:0,width:0,height,top,bottom:top+height};};
+ try{
+  routeTo(e,'#explore/art_000000000001');await flush();assert.equal(byClass(inspector(e),'entity-trail').length,0,'the first record has no line');
+  explorer.scrollTop=600;follow(e,rowTo(e,eulberg,'similar'));await flush();e.history.go(-1);await flush();
+  assert.deepEqual([titleShown(e),byClass(inspector(e),'entity-trail').length,explorer.scrollTop,e.document.activeElement.getAttribute?.('href')],['Recondite',1,633,eulberg],'the line pushes the record 33 px down, and the scroll follows: the link followed stands where it stood');
+  e.history.go(1);await flush();e.history.go(-1);await flush();
+  assert.equal(explorer.scrollTop,633,'left with its line, it comes back at the same scroll');
+  e.elements['explorer-close'].emit('click');await flush();
+  routeTo(e,'#explore/art_000000000001');await flush();explorer.scrollTop=0;follow(e,rowTo(e,eulberg,'similar'));await flush();e.history.go(-1);await flush();
+  assert.deepEqual([byClass(inspector(e),'entity-trail').length,explorer.scrollTop],[1,0],'left at its top, it comes back at its top: the line shows over the title, and the record stands 33 px lower');
+  for(const [top,back,why] of [[96,96,'the line still shows 1 px under the bar: the scroll stays'],[97,130,'the line is just out of view under the bar: the scroll follows']]){
+   e.elements['explorer-close'].emit('click');await flush();
+   routeTo(e,'#explore/art_000000000001');await flush();explorer.scrollTop=top;follow(e,rowTo(e,eulberg,'similar'));await flush();e.history.go(-1);await flush();
+   assert.equal(explorer.scrollTop,back,why);
+  }
+ }finally{e.Element.prototype.getBoundingClientRect=box;}
 });
 
 test('a hop keeps the record in place, dimmed, then starts the next one at its title',async()=>{
@@ -3963,21 +4143,22 @@ test('from 1100px wide a stage is a map too: its top names on the left, the stag
  assert.deepEqual([content.children.map(cls),byClass(content,'neighbourhood-caption')[0].children.at(-1).textContent,e.document.activeElement===byClass(content,'neighbourhood-caption')[0].children.at(-1)],[['entity-heading','neighbourhood-caption','regions'],'Show as a map',true],'the list, from the numbers shown, with its switch');
 });
 
-test('the trail keeps the record shown whole whenever its box can hold it, and cuts the oldest steps first, to a few letters each',async()=>{
+test('each name on the line takes half the line at most and is cut at its end',async()=>{
  const e=setup({journey:true});await flush();
  const titles={art_000000000071:'Abandoned Soul (Recondite Remix)',lab_000000000072:'Watergate Records',rel_000000000073:'Watergate Records 2008-2018',art_000000000074:'Tale of Us'};
  e.discovery=url=>{const id=url.split('/').pop();return {entity:{id,type:'artist',title:titles[id]},included:[]};};
- for(const id of Object.keys(titles)){e.visit('#explore/'+id);await flush();}
- const path=byClass(inspector(e),'entity-trail')[0],watch=e.observers.find(o=>o.targets.includes(path));
- // Laid out like a browser: each step as wide as its name, 6px a letter, unless cut; a slash 12px; 4px between.
- const wide=n=>Math.min(n.getAttribute('aria-hidden')?12:n.textContent.length*6,parseFloat(n.style.maxWidth)>=0?parseFloat(n.style.maxWidth):Infinity);
- for(const n of path.children)n.getBoundingClientRect=()=>{let left=0;for(const m of path.children.slice(0,path.children.indexOf(n)))left+=wide(m)+4;return {left,width:wide(n),right:left+wide(n)};};
- const cut=()=>path.children.filter(n=>!n.getAttribute('aria-hidden')).map(n=>n.style.maxWidth||'');
- path.clientWidth=576;watch.fn();assert.deepEqual(cut(),['','','',''],'a box that holds it all cuts nothing');
- path.clientWidth=360;watch.fn();
- assert.deepEqual(cut(),['40px','40px','160px',''],'216px too wide: the oldest gives 152px down to a few letters, the next 62px, the third the last 2px, and Tale of Us stays whole');
- path.clientWidth=576;watch.fn();assert.deepEqual(cut(),['','','',''],'a wider box gives the names back');
- const rules=cssRules();assert.match(rules.get('.entity-trail > *'),/flex:none/,'a step is as wide as its name until the page cuts it');
+ for(const id of Object.keys(titles)){routeTo(e,'#explore/'+id);await flush();}
+ e.history.go(-1);await flush();
+ const line=byClass(inspector(e),'entity-trail')[0];
+ assert.deepEqual(line.children.map(a=>textOf(a)),['Watergate Records','Tale of Us'],'two names, whole in the page: the page cuts them, not the script');
+ assert.deepEqual([e.observers.some(o=>o.targets.includes(line)),line.descendants().filter(n=>n.style?.maxWidth).length],[false,0],'nothing watches the line or sets a width on it');
+ const rules=cssRules();
+ assert.match(rules.get('.entity-trail a'),/min-width:0; max-width:50%;/,'each link takes half the line at most, and may shrink below its name');
+ assert.match(rules.get('.entity-trail a > span'),/^\s*overflow:hidden; text-overflow:ellipsis;\s*$/,'the name is cut at its end, the arrow stays');
+ assert.match(rules.get('.entity-trail a[data-step="1"]'),/margin-left:auto;/,'a lone forward link stands at the end of the line');
+ assert.match(rules.get('.neighbourhood .entity-trail'),/justify-content:center; gap:var\(--s5\);/,'on the map the two stand centred over the picture');
+ assert.match(rules.get('.neighbourhood .entity-trail a[data-step="1"]'),/^\s*margin-left:0;\s*$/,'and a lone forward link stays in the middle');
+ assert.deepEqual(['.entity-trail > *','.entity-trail > :is(a, [aria-current])','.entity-trail [aria-current]'].map(k=>rules.has(k)),[false,false,false],'the Path\'s step rules are gone');
 });
 
 test('a short map gives each band the room its pictured names need, so no name ends below the map',async()=>{
@@ -5031,6 +5212,21 @@ test('after a reload, Back brings a record back at the place written on its entr
  e.history.go(-1);await flush();
  const focus=e.document.activeElement;
  assert.deepEqual([titleShown(e),e.elements.explorer.scrollTop,focus.getAttribute?.('href'),regionOf(e,'similar').contains(focus)],['Recondite',600,eulberg,true],'the page life before the reload left Recondite at 600 px, by Eulberg');
+});
+
+test('after a reload, Back to the first record keeps the link followed where it stood, from the place on its entry',async()=>{
+ const old=n=>({explorer:1,seen:1,base:1,depth:n,owned:1,key:'1:'+(n+1)}),data=hood(),eulberg='#explore/art_000000000101';
+ // Left with no line, its title 200 px down the record; it comes back with a line forward, 33 px taller.
+ const e=nested4(setup({journey:true,hash:eulberg,state:old(1),below:[{hash:''},{hash:'#explore/art_000000000001',state:{...old(0),top:600,next:eulberg,region:'similar',head:200}}]}));
+ const explorer=e.elements.explorer,box=e.Element.prototype.getBoundingClientRect;explorer.scrollTop=0;
+ e.Element.prototype.getBoundingClientRect=function(){if(this===explorer)return {left:0,right:0,width:0,height:700,top:64,bottom:764};
+  const line=this.className==='entity-trail',at=this===inspector(e)||line?144:this.localName==='h3'?344+(this.parent?.parent?.children[0]?.className==='entity-trail'?33:0):null;
+  if(at===null)return box.call(this);const top=at-explorer.scrollTop,height=line?17:40;return {left:0,right:0,width:0,height,top,bottom:top+height};};
+ try{
+  e.discovery=url=>data[url.split('/').pop()]||entity(url.split('/').pop());await flush();
+  e.history.go(-1);await flush();
+  assert.deepEqual([titleShown(e),byClass(inspector(e),'entity-trail').length,explorer.scrollTop],['Recondite',1,633],'the page life before the reload left Recondite at 600 px with no line: he comes back 33 px further down');
+ }finally{e.Element.prototype.getBoundingClientRect=box;}
 });
 
 test('Back to a record at hand whose payload fails opens it at its title, at 0 px',async()=>{

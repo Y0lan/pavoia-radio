@@ -37,7 +37,7 @@
       loading:'Loading the connections…',unavailable:'These details are unavailable. Try another record or search again.',empty:'No matches in the radio catalogue.',
       artist:'Artist',track:'Track',release:'Release',label:'Label',playlist:'Playlist',primary:'Artist',featured:'Featuring',remixer:'Remixed by',
       similar:'Similar artists',collaboration:'Collaboration',remix:'Remix',shared_release:'Shared release','musicbrainz:member of band':'Band member','musicbrainz:collaboration':'Collaboration',
-      favorite:'Essentials favourite',onRadio:'On the radio',bioFrom:'Biography from',more:'More',less:'Less',showAll:'Show all {n}',showListed:'Show the {n} listed',trail:'Path',elsewhere:'Elsewhere',
+      favorite:'Essentials favourite',onRadio:'On the radio',bioFrom:'Biography from',more:'More',less:'Less',showAll:'Show all {n}',showListed:'Show the {n} listed',trail:'Back and forward',stepBack:'Back',stepBackTo:'Back to {title}',stepForward:'Forward',stepForwardTo:'Forward to {title}',searchNamed:'“{q}”',elsewhere:'Elsewhere',
       bioEnglish:'Biography in English',held:'Artist details are being checked.',artists:'Artists',tracks:'Tracks',
       preview:'Listen · 60 s',stopPreview:'Stop',previewError:'The preview could not play. Try again.',
       result:'result',results:'results',firstResults:'First 40 results. Add a word to narrow them.',
@@ -57,7 +57,7 @@
       loading:'Verbindungen werden geladen…',unavailable:'Diese Details sind nicht verfügbar. Wähle einen anderen Eintrag oder suche erneut.',empty:'Keine Treffer im Radiokatalog.',
       artist:'Künstler',track:'Track',release:'Veröffentlichung',label:'Label',playlist:'Playlist',primary:'Künstler',featured:'Mit',remixer:'Remix von',
       similar:'Ähnliche Künstler',collaboration:'Zusammenarbeit',remix:'Remix',shared_release:'Gemeinsame Veröffentlichung','musicbrainz:member of band':'Bandmitglied','musicbrainz:collaboration':'Zusammenarbeit',
-      favorite:'Essentials-Favorit',onRadio:'Im Radio',bioFrom:'Biografie von',more:'Mehr',less:'Weniger',showAll:'Alle {n} zeigen',showListed:'Die {n} aufgeführten zeigen',trail:'Pfad',elsewhere:'Anderswo',
+      favorite:'Essentials-Favorit',onRadio:'Im Radio',bioFrom:'Biografie von',more:'Mehr',less:'Weniger',showAll:'Alle {n} zeigen',showListed:'Die {n} aufgeführten zeigen',trail:'Zurück und weiter',stepBack:'Zurück',stepBackTo:'Zurück zu {title}',stepForward:'Weiter',stepForwardTo:'Weiter zu {title}',searchNamed:'„{q}“',elsewhere:'Anderswo',
       bioEnglish:'Biografie auf Englisch',held:'Die Künstlerdaten werden geprüft.',artists:'Künstler',tracks:'Tracks',
       preview:'Anhören · 60 s',stopPreview:'Stopp',previewError:'Die Hörprobe konnte nicht starten. Bitte erneut versuchen.',
       result:'Treffer',results:'Treffer',firstResults:'Die ersten 40 Treffer. Ergänze ein Wort, um sie einzugrenzen.',
@@ -80,7 +80,7 @@
     changesTitle:'Added and removed',changeAdded:'added',changeRemoved:'removed',changesMore:'Show earlier changes',changesSince:'Changes are recorded since {date}.',
     airNow:'On air now',airTotal:'{n} listening on all stations',airLoading:'Loading track…',airNoTrack:'No track announced',airError:'What plays now could not load.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
-    indexTab:'Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
+    indexTab:'Index',toHistory:'to History',toStatistics:'to Statistics',toIndexTab:'to the Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
     markArtists:'{mark}, {n} artists',markArtist1:'{mark}, 1 artist',markLabels:'{mark}, {n} labels',markLabel1:'{mark}, 1 label',symbols:'Numbers and symbols',band:'{n} tracks or more',band1:'One track',
     markArtists0:'{mark}, no artists',markLabels0:'{mark}, no labels',railLetters:'Jump to a letter',railCounts:'Jump to a track count',railFind:'Back to the filter',filterHint:'Press / to filter. In the list, type a name to jump to it.'});
   Object.assign(copy.de, {exploreTab:'Wurzeln',history:'Verlauf',statistics:'Statistik',historyDay:'Tag',older:'Frühere Tracks anzeigen',loadingMore:'Wird geladen…',now:'Jetzt',allStages:'Alle Sender',noHistory:'Auf diesem Sender lief noch nichts.',noDay:'An diesem Tag lief hier nichts.',historyError:'Der Verlauf konnte nicht geladen werden.',musicLoading:'Musik wird geladen…',musicError:'Diese Daten konnten nicht geladen werden.',retry:'Erneut versuchen',releases:'Veröffentlichungen',years:'Erscheinungsjahre',labels:'Labels',
@@ -91,7 +91,7 @@
     changesTitle:'Hinzugefügt und entfernt',changeAdded:'hinzugefügt',changeRemoved:'entfernt',changesMore:'Frühere Änderungen anzeigen',changesSince:'Änderungen werden seit {date} erfasst.',
     airNow:'Gerade läuft',airTotal:'{n} hören auf allen Sendern',airLoading:'Titel wird geladen…',airNoTrack:'Kein Titel gemeldet',airError:'Was gerade läuft, konnte nicht geladen werden.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
-    indexTab:'Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
+    indexTab:'Index',toHistory:'zum Verlauf',toStatistics:'zur Statistik',toIndexTab:'zum Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
     markArtists:'{mark}, {n} Künstler',markArtist1:'{mark}, 1 Künstler',markLabels:'{mark}, {n} Labels',markLabel1:'{mark}, 1 Label',symbols:'Zahlen und Zeichen',band:'{n} Tracks oder mehr',band1:'Ein Track',
     markArtists0:'{mark}, keine Künstler',markLabels0:'{mark}, keine Labels',railLetters:'Zu einem Buchstaben springen',railCounts:'Zu einer Trackzahl springen',railFind:'Zurück zum Filter',filterHint:'Mit / filtern. In der Liste springst du mit den ersten Buchstaben zu einem Namen.'});
   const word = key => copy[radio.getState().language][key] || key;
@@ -186,7 +186,7 @@
   function sites(list) {const seen=new Set();return list.map(l=>({kind:l.kind,url:external(l.url)})).filter(l=>l.url&&l.kind!=='wikidata').sort((a,b)=>place(a.kind)-place(b.kind)).filter(l=>!seen.has(l.url)&&seen.add(l.url));}
   const region=code=>{try{return new Intl.DisplayNames([radio.getState().language],{type:'region'}).of(code);}catch{return code;}};
   const time=n=>Math.floor(n/60)+':'+String(Math.floor(n%60)).padStart(2,'0');
-  let recordTitle=null, bioWatch=null, mapWatch=null, trailWatch=null, glide=null, enriched=null, nowKey='', nowRequest=null, hop=null, selected=null, bodyShown=false, preview=null, previewButton=null, trail=[], currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
+  let recordTitle=null, bioWatch=null, mapWatch=null, glide=null, enriched=null, nowKey='', nowRequest=null, hop=null, selected=null, bodyShown=false, preview=null, previewButton=null, currentLanguage='', renderedPlayer='', shownQuery='', shownCount=0, typing=null;
   // A window 1100px wide or more draws a record as a map, unless the listener chose the list; the choice is kept, and a
   // page that cannot read it draws the map.
   let listView=false;try{listView=localStorage.getItem('pavoia-explorer-view')==='list';}catch{/* Storage is optional. */}
@@ -198,7 +198,9 @@
   // An entry this page opened carries this page's life in its state, so Back and Forward, which keep
   // the page, keep it too; any other explorer entry is marked as found, not owned. Each entry of a visit
   // also holds its depth over the visit's first one (owned when the page is right under that one), the
-  // life that wrote the first one (base), the life that wrote the entry before it (backLife) and its own key.
+  // life that wrote the first one (base), the life that wrote the entry before it (backLife) and its own key. An entry
+  // under the first one names the place before it and that place's address (back, backHref), and an entry reached by Back
+  // names the place after it and the life that saw it (ahead), for the line over a record's title.
   const life=performance.timeOrigin||Date.now();
   let landing=false,closing=false,pushes=0,restored='';
   // The place each entry of the visit was left at, by its key: in memory, since a Back or a Forward cannot write the entry
@@ -211,38 +213,53 @@
   const writeState=(method,state,url)=>{try{history[method](state,'',url);return true;}catch{return false;}};
   // A record or the search page, once it shows whole, is a place to come back to: how far it was scrolled, the link it
   // was left by (next) and that link's region, the regions shown whole and an opened biography. A browser move names no
-  // link, so the one it was left by before stays. It returns the place, or nothing for a tab, which keeps its own.
+  // link, so the one it was left by before stays. A record also keeps how far down its title stands (head), since the line
+  // over the title can come back with it. It returns the place, or nothing for a tab, which keeps its own.
+  const titleAt=()=>recordTitle.getBoundingClientRect().top-$('entity-inspector').getBoundingClientRect().top;
   function leave(next) {
     const workspace=$('explore-workspace'),record=!workspace.hidden&&!workspace.getAttribute('aria-busy');
     if(view!=='explore'||pending||!shown.key||!(record||!$('discovery-results').hidden))return null;
     const old=places.get(shown.key)||{},panel=$('entity-inspector');
     const place={top:dialog.scrollTop,next:next===undefined?old.next||'':next,region:next===undefined?old.region||'':followed?.closest?.('.region')?.dataset.key||'',
-      open:record?[...panel.querySelectorAll('.region[data-open]')].map(n=>n.dataset.key):[],more:record&&panel.querySelector('.bio-foot')?.querySelector('button')?.getAttribute('aria-expanded')==='true'};
+      open:record?[...panel.querySelectorAll('.region[data-open]')].map(n=>n.dataset.key):[],more:record&&panel.querySelector('.bio-foot')?.querySelector('button')?.getAttribute('aria-expanded')==='true',
+      head:record&&recordTitle&&panel.contains(recordTitle)?titleAt():undefined};
     places.delete(shown.key);places.set(shown.key,place);if(places.size>64)places.delete(places.keys().next().value);
     return place;
   }
   // The entry shown, after a move or a write.
   const mark=()=>{const s=history.state||{};shown={depth:s.depth||0,key:s.key||''};};
+  // The place shown, named for the line over a record's title: a record by its title, a search by its query, a tab by the
+  // key of its word, so the line speaks the language of the moment it is drawn; nothing while no place shows. While a
+  // place paint waits, the place is the record that waits, though the last view still shows, by its title once at hand.
+  const placeName=()=>{
+    if(!dialog.open)return null;
+    if(view!=='explore')return {tab:view==='index'?'indexTab':view};
+    if(pending)return selected?{title:selected.title}:null;
+    if(selected&&!$('explore-workspace').hidden)return {title:selected.title};
+    return shownQuery&&!$('discovery-results').hidden?{q:shownQuery}:null;
+  };
   // An entry's state without the place it was left at, which never passes on to the next place.
-  const unplaced=({top,next,region,open,more,...s}={})=>s;
+  const unplaced=({top,next,region,open,more,head,...s}={})=>s;
   // The one place that adds an entry. Opening the explorer starts a visit at depth 0, owned; a move inside
   // goes one deeper. At depth 40 a move replaces the entry, so a visit holds 41 entries at most and the page
   // entry stays in the browser's history (Chromium keeps 50), where ✕ reaches it. An entry that cannot be
   // pushed is replaced, as a move at depth 40 is, and when that fails too the move goes on.
   function push(to) {
-    // The place left goes on its entry too, for a reload; at depth 40 that entry is about to be replaced.
-    const left=leave(to),s=unplaced(history.state||{}),key=life+':'+(++pushes),depth=s.depth||0;
-    if(left&&dialog.open&&depth<40)writeState('replaceState',{...s,...left});
+    // The place left goes on its entry too, for a reload; at depth 40 that entry is about to be replaced. The push drops
+    // the entries in front, so the entry left no longer names a place ahead. A place still waiting for its paint keeps
+    // the place it had, and its entry names the address it is left for, where Forward now goes.
+    const was=history.state||{},left=leave(to),s=unplaced(was),key=life+':'+(++pushes),depth=s.depth||0;delete s.ahead;
+    if((left||was.ahead||was.next&&was.next!==to)&&dialog.open&&depth<40){const entry=left?{...s,...left}:{...was,next:to};delete entry.ahead;writeState('replaceState',entry);}
     const stay=dialog.open?{...s,seen:life,key}:{...s,explorer:life,seen:life,base:life,depth:0,owned:0,key};
     if(dialog.open&&depth>=40){writeState('replaceState',stay,to);mark();return;}
-    const next=dialog.open?{explorer:life,seen:life,base:s.base??null,depth:depth+1,owned:s.owned?1:0,key,backLife:s.seen??null}:{explorer:life,seen:life,base:life,depth:0,owned:1,key};
+    const next=dialog.open?{explorer:life,seen:life,base:s.base??null,depth:depth+1,owned:s.owned?1:0,key,backLife:s.seen??null,back:placeName(),backHref:location.hash}:{explorer:life,seen:life,base:life,depth:0,owned:1,key};
     if(!writeState('pushState',next,to))writeState('replaceState',stay,to);
     mark();
   }
-  // A new visit starts with an empty trail and a fresh History, and never shows the last visit's record, results or tab
-  // while the first place loads.
+  // A new visit starts with a fresh History, and never shows the last visit's record, results or tab while the first
+  // place loads.
   // The dialog takes focus itself, not its first tab, which would show a ring on a page just loaded.
-  function open() {if(dialog.open)return;trail=[];$('explore-workspace').hidden=$('discovery-results').hidden=$('music-view').hidden=true;delete $('music-content').dataset.key;dialog.show();dialog.focus({preventScroll:true});for(const n of behind)n.inert=true;}
+  function open() {if(dialog.open)return;$('explore-workspace').hidden=$('discovery-results').hidden=$('music-view').hidden=true;delete $('music-content').dataset.key;dialog.show();dialog.focus({preventScroll:true});for(const n of behind)n.inert=true;}
   // The record on air, as the roots know it, or as the radio does until they answer.
   const nowID=()=>{const t=radio.getState().track;return enriched?.entity.id||(t?'plex_'+t.id:'');};
   async function request(path,signal) {
@@ -417,12 +434,18 @@
     const arrive=(at=place)=>{
       reveal();$('discovery-status').textContent='';workspace.hidden=false;
       renderEntity(selected);renderBody(selected,at.open,at.more);dialog.scrollTop=at.top;
-      const panel=$('entity-inspector'),left=a=>a.getAttribute('href')===at.next&&!a.closest?.('.entity-trail'),region=[...panel.querySelectorAll('.region')].find(n=>n.dataset.key===at.region);
+      const panel=$('entity-inspector'),frame=dialog.getBoundingClientRect?.(),bar=Math.max(dialog.querySelector('.explorer-top')?.getBoundingClientRect?.().bottom??0,frame?.top??0),end=frame?.bottom??0;
+      // The line over the title may show now where it did not, as Forward on the first record of a visit. Where it shows
+      // at the place left, under the bar, it stays in view and the record stands lower by its height. Where it is scrolled
+      // out of view, the scroll moves by its height, so the title and all under it stand where they stood, under the
+      // pointer.
+      const grown=Number.isFinite(at.head)?titleAt()-at.head:0;
+      if(grown&&!(panel.querySelector('.entity-trail')?.getBoundingClientRect().bottom>bar))dialog.scrollTop=at.top+grown;
+      const left=a=>a.getAttribute('href')===at.next&&!a.closest?.('.entity-trail'),region=[...panel.querySelectorAll('.region')].find(n=>n.dataset.key===at.region);
       const link=at.next&&([...region?.querySelectorAll('a')||[]].find(left)||[...panel.querySelectorAll('a')].find(left));
       // Focus goes to the link followed. With none, it goes to the title where the title shows. A title scrolled out
       // of view would bring the record back to its top at the first Tab, so focus then goes to the first link that
       // shows whole in the explorer, under its bar where the bar stays, or to the explorer itself.
-      const frame=dialog.getBoundingClientRect?.(),bar=Math.max(dialog.querySelector('.explorer-top')?.getBoundingClientRect?.().bottom??0,frame?.top??0),end=frame?.bottom??0;
       const inView=at.top>0&&[...panel.querySelectorAll('a')].find(a=>{const box=a.getBoundingClientRect?.();return a.getAttribute('href')&&box&&box.height>0&&box.top>=bar&&box.bottom<=end;});
       if([dialog,document.body,had].includes(document.activeElement))(link||(at.top>0?inView||dialog:recordTitle)).focus({preventScroll:true});
     };
@@ -443,7 +466,7 @@
     named.catch(()=>{}).then(()=>clearTimeout(timeout));
     try{await Promise.race([named,deadline]);if(painted)await painted;if(hop===controller){if(place)arrive();else renderBody(selected);}}
     // A payload that fails after its header showed from a record at hand is as late as one past the deadline: the header
-    // stays, in the trail and with focus, and the body paints with the records at hand.
+    // stays, with its line and with focus, and the body paints with the records at hand.
     catch{if(painted)await painted;if(hop===controller){if(selected){if(place)arrive({top:0,next:'',region:'',open:[],more:false});else renderBody(selected);}
       else{if(place)reveal();workspace.removeAttribute('aria-busy');workspace.inert=false;workspace.hidden=true;$('discovery-status').textContent=word('unavailable');}}}
     finally{clearTimeout(wake);}
@@ -500,21 +523,11 @@
     parts.filter(Boolean).forEach((part,i)=>{if(i)line.append(' · ');line.append(...[part].flat());});
     return line;
   }
-  // The header: the trail, the picture, the type, the title and its line.
+  // The header: the line to the places before and after, the picture, the type, the title and its line.
   function renderEntity(e) {
     const panel=$('entity-inspector'),heading=node('div','entity-heading'),about=node('div');
-    bioWatch?.disconnect();mapWatch?.disconnect();trailWatch?.disconnect();bodyShown=false;
-    // The trail of records opened in this visit; going back to one cuts the trail there.
-    const at=trail.findIndex(t=>t.id===e.id);trail.splice(at<0?trail.length:at,Infinity,{id:e.id,title:e.title});
-    if(trail.length>1){
-      const path=node('nav','entity-trail');path.setAttribute('aria-label',word('trail'));
-      trail.slice(-4).forEach((t,i,shown)=>{
-        if(i){const slash=node('span','',' / ');slash.setAttribute('aria-hidden','true');path.append(slash);}
-        const step=node(i<shown.length-1?'a':'span','',t.title);if(step.localName==='a')step.href='#explore/'+t.id;else step.setAttribute('aria-current','page');path.append(step);
-      });heading.append(path);
-      // It fits again when its box or the font changes: a resize, the map, a late Inter.
-      trailWatch=new ResizeObserver(()=>fitTrail(path));trailWatch.observe(path);document.fonts.ready.then(()=>fitTrail(path));
-    }
+    bioWatch?.disconnect();mapWatch?.disconnect();bodyShown=false;
+    const steps=stepLine();if(steps)heading.append(steps);
     // The track on air says so in red, the colour of what plays now; the pavoia:radio listener puts it out in place.
     const kind=node('p','eyebrow',word(e.type));
     if(e.id===enriched?.entity.id)kind.append(onAirMark());
@@ -531,14 +544,22 @@
     // On the map the header sits in the middle of its neighbourhood from its first paint, so it never moves.
     if(mapOn()){const map=node('div','neighbourhood');map.append(heading);panel.replaceChildren(map);}else panel.replaceChildren(heading);
   }
-  // The trail stays in its box, on the map the header's: the record shown keeps its whole name whenever the box can hold
-  // it, and the steps before it give way first, the oldest first, each keeping a few letters. Each step is as wide as its
-  // name until it is cut here.
-  function fitTrail(path) {
-    const all=[...path.children],steps=all.filter(n=>n.getAttribute('aria-hidden')!=='true'),width=n=>n.getBoundingClientRect().width;
-    for(const n of steps)n.style.maxWidth='';
-    let over=all.at(-1).getBoundingClientRect().right-all[0].getBoundingClientRect().left-path.clientWidth;
-    for(const n of steps){if(!(over>0))break;const w=width(n),cut=Math.min(over,n===steps.at(-1)?w:Math.max(0,w-40));if(cut>0){n.style.maxWidth=w-cut+'px';over-=cut;}}
+  // The line over a record's title, from the entry shown: where Back goes, under the first place of the visit, and where
+  // Forward goes, when the browser keeps a place ahead. Each link names its place, or says Back or Forward when the entry
+  // does not know it, and the name is cut at its end by the page's rules, never here. With neither, there is no line.
+  function stepLine() {
+    const s=history.state||{},line=node('nav','entity-trail'),named=n=>n?.title||(n?.q?word('searchNamed').replace('{q}',()=>n.q):n?.tab?word(n.tab):'');
+    const step=(href,place,by)=>{
+      const name=named(place),plain=word(by<0?'stepBack':'stepForward'),a=node('a'),glyph=drawing('0 0 24 14',[by<0?'m5 3-4 4 4 4M2 7h20':'m19 3 4 4-4 4M2 7h20'],'');
+      a.href=href;a.dataset.step=String(by);
+      // A tab takes its article in German (zum Verlauf, zur Statistik), so it has its own words after Back or Forward.
+      a.setAttribute('aria-label',place?.tab?plain+' '+word('to'+place.tab[0].toUpperCase()+place.tab.slice(1)):name?word(by<0?'stepBackTo':'stepForwardTo').replace('{title}',()=>name):plain);
+      const text=node('span','',name||plain);if(by<0)a.append(glyph,text);else a.append(text,glyph);return a;
+    };
+    if(s.depth>0&&s.backHref)line.append(step(s.backHref,s.back,-1));
+    if(s.next&&window.navigation?.canGoForward!==false)line.append(step(s.next,s.ahead?.name,1));
+    if(!line.children.length)return null;
+    line.setAttribute('aria-label',word('trail'));return line;
   }
   // Similar regions keep their heading when empty, and say so in one sentence; so do a label's releases.
   const empties={similar:'noSimilar',similarLabels:'noSimilarLabels',similarReleases:'noSimilarReleases'};
@@ -644,7 +665,7 @@
   // The record in the middle and its closest names on two ellipses around it, nearer the middle when closer: plain
   // arithmetic on the box and the names' measured sizes, so the same records in the same window give the same map. A
   // plain name hangs in the outer column from a pictured name of its band; any other sits in the inner column. A name
-  // or a region name moves out just enough to clear the header, the trail and what is already placed; a plain name with
+  // or a region name moves out just enough to clear the header, its line and what is already placed; a plain name with
   // no room in its band, or past the edge, leaves the map (the list keeps it). Returns the paths each name lights.
   function layoutMap(box,plan,lines) {
     const W=box.clientWidth,H=box.clientHeight,cx=W/2,cy=H/2,rx1=Math.min(.19*W,250),rx2=Math.min(.36*W,470),ry=.62*H,origin=box.getBoundingClientRect();
@@ -823,9 +844,24 @@
   $('explorer-close').addEventListener('click',close);
   // Explorer links, in the explorer or the player bar, go through go(). Ctrl, Cmd, Shift and middle
   // clicks keep opening them in a new tab or window.
+  let stepAt={t:-Infinity,x:0,y:0};
   document.addEventListener('click',event=>{
     if(event.button||event.ctrlKey||event.metaKey||event.shiftKey||event.altKey)return;
     const link=event.target.closest?.('a[href^="#"]'),href=link?.getAttribute('href')||'';
+    // A link of the line over a record's title is a browser step when its target entry is in this document: the
+    // Navigation API says so, or, without it, this page life wrote that entry. Otherwise it goes to its address, in a
+    // new entry, so it never loads another document. While ✕ is on its way, it waits as every move does. A click within
+    // half a second of a step and on the same spot (16 px) is the end of a double click, on the old link or on the one
+    // drawn in its place: it changes nothing, so a double click never steps back and forth, nor twice back out of the
+    // explorer. A click on the other link of the line steps at once.
+    if(link?.dataset?.step){
+      event.preventDefault();
+      const again=event.timeStamp-stepAt.t<500&&Math.hypot(event.clientX-stepAt.x,event.clientY-stepAt.y)<=16;
+      if(closing||again)return;stepAt={t:event.timeStamp,x:event.clientX,y:event.clientY};
+      const by=Number(link.dataset.step),s=history.state||{},nav=window.navigation;
+      const here=nav?.entries&&nav.currentEntry?nav.entries()[nav.currentEntry.index+by]?.sameDocument===true:by<0?s.backLife===life:s.ahead?.life===life;
+      if(here)history.go(by);else go(href);return;
+    }
     if(!/^#(?:explore|history|statistics|index)(?:[/?]|$)/.test(href))return;
     event.preventDefault();
     // Rows kept on screen while the next ones load are out of date: Enter on one opens nothing.
@@ -1638,7 +1674,7 @@
     return {section,scope,kind,day,by,q,mark,address:section==='history'?historyAt(scope,day):index?indexAt({kind,scope,by,q,at:mark}):'#statistics/'+scope};
   }
   // The place an entry was left at: the one kept in memory, or the one written on the entry for a reload, or its top.
-  const placeFor=s=>places.get(s?.key)||{top:s?.top||0,next:s?.next||'',region:s?.region||'',open:s?.open||[],more:Boolean(s?.more)};
+  const placeFor=s=>places.get(s?.key)||{top:s?.top||0,next:s?.next||'',region:s?.region||'',open:s?.open||[],more:Boolean(s?.more),head:s?.head};
   function restore(hash=location.hash){
     landing=false;
     const place=placeOf(hash),{section,type,id,name}=place;
@@ -1707,7 +1743,10 @@
   // popstate still restores.
   // The place left is kept first, while it still shows.
   // A move that took away the element in focus hands focus to the explorer, never to the page under it.
-  window.addEventListener('popstate',()=>{leave();moving=true;try{restore();}finally{moving=false;}mark();restored=location.href;if(dialog.open&&document.activeElement===document.body)dialog.focus({preventScroll:true});});
+  // A Back of one entry names the place it leaves on the entry it lands on, for the line's Forward, before that place goes.
+  window.addEventListener('popstate',()=>{
+    const s=history.state;if(!closing&&dialog.open&&s?.explorer&&s.depth===shown.depth-1)writeState('replaceState',{...s,ahead:{name:placeName(),life}});
+    leave();moving=true;try{restore();}finally{moving=false;}mark();restored=location.href;if(dialog.open&&document.activeElement===document.body)dialog.focus({preventScroll:true});});
   window.addEventListener('hashchange',()=>{const same=location.href===restored;restored='';if(!same){restore();mark();}});
   window.addEventListener('pavoia:radio',()=>{const lang=radio.getState().language;if(currentLanguage!==lang){currentLanguage=lang;localise();}enrich();
     // A record that has left the air loses its red dot in place; nothing else on the page moves. While a place paint

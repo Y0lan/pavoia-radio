@@ -3,7 +3,9 @@
 // sound: it blocks the stream and the previews, so it never counts as a listener, and it runs on serve.py. At 1440x900
 // and at 390x844 (a phone) it walks the records and the Index, then proves a typed address, a station change deep in a
 // visit, a link to the History place shown, the search, and 60 hops against the browser's 50 kept entries; then that
-// Back and Forward return to the place left, a record and the Index, each in one frame (explore plan step 4). Part two
+// Back and Forward return to the place left, a record and the Index, each in one frame (explore plan step 4); then the
+// line over a record's title at five sizes in two languages, and its links with and without the Navigation API and
+// through a reload (explore plan step 5). Part two
 // plays, so it runs only on the fake preview, after GET /__mode?set=ok answered ok; elsewhere it stops before any
 // stream request and the result says so. The discovery service does not run on a developer machine, so the six
 // records, the search answer, the names and the radio answers are inline: each page opens in a new browser context,
@@ -81,7 +83,7 @@ async page => {
   const record=(p,title)=>p.waitForFunction(title=>{const w=document.getElementById('explore-workspace');return document.getElementById('explorer').open&&!w.hidden&&!w.hasAttribute('aria-busy')&&document.querySelector('#entity-inspector h3')?.textContent===title;},title,{timeout:15000});
   const tab=(p,name,rows)=>p.waitForFunction(([name,rows])=>{const v=document.getElementById('music-view');return document.getElementById('explorer').open&&!v.hidden&&v.dataset.view===name&&!document.getElementById('music-content').hasAttribute('aria-busy')&&document.querySelectorAll(rows).length>0;},[name,rows],{timeout:15000});
   const closed=p=>p.waitForFunction(()=>!document.getElementById('explorer').open,null,{timeout:8000});
-  // A link of the record, never one of its trail, scrolled into view and clicked as a listener does. A real click
+  // A link of the record, never one of its line, scrolled into view and clicked as a listener does. A real click
   // only: a link that is covered or does not take the pointer fails the step.
   const follow=(p,id)=>p.locator('#entity-inspector a[href="#explore/'+id+'"]:not(.entity-trail a)').first().click({timeout:10000});
   // The player's artist opens the visit; the explorer covers the hero, so it is reached only with the explorer closed.
@@ -198,11 +200,14 @@ async page => {
       await p.locator('#entity-inspector .region[data-key=onRadio] > button.text-button').click();
       const track=p.locator('#entity-inspector .region[data-key=onRadio] a.row[href="#explore/'+flu(10)+'"]');
       await track.evaluate(a=>{const d=document.getElementById('explorer');d.scrollTop+=a.getBoundingClientRect().top-d.getBoundingClientRect().top-160;});await p.waitForTimeout(100);
-      const left=await place(p);assert(left.top>=100,'Super Flu is not taller than the window at '+width+' px: '+JSON.stringify(left));
+      const left={...await place(p),y:await track.evaluate(a=>Math.round(a.getBoundingClientRect().top))};assert(left.top>=100,'Super Flu is not taller than the window at '+width+' px: '+JSON.stringify(left));
       await track.click();await record(p,'Flu Track 10');
       const hop=await place(p);assert(hop.top===0&&hop.href==='h3','a hop by a link must start at its title at '+width+' px: '+JSON.stringify(hop));
-      await sample(p);await p.goBack();await record(p,'Super Flu');const back=await place(p),backFrames=await frames(p,{title:'Super Flu',top:left.top});
-      assert(Math.abs(back.top-left.top)<=2&&back.href==='#explore/'+flu(10)&&back.region==='onRadio'&&back.open.includes('onRadio')&&backFrames.count===1&&!backFrames.empty,
+      // He is the first record of the visit: he comes back with the line over his title, which was not there when he was
+      // left. He was left scrolled past it, so the line is out of view and the scroll grows by its height (0 px on the
+      // map, where the line stands over the picture): the track followed stands where it stood.
+      await sample(p);await p.goBack();await record(p,'Super Flu');const back=await place(p),backFrames=await frames(p,{title:'Super Flu',top:back.top});
+      assert(Math.abs(back.y-left.y)<=1&&back.top>=left.top&&back.top-left.top<=48&&back.href==='#explore/'+flu(10)&&back.region==='onRadio'&&back.open.includes('onRadio')&&backFrames.count===1&&!backFrames.empty,
         'Back to Super Flu at '+width+' px: '+JSON.stringify({left,back,backFrames}));
       await sample(p);await p.goForward();await record(p,'Flu Track 10');const forward=await place(p),forwardFrames=await frames(p,{title:'Flu Track 10',top:0});
       assert(forward.top===0&&forwardFrames.count===1&&!forwardFrames.empty,'Forward to the track at '+width+' px: '+JSON.stringify({forward,forwardFrames}));
@@ -223,17 +228,110 @@ async page => {
       await sample(p);await p.goBack();await tab(p,'index','#music-content a.row');const indexBack=await place(p),indexFrames=await frames(p,{view:'index',top:index.top});
       assert(Math.abs(indexBack.top-index.top)<=2&&indexBack.href==='#explore/'+aikon&&Math.abs(indexBack.y-index.y)<=2&&indexFrames.count===1,'Back to the Index at '+width+' px: '+JSON.stringify({index,indexBack,indexFrames}));
       // Back from the Index to Super Flu: the Index stays until Super Flu paints whole, at the scroll he had.
-      await sample(p);await p.goBack();await record(p,'Super Flu');const fromIndex=await frames(p,{title:'Super Flu',top:left.top}),again=await place(p);
-      assert(fromIndex.count===1&&fromIndex.waited>=5&&fromIndex.empty===0&&Math.abs(again.top-left.top)<=2,'Back from the Index to Super Flu at '+width+' px: '+JSON.stringify({fromIndex,again}));
+      await sample(p);await p.goBack();await record(p,'Super Flu');const fromIndex=await frames(p,{title:'Super Flu',top:back.top}),again=await place(p);
+      assert(fromIndex.count===1&&fromIndex.waited>=5&&fromIndex.empty===0&&Math.abs(again.top-back.top)<=2,'Back from the Index to Super Flu at '+width+' px: '+JSON.stringify({fromIndex,again}));
       // He left Super Flu by a tab, so no link of his record is kept, and his title is far up: focus goes to a link
       // that shows whole, so the first Tab keeps the record where it is.
       const held=await p.evaluate(()=>{const a=document.activeElement,d=document.getElementById('explorer'),box=a.getBoundingClientRect(),bar=Math.max(d.querySelector('.explorer-top').getBoundingClientRect().bottom,d.getBoundingClientRect().top);
         return {inRecord:Boolean(a.closest('#entity-inspector')),whole:box.top>=bar-0.5&&box.bottom<=d.getBoundingClientRect().bottom+0.5};});
       assert(held.inRecord&&held.whole,'Back from the Index to Super Flu put focus on something out of view at '+width+' px: '+JSON.stringify(held));
-      await p.keyboard.press('Tab');const tabbed=await place(p);assert(Math.abs(tabbed.top-left.top)<=120,'the first Tab lost the scroll at '+width+' px: '+JSON.stringify({tabbed,left}));
+      await p.keyboard.press('Tab');const tabbed=await place(p);assert(Math.abs(tabbed.top-back.top)<=120,'the first Tab lost the scroll at '+width+' px: '+JSON.stringify({tabbed,back}));
       walk['place'+width]={left,hop,back,backFrames,forward,forwardFrames,kept,index,indexBack,indexFrames,fromIndex,again};
       await ctx.close();
     }
+  }
+
+  // The line over a record's title (explore plan step 5) replaces the Path, in its place and at its height. Morttagua,
+  // Timeless Ibiza, Aaron Suiss, then Back: Timeless Ibiza names the place before and the place after. On the map at 1440
+  // and 1100, in the list at 1100, and on phones at 390 and 360, in English and German, its title stands where the Path
+  // put it, the line overflows nothing, and each link's 44 px target (14 px over and under it, 8 px beside it) covers no
+  // name of the map and no control of the bar. The titles stand where the Path put them with these records: 415, 365,
+  // 172, 213 and 213 px (dev's Timeless Ibiza, whose map is laid out from more names, puts them at 467 and 417 on the maps).
+  const line=p=>p.evaluate(()=>{const box=n=>{const r=n.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};},nav=document.querySelector('#entity-inspector .entity-trail');
+    const meet=(a,b)=>a.left<b.right&&b.left<a.right&&a.top<b.bottom&&b.top<a.bottom,shown=n=>{const r=n.getBoundingClientRect();return r.width>0&&r.height>0&&!n.closest('[hidden]');};
+    const others=[...document.querySelectorAll('#entity-inspector .neighbourhood li'),...document.querySelectorAll('.explorer-top :is(a, button, input)')].filter(shown);
+    const links=nav?[...nav.querySelectorAll('a')].map(a=>{const r=box(a),grown={left:r.left-8,right:r.right+8,top:r.top-14,bottom:r.bottom+14};
+      return {text:a.textContent,name:a.getAttribute('aria-label'),href:a.getAttribute('href'),step:a.dataset.step,width:Math.round(r.width),covers:others.filter(o=>meet(grown,box(o))).map(o=>o.textContent.trim().slice(0,30)||o.id)};}):[];
+    // Over: how far a link stands past the line's edges. The 44 px targets reach past them, as they may: nothing scrolls.
+    const d=document.getElementById('explorer'),edge=nav&&box(nav),over=nav?Math.max(0,...[...nav.querySelectorAll('a')].map(a=>{const r=box(a);return Math.max(edge.left-r.left,r.right-edge.right);})):0;
+    return {title:Math.round(document.querySelector('#entity-inspector h3').getBoundingClientRect().top),line:nav?{label:nav.getAttribute('aria-label'),width:Math.round(edge.width),height:Math.round(edge.height),over}:null,links,page:document.documentElement.scrollWidth,frame:d.scrollWidth-d.clientWidth};});
+  const toIbiza=async p=>{
+    await p.evaluate(href=>{const a=document.createElement('a');a.href=href;document.body.append(a);a.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));a.remove();},'#explore/'+morttagua);
+    // The explorer slides in as it opens: Morttagua is measured once it stands still.
+    await record(p,'Morttagua');await p.evaluate(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>null))));const first={...await line(p),at:await p.evaluate(()=>Math.round(document.getElementById('explorer').scrollTop))},link=p.locator('#entity-inspector a[href="#explore/'+ibiza+'"]:not(.entity-trail a)').first();
+    await link.scrollIntoViewIfNeeded();first.left=await link.evaluate(a=>({y:Math.round(a.getBoundingClientRect().top),top:Math.round(document.getElementById('explorer').scrollTop)}));
+    await follow(p,ibiza);await record(p,'Timeless Ibiza');await follow(p,aaron);await record(p,'Aaron Suiss');
+    await p.goBack();await record(p,'Timeless Ibiza');await p.waitForTimeout(300);return first;};
+  walk.line={};
+  for(const [size,width,height,phone,list,title] of [['1440 map',1440,900,false,false,415],['1100 map',1100,800,false,false,365],['1100 list',1100,800,false,true,172],['390',390,844,true,false,213],['360',360,740,true,false,213]])
+    for(const [lang,back,ahead] of [['en','Back to Morttagua','Forward to Aaron Suiss'],['de','Zurück zu Morttagua','Weiter zu Aaron Suiss']]){
+      const {ctx,p}=await open({width,height,phone});
+      if(list)await ctx.addInitScript(()=>{try{localStorage.setItem('pavoia-explorer-view','list');}catch{/* Storage is optional. */}});
+      await p.goto(origin+'/?station=palac-dance');await p.locator('#language [value='+lang+']').dispatchEvent('click');
+      const first=await toIbiza(p),m=await line(p),label=size+' '+lang+': '+JSON.stringify({first,m});
+      assert(first.line===null,'the first record of a visit has a line at '+label);
+      assert(m.title===title,'the title moved from '+title+' px at '+label);
+      assert(m.line&&m.line.height===17&&m.line.over<=0.5&&m.page<=width&&m.frame<=0,'the line is not 17 px high on one row inside its box, or something scrolls sideways, at '+label);
+      assert(JSON.stringify(m.links.map(l=>[l.name,l.text,l.step]))===JSON.stringify([[back,'Morttagua','-1'],[ahead,'Aaron Suiss','1']]),'the line does not name both places at '+label);
+      assert(m.links.every(l=>l.covers.length===0&&l.width<=m.line.width/2+0.5),'a link covers a name or a control, or takes more than half the line, at '+label);
+      // Back to Morttagua, the first record: the line now stands over his title. On the map it stands over the picture:
+      // nothing moves. In the list, where the line shows at the place left, under the bar, the scroll stays and all under
+      // the line stands lower by its height; where it is scrolled out of view, the scroll moves by its height, so the link
+      // followed stands where it stood (the explorer may scroll that far only where the record is taller than the window).
+      await p.goBack();await record(p,'Morttagua');
+      const home=await p.evaluate(id=>({y:Math.round(document.querySelector('#entity-inspector a[href="#explore/'+id+'"]:not(.entity-trail a)').getBoundingClientRect().top),top:Math.round(document.getElementById('explorer').scrollTop),max:(d=>d.scrollHeight-d.clientHeight)(document.getElementById('explorer')),
+        title:Math.round(document.querySelector('#entity-inspector h3').getBoundingClientRect().top),ahead:document.querySelector('#entity-inspector .entity-trail a[data-step="1"]')?.textContent,
+        line:Math.round(document.querySelector('#entity-inspector .entity-trail')?.getBoundingClientRect().bottom??-1),bar:Math.round(Math.max(document.querySelector('.explorer-top').getBoundingClientRect().bottom,document.getElementById('explorer').getBoundingClientRect().top))}),ibiza);
+      // How much lower his title stands in the record than when he was left: the line's height and its gap.
+      home.grown=home.title+home.top-first.title-first.at;home.shows=home.line>home.bar;
+      const kept=JSON.stringify({left:first.left,home,first:first.title,at:first.at});
+      assert(home.ahead==='Timeless Ibiza','Back to Morttagua shows no line forward at '+label+' '+kept);
+      if(!phone&&!list)assert(home.title===first.title&&home.top===first.left.top&&home.y===first.left.y,'on the map, Morttagua moved at '+size+' '+lang+': '+kept);
+      else if(home.shows)assert(home.top===first.left.top&&home.grown>=17&&home.grown<=48&&Math.abs(home.y-first.left.y-home.grown)<=1,'the line shows, and the scroll moved or the record did not stand lower by the line at '+size+' '+lang+': '+kept);
+      else assert(home.grown>=17&&(Math.abs(home.y-first.left.y)<=1||home.top===home.max),'the line is out of view, and the link followed moved at '+size+' '+lang+': '+kept);
+      walk.line[size+' '+lang]={title:m.title,width:m.line.width,links:m.links.map(l=>[l.text,l.width]),first:{left:first.left,home}};
+      await ctx.close();
+    }
+
+  // A double click on the line steps once. On the map a lone link stands in the middle, so the second click of a double
+  // click lands on the link drawn in its place, or, when both come before the browser moves, on the same link again:
+  // either would undo the step, or step twice back, out of the explorer.
+  walk.double={};
+  for(const [width,height] of [[1440,900],[1100,800]])
+    for(const gap of [0,40,150,300]){
+      const {ctx,p}=await open({width,height});
+      await p.goto(origin+'/?station=palac-dance');await p.locator('#language [value=en]').dispatchEvent('click');
+      await p.evaluate(href=>{const a=document.createElement('a');a.href=href;document.body.append(a);a.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));a.remove();},'#explore/'+morttagua);
+      // A pictured name glides into the middle: the double click comes once the link takes the pointer where it stands.
+      await record(p,'Morttagua');await follow(p,ibiza);await record(p,'Timeless Ibiza');
+      await p.waitForFunction(()=>{const a=document.querySelector('#entity-inspector .entity-trail a[data-step="-1"]'),r=a?.getBoundingClientRect();
+        return r&&!document.getAnimations().length&&document.elementFromPoint(r.left+r.width/2,r.top+r.height/2)?.closest('a')===a;},null,{timeout:8000});
+      const box=await p.locator('#entity-inspector .entity-trail a[data-step="-1"]').evaluate(a=>{const r=a.getBoundingClientRect();return {x:r.left+r.width/2,y:r.top+r.height/2,links:a.parentNode.children.length};});
+      assert(box.links===1,'Timeless Ibiza has more than its back link at '+width+' px');
+      if(gap){await p.mouse.click(box.x,box.y);await p.waitForTimeout(gap);await p.mouse.click(box.x,box.y);}else await p.mouse.dblclick(box.x,box.y);
+      await p.waitForTimeout(800);const s=await state(p);
+      assert(s.open&&s.shown==='Morttagua'&&s.hash==='#explore/'+morttagua,'a double click '+gap+' ms apart at '+width+' px ended on '+JSON.stringify(s));
+      walk.double[width+' '+gap]=s.shown;
+      await ctx.close();
+    }
+
+  // The line's links are the browser's Back and Forward, with the Navigation API and without it: each one steps one
+  // entry and loads no other document. A reload keeps the line, from the entry's state.
+  for(const hide of [false,true]){
+    const {ctx,p}=await open({width:1440,height:900});
+    if(hide)await ctx.addInitScript(()=>{delete window.navigation;if('navigation' in window)Object.defineProperty(window,'navigation',{value:undefined,configurable:true});});
+    await p.goto(origin+'/?station=palac-dance');await p.locator('#language [value=en]').dispatchEvent('click');
+    await toIbiza(p);await p.evaluate(()=>{window.__mark=1;});await spy(p);
+    const at=await state(p),api=await p.evaluate(()=>typeof window.navigation);
+    assert(api===(hide?'undefined':'object'),'the Navigation API is '+api+' with hide='+hide);
+    const click=async(step,title)=>{await p.locator('#entity-inspector .entity-trail a[data-step="'+step+'"]').click();await record(p,title);return state(p);};
+    const ahead=await click(1,'Aaron Suiss'),back=await click(-1,'Timeless Ibiza'),label=JSON.stringify({hide,at,ahead,back,goes:await goes(p)});
+    assert(ahead.length===at.length&&back.length===at.length&&ahead.mark===1&&back.mark===1&&ahead.hash==='#explore/'+aaron&&back.hash==='#explore/'+ibiza&&JSON.stringify(await goes(p))==='[1,-1]','the line did not step as Back and Forward do: '+label);
+    if(!hide)assert(ahead.at===at.at+1&&back.at===at.at,'the line moved the entry by more than one: '+label);
+    const before=await line(p);await p.reload();await record(p,'Timeless Ibiza');const after=await line(p);
+    assert(JSON.stringify(after.links.map(l=>[l.name,l.href]))===JSON.stringify(before.links.map(l=>[l.name,l.href]))&&after.links.length===2,'a reload lost the line: '+JSON.stringify({hide,before:before.links,after:after.links}));
+    walk['steps'+(hide?'NoApi':'Api')]={at:at.at,ahead:ahead.at,back:back.at,length:[at.length,ahead.length,back.length],reload:after.links.map(l=>l.name)};
+    await ctx.close();
   }
 
   // Part two plays: only on the fake preview, whose /stream/** is a local tone, never on serve.py, which relays the
@@ -261,6 +359,9 @@ async page => {
   await p.goForward();await record(p,'Timeless Ibiza');await playsOn('Forward');
   await p.locator('#explorer-close').click();await closed(p);await playsOn('✕');
   await p.goForward();await record(p,'Maceo Plex');await playsOn('Forward after ✕');
+  // The line's links are moves too: they leave the music alone.
+  await p.locator('#entity-inspector .entity-trail a[data-step="1"]').click();await record(p,'Morttagua');await playsOn('the line forward');
+  await p.locator('#entity-inspector .entity-trail a[data-step="-1"]').click();await record(p,'Maceo Plex');await playsOn('the line back');
   // A pause stays a pause through Back.
   const cuts=await p.evaluate(()=>window.__cuts);
   assert(cuts.length===0,'The walk cut the music: '+JSON.stringify(cuts));
