@@ -64,6 +64,8 @@ async page => {
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'playing');
   const previous = await page.locator('#photo').getAttribute('src');
   await select('01');
+  assert(await page.locator('#audio').getAttribute('src') === '/stream/palac-feel.mp3', 'A station change while playing moved the stream');
+  await page.locator('#play-shown').click();
   assert(await page.locator('#audio').getAttribute('src') === '/stream/bermuda-day.mp3', 'Audio waited for a photo');
   assert(await page.locator('#photo').getAttribute('src') === previous, 'A pending photo cleared the scene');
   await select('02');
@@ -76,11 +78,14 @@ async page => {
   await select('07');
   await loaded();
   assert(await page.locator('#photo').getAttribute('src') === 'photos/selected/p008.jpg', 'Failed photo replaced a valid image');
+  assert(await page.locator('#audio').getAttribute('src') === '/stream/bermuda-day.mp3', 'A station change while playing moved the stream');
+  await page.locator('#play-shown').click();
   assert(await page.locator('#audio').getAttribute('src') === '/stream/fontanna.mp3', 'Failed photo interrupted station selection');
   await page.unroute('**/photos/selected/p052.jpg', failed);
 
   await page.emulateMedia({reducedMotion:'reduce'});
   await select('05');
+  await page.locator('#play-shown').click();
   await loaded();
   await page.locator('#change-photo').click();
   await loaded();
@@ -93,6 +98,7 @@ async page => {
   const unavailable = async route => { await streamGate; await route.abort().catch(() => {}); };
   await page.route('**/stream/fontanna.mp3', unavailable);
   await select('07');
+  await page.locator('#play-shown').click();
   await page.waitForFunction(() => window.Pavoia.getState().playbackState === 'connecting');
   assert(await page.locator('#playback-status').isVisible(), 'Mobile connection status is hidden');
   assert((await page.locator('#playback-status').boundingBox()).height > 10, 'Mobile connection status is clipped');

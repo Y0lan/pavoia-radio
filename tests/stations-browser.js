@@ -12,9 +12,16 @@ async page => {
   const stages=await page.evaluate(()=>window.Pavoia.stations);
   await page.locator('#play').click();
   const checked=[];
+  // A pick while the radio plays shows the station and keeps the music; the hero's play then moves the music there.
   for(const stage of stages){
+    const heard=await page.locator('#audio').getAttribute('src');
     if(await page.locator('#open-stations').isVisible())await page.locator('#open-stations').click();
     await page.getByRole('radio',{name:stage.name}).check();
+    await page.waitForFunction(id=>window.Pavoia.getState().viewing===id,stage.id);
+    if(heard!=='/stream/'+stage.id+'.mp3'){
+      assert(await page.locator('#audio').getAttribute('src')===heard&&await page.locator('#audio').evaluate(a=>!a.paused),stage.id+': a pick while playing moved the stream');
+      await page.locator('#play-shown').click();
+    }
     await page.waitForFunction(id=>window.Pavoia.getState().stage===id&&window.Pavoia.getState().playbackState==='playing'&&document.getElementById('audio').currentTime>0,stage.id);
     assert(await page.locator('#audio').getAttribute('src')==='/stream/'+stage.id+'.mp3',stage.id+' wrong stream');
     checked.push(stage.id);

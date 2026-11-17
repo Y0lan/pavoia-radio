@@ -105,14 +105,17 @@ Object.assign(words.en, {orderStations:'Order the stations', byFeeling:'By feeli
 Object.assign(words.de, {orderStations:'Sender ordnen', byFeeling:'Nach Stimmung', byStage:'Nach Bühne', day:'Tag', night:'Nacht', anyTime:'Jederzeit', stageOf:'Bühne {stage}',
   phrases:{bermuda:'Unter freiem Himmel', palac:'Höhepunkt und Blick nach innen', etage:'Der Keller', fontanna:'Tanzen bei Tageslicht', ambiance:'Ein sicherer, ruhiger Ort', bus:'Irgendwo im Wald'}});
 // The shortcuts under the roots: each key's name where it has one, and what it does.
-Object.assign(words.en, {keysTitle:'Keyboard shortcuts', keySpace:'Play or pause', keyArrowsName:'Left and right arrows', keyArrows:'Previous or next station',
-  keyNumbers:'The station at that place in the list', keyMute:'Sound off, and on again', keyFilter:'In the Index: filter the names', keyClose:'Back to listening', keyHelp:'Show or hide these shortcuts'});
-// Away from the station heard (on the Bus), the bar's label is a door back to it; the radio heard says so. The German
-// word is no longer than the English one, so the waveform keeps its room in the one-row bar.
+Object.assign(words.en, {keysTitle:'Keyboard shortcuts', keySpace:'Play or pause', keyArrowsName:'Left and right arrows', keyArrows:'Show the previous or next station',
+  keyNumbers:'Show the station at that place in the list', keyMute:'Sound off, and on again', keyFilter:'In the Index: filter the names', keyClose:'Back to listening', keyHelp:'Show or hide these shortcuts'});
+// Away from the station heard (on the Bus or on another station), the bar's label is a door back to it; the radio
+// heard says so. The German word is no longer than the English one, so the waveform keeps its room in the one-row bar.
 Object.assign(words.en, {tunedTo:'Tuned to {station}', backTo:'Back to {station}', hearing:'You hear this station'});
 Object.assign(words.de, {tunedTo:'Sender: {station}', backTo:'Zurück zu {station}', hearing:'Diesen Sender hörst du'});
-Object.assign(words.de, {keysTitle:'Tastenkürzel', keySpace:'Abspielen oder pausieren', keyArrowsName:'Pfeiltasten links und rechts', keyArrows:'Vorheriger oder nächster Sender',
-  keyNumbers:'Der Sender an dieser Stelle der Liste', keyMute:'Ton aus und wieder an', keyFilter:'Im Index: Namen filtern', keyClose:'Zurück zum Radio', keyHelp:'Diese Kürzel zeigen oder verbergen'});
+// The hero's play names the station shown, and what it plays now, so its name holds the words it shows.
+Object.assign(words.en, {playShown:'Play {station}', playShownNow:'Play {station}, now {title} · {artist}'});
+Object.assign(words.de, {playShown:'{station} abspielen', playShownNow:'{station} abspielen, gerade {title} · {artist}'});
+Object.assign(words.de, {keysTitle:'Tastenkürzel', keySpace:'Abspielen oder pausieren', keyArrowsName:'Pfeiltasten links und rechts', keyArrows:'Vorherigen oder nächsten Sender zeigen',
+  keyNumbers:'Den Sender an dieser Stelle der Liste zeigen', keyMute:'Ton aus und wieder an', keyFilter:'Im Index: Namen filtern', keyClose:'Zurück zum Radio', keyHelp:'Diese Kürzel zeigen oder verbergen'});
 let language = 'en';
 try { const saved=localStorage.getItem('pavoia-language'); if (Object.hasOwn(words,saved)) language=saved; } catch { /* Storage is optional. */ }
 const text = key => words[language][key];
@@ -167,7 +170,8 @@ let remembered = null;
 try { remembered = localStorage.getItem('pavoia-station'); } catch { /* Storage is optional. */ }
 let currentMood = moodOf(new URLSearchParams(location.search).get('station')) || moodOf(remembered) || moods[3];
 // currentMood is the station shown: the hero, the rail, the address and the Live count. tunedMood is the station the
-// player bar holds: the one that plays, or that the bar's play starts. For now a station change moves both at once.
+// player bar holds: the one that plays, or that the bar's play starts. While the radio is on, a station change moves
+// only the station shown; the hero's play moves the music there.
 let tunedMood = currentMood;
 const apart = () => tunedMood !== currentMood;
 // The page is away from the station heard: on the Bus, or on another station.
@@ -426,10 +430,11 @@ function step(dir) {
   selectMood(beside(currentMood, dir).id);
 }
 // The lock screen and the media keys have no page to press play on: they step from the station heard and, while the
-// radio is on, move the music there.
+// radio is on, move the music there; paused, the bar takes that station, also when it is the station already shown.
 function stepMusic(dir) {
   selectMood(beside(tunedMood, dir).id);
   if (radioOn()) playShown();
+  else if (apart()) tuneShown();
 }
 let swipe = null;
 $('poster').addEventListener('pointerdown', event => {
@@ -550,10 +555,29 @@ function renderBar() {
   syncBar();
   markHearing();
 }
-// Away from the station heard, the page says so, and the bar's label leads back to it.
+// Away from the station heard, the page says so, the bar's label leads back to it, and the hero offers the station shown.
 function renderAway() {
   document.body.toggleAttribute('data-away', away());
   paintStage();
+  renderShown();
+}
+// The hero's play, in the eyebrow: while the bar holds another station, off the Bus, it plays the station shown and
+// names what that station plays now, as the bar names a track. A control that goes while it has focus gives it to the
+// bar's play button.
+function renderShown() {
+  const control = $('play-shown');
+  if (!apart() || location.hash === '#bus' || !currentMood.stage) {
+    if (document.activeElement === control) $('play').focus({ preventScroll: true });
+    control.hidden = true;
+    return;
+  }
+  const entry = airOf(currentMood), now = entry.fresh ? entry.track : null, name = plain(currentMood);
+  const title = now?.title || text('untitled'), artist = now?.artist || text('unknownArtist'), play = text('playShown').replace('{station}', name);
+  $('play-shown-text').textContent = now ? `${title} · ${artist}` : entry.loading ? text('loading') : text('play');
+  control.setAttribute('aria-label', now ? text('playShownNow').replace('{station}', name).replace('{title}', title).replace('{artist}', artist)
+    : entry.loading ? `${play}, ${text('loading')}` : play);
+  control.title = play;
+  control.hidden = false;
 }
 // The bar's label, its only writer. It names the station held, and the stage after a station named otherwise; where its
 // column is narrow, the stylesheet hides the stage. Away, it is a door back: "Tuned to …", the same playing or paused,
@@ -737,6 +761,7 @@ function playShown() {
   connect();
   poll(tunedMood);
 }
+$('play-shown').addEventListener('click', playShown);
 // The bar takes the station shown while the radio is off, and starts nothing: its play then starts that station.
 function tuneShown() {
   tunedMood = currentMood;
@@ -788,8 +813,8 @@ document.addEventListener('keydown', event => {
   }
 });
 // The other page keys listen on the window, after every handler of the document, so a key the Index or Escape took
-// stays theirs. They wait while typing, with Ctrl, Cmd or Alt, and while the stations sheet is open. 1 to 9 pick the
-// station at that place on screen, as the rail does, so a paused radio stays paused. M mutes where the volume shows.
+// stays theirs. They wait while typing, with Ctrl, Cmd or Alt, and while the stations sheet is open. 1 to 9 show the
+// station at that place on screen, as the rail does, so the music stays where it is. M mutes where the volume shows.
 // ? opens or closes the shortcuts under the roots, which the open explorer covers.
 window.addEventListener('keydown', event => {
   if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.target.matches?.(typing) || document.querySelector('dialog:modal')) return;
@@ -798,11 +823,14 @@ window.addEventListener('keydown', event => {
   else if (event.key === '?' && !$('explorer').open) toggleKeys();
 });
 // A key picks a station as the rail does. The open explorer covers the hero, so there a pick moves the music too while
-// the radio is on; a key for the station already shown and heard changes nothing, and a preview goes on.
+// the radio is on, and the bar while it is paused, as Switch to this station does; a key for the station already shown
+// and heard changes nothing, and a preview goes on.
 function pick(id) {
   const before = currentMood;
   selectMood(id);
-  if ($('explorer').open && radioOn() && (apart() || currentMood !== before)) playShown();
+  if (!$('explorer').open) return;
+  if (radioOn() && (apart() || currentMood !== before)) playShown();
+  else if (apart()) tuneShown();
 }
 function toggleKeys() {
   const keys = $('keys'), summary = keys.querySelector('summary');
@@ -845,7 +873,7 @@ async function poll(mood = currentMood) {
     if (current()) polls.delete(stage);
   }
   // One announcement per answer: the bar's, or for a station only shown, its own.
-  if (stage === currentMood.stage) renderStatus();
+  if (stage === currentMood.stage) { renderStatus(); renderShown(); }
   if (stage === tunedMood.stage) syncBar();
   else if (stage === currentMood.stage) announceRadio();
 }
@@ -885,29 +913,23 @@ async function pollListeners(urgent = false) {
   }
 }
 
+// A station change shows the station. While the radio is on, the music, the bar and its retry ladder stay where they
+// are, and a preview plays on; with the radio off, the bar and the memory take the station shown.
 function selectMood(id) {
   const next = moods.find(mood => mood.id === id);
   if (!next) return;
   closeStations();
   leaveBus();
   if (next === currentMood) return;
-  // A preview paused the radio: when it was on before, the new station plays.
-  if (window.Pavoia?.cancelPreview?.()) wanted = true;
-  clearTimeout(retryTimer);
-  release();
-  retries = 0;
-  lost = false;
   audienceController?.abort();audienceController=null;audienceData=null;audienceStage=null;
-  currentMood = tunedMood = next;
-  prunePolls();
+  currentMood = next;
   writeAddress();
-  rememberStation();
-  if (!next.stage) wanted = false;
+  if (!radioOn()) tuneShown();
+  prunePolls();
   render();
   renderBar();
-  if (wanted) connect();
-  else state('paused', 'paused');
-  poll();
+  if (!wanted) state('paused', 'paused');
+  poll(next);
   pollListeners(true);
 }
 $('moods').addEventListener('change', event => selectMood(event.target.value));

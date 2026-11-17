@@ -225,7 +225,8 @@ test('the start says Connecting; only a stall during play says Buffering',async(
  const e=setup();await flush();e.click();e.audio.emit('waiting');
  assert.equal(e.elements['playback-status'].textContent,'Connecting…');
  e.playing();e.audio.readyState=2;e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering…');
- e.change('03');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Connecting…','a new station connects again');
+ e.change('03');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Buffering…','a station change only shows: the music heard stays as it was');
+ e.elements['play-shown'].emit('click');await flush();e.audio.emit('waiting');assert.equal(e.elements['playback-status'].textContent,'Connecting…','play on the station shown connects again');
 });
 
 test('the live count polls fast after a change and backs off while it stays the same',async()=>{
@@ -281,6 +282,8 @@ test('a lost stream keeps trying on a bounded ladder, and a click pauses it; blo
 test('active and paused station changes, stale play rejection and timer reset',async()=>{
  const e=setup();await flush();e.click();const old=e.audio.calls[0];
  e.response=status('Dance',3);e.change('03');await flush();
+ assert.deepEqual([e.audio.src,e.audio.calls.length,e.elements['player-title'].textContent,e.mediaSession.metadata.album],['/stream/palac-feel.mp3',1,'First','Lost in Feelings · Pałac'],'an active change keeps the stream, the bar and the lock screen of the station heard');
+ e.elements['play-shown'].emit('click');
  old.reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();e.playing();
  assert.equal(e.audio.src,'/stream/palac-dance.mp3');assert.equal(e.elements['player-title'].textContent,'Dance');
  assert.equal(e.mediaSession.metadata.album,'Night in Motion · Pałac','the lock screen names the stage after the station');
@@ -335,7 +338,7 @@ test('getState names the station shown and the station tuned',async()=>{
  e.elements['preview-audio'].play=async()=>{};e.click();e.playing();
  e.visit('#explore/trk_0123456789ab');await flush();e.elements['entity-inspector'].querySelector('.preview-toggle').emit('click');await flush();
  assert.equal(s().wanted,false,'the preview holds the radio');
- e.change('03');await flush();assert.deepEqual([...both(),s().wanted],['palac-dance','palac-dance',false,true],'after a change during a preview');
+ e.change('03');await flush();assert.deepEqual([...both(),s().wanted],['palac-dance','etage-zero',true,false],'a change during a preview shows the station, and the radio held stays on the station heard');
  e.response=new Error('Offline');await e.poll();
  assert.deepEqual([s().viewingTrack,s().track?.title,s().dataFresh],[null,'Dance',false],'a failed answer is no track on air for the station shown');
 });
@@ -420,13 +423,14 @@ test('two language buttons switch in one click and mark the active one',async()=
  e.setLanguage('en');assert.deepEqual([en.attrs['aria-pressed'],de.attrs['aria-pressed']],['true','false']);
 });
 
-test('native end/error ordering reconnects and station changes reset retry timers',async()=>{
+test('native end/error ordering reconnects, and play on the station shown resets retry timers',async()=>{
  for(const ended of [true,false]){
   const e=setup();await flush();e.click();e.playing();
   e.audio.paused=true;e.audio.ended=ended;e.audio.error=ended?null:{code:2};e.audio.emit('pause');
   e.audio.emit(ended?'ended':'error');assert.equal(e.elements.player.dataset.state,'retrying');
   e.fire(1000);e.error();assert.ok([...e.timers.values()].some(t=>t.delay===2000));
-  e.change('03');await flush();await flush();assert.deepEqual([...e.timers.values()].map(t=>t.delay),[20000]);
+  e.change('03');await flush();await flush();assert.deepEqual([...e.timers.values()].map(t=>t.delay),[2000],'a station change keeps the ladder of the station heard');
+  e.elements['play-shown'].emit('click');await flush();await flush();assert.deepEqual([...e.timers.values()].map(t=>t.delay),[20000],'play on the station shown starts afresh');
   e.error();await flush();assert.deepEqual([...e.timers.values()].map(t=>t.delay),[1000]);
   e.fire(1000);e.playing();await flush();assert.deepEqual([...e.timers.values()].map(t=>t.delay),[30000]);
   e.click();assert.equal(e.timers.size,0);
@@ -490,7 +494,8 @@ test('Bus navigation and metadata updates keep the playing station and source',a
  const entries=e.urls().length;e.elements['dock-artwork'].emit('click');
  assert.deepEqual([e.urls().length,e.audio.src,e.audio.calls.length],[entries,source,calls],'on the station heard, the cover leads nowhere');
  e.location.hash='#bus';e.window.emit('hashchange');e.change('01');await flush();
- assert.equal(e.location.hash,'');assert.equal(e.audio.src,'/stream/bermuda-day.mp3');
+ assert.deepEqual([e.location.hash,e.audio.src,e.audio.calls.length,e.window.Pavoia.getState().viewing],['',source,calls,'bermuda-day'],'a station picked on the Bus shows it, and the music goes on');
+ e.elements['play-shown'].emit('click');assert.equal(e.audio.src,'/stream/bermuda-day.mp3','its play moves the music there');
 });
 
 test('direct Bus links remain paused and use the regular station for playback',async()=>{
@@ -507,9 +512,10 @@ test('late or failed photos keep the latest scene without delaying audio',async(
  const e=setup({deferImages:true});e.imageRequests[0].resolve();await flush();
  const original=e.elements.photo.src;
  e.click();e.playing();e.change('02');
- assert.equal(e.audio.src,'/stream/bermuda-evening.mp3');
+ assert.equal(e.audio.src,'/stream/palac-feel.mp3','a change while playing keeps the stream of the station heard');
  assert.equal(e.elements.photo.src,original);
- e.change('01');assert.equal(e.audio.src,'/stream/bermuda-day.mp3');
+ e.change('01');assert.equal(e.audio.src,'/stream/palac-feel.mp3');
+ e.elements['play-shown'].emit('click');assert.equal(e.audio.src,'/stream/bermuda-day.mp3','its play cuts at once, before the photo has loaded');
  e.imageRequests[2].resolve();await flush();
  assert.equal(e.elements.photo.src,'photos/selected/p036.jpg');
  assert.equal(e.elements['photo-count'].textContent,'1 / 8');
@@ -574,7 +580,12 @@ test('the arrow keys and the media keys step through the stations',async()=>{
  e.openDialog={};e.key('ArrowRight');assert.equal(stage(),'palac-dance','the modal stations sheet keeps its arrows');
  e.openDialog=null;e.elements.explorer.open=true;e.key('ArrowRight');assert.equal(stage(),'palac-feel','the explorer leaves the arrows to the radio');
  e.elements.explorer.open=false;e.key('ArrowLeft');e.change('01');e.key('ArrowLeft');assert.equal(stage(),'essentials','the first station wraps to the last');
- e.click();e.key('ArrowRight');assert.equal(e.audio.src,'/stream/bermuda-day.mp3','playback follows the station');
+ e.click();e.playing();const calls=e.audio.calls.length,viewing=()=>e.window.Pavoia.getState().viewing;e.key('ArrowRight');
+ assert.deepEqual([viewing(),stage(),e.audio.src,e.audio.calls.length],['bermuda-day','essentials','/stream/essentials.mp3',calls],'while it plays, an arrow only shows the station');
+ e.actions.previoustrack();
+ assert.deepEqual([stage(),viewing(),e.audio.src,e.audio.calls.length],['closing','closing','/stream/closing.mp3',calls+1],'previoustrack steps from the station heard, not the one shown, and plays it in one cut');
+ e.key('ArrowLeft');e.actions.nexttrack();
+ assert.deepEqual([stage(),viewing(),e.audio.src,e.audio.calls.length],['essentials','essentials','/stream/essentials.mp3',calls+2],'nexttrack too');
 });
 
 test('a blocked autoplay is a neutral pause and only transient states show words',async()=>{
@@ -608,6 +619,10 @@ test('the bar names the stage, the tab names the record and Play names its key',
  e.click();e.playing();e.location.hash='';e.window.emit('hashchange');
  assert.deepEqual([textOf(bar),e.document.body.getAttribute('data-away')],['Lost in Feelings · Pałac',null],'back on the station, the label is plain text again');
  e.response=new Error('Offline');e.change('03');await flush();
+ assert.deepEqual([textOf(e.elements['player-stage']),e.elements['player-title'].textContent,e.document.title],['Tuned to Lost in Feelings','First','▶ First · Artist First · Pavoia Radio'],'while another station shows, the bar and the tab keep the station heard');
+ e.response={track:null,audience:status('None').audience};await e.poll();
+ assert.deepEqual([e.elements['player-title'].textContent,e.document.title],['No track announced','Lost in Feelings · Pavoia Radio'],'with no track on the station heard, the tab names it, not the station shown');
+ e.response=new Error('Offline');e.elements['play-shown'].emit('click');await flush();
  assert.equal(textOf(e.elements['player-stage']),'Night in Motion · Pałac');assert.equal(e.elements['player-title'].textContent,'Night in Motion','a failed metadata call names the station');
  assert.equal(e.elements['player-artist'].textContent,'','the artist line does not repeat it');
  e.setLanguage('de');assert.equal(e.elements.play.title,'Pause (Leertaste)');
@@ -969,6 +984,8 @@ test('By feeling orders the rail, the arrows, the media keys and the position, a
  const again=setup({storage});await flush();
  assert.deepEqual([stationIds(again),again.elements.ways.children.map(b=>b.attrs['aria-pressed'])],[byFeeling,['true','false']],'a later visit lists by feeling');
  assert.deepEqual([again.window.Pavoia.getState().stage,again.elements['station-text'].textContent],['essentials','9 / 9'],'and opens on the last station, counted by feeling');
+ e.click();e.change('04');e.actions.nexttrack();
+ assert.deepEqual([stage(),e.window.Pavoia.getState().viewing,e.audio.src],['bermuda-day','bermuda-day','/stream/bermuda-day.mp3'],'while another station shows, the media keys step by feeling from the station heard');
 });
 
 test('a way changes no station, no photo and no playback',async()=>{
@@ -1036,7 +1053,7 @@ test('the hero names the station\'s stage over its title, and hides it on the Bu
  e.location.hash='#bus';e.window.emit('hashchange');assert.equal(eyebrow.hidden,true,'the Bus hides it, since its title is its stage');
  e.location.hash='';e.window.emit('popstate');assert.equal(eyebrow.hidden,false,'leaving the Bus shows it again');
  assert.equal(eyebrow.textContent,'','the fact is written into its span, so the eyebrow keeps its child');
- assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage"><span id="mood-fact">Pałac stage<\/span><\/p>\s*<h1 id="mood-name">/,'over the title from the first paint');
+ assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage"><span id="mood-fact">Pałac stage<\/span><button type="button" id="play-shown" class="play-shown" hidden>.*?<\/button><\/p>\s*<h1 id="mood-name">/,'over the title from the first paint, then the hero\'s play, hidden');
 });
 
 test('the spoken position says the stage once',async()=>{
@@ -1208,6 +1225,8 @@ test('a station change by the rail, the arrows, the media keys or the explorer k
   ['nexttrack',()=>e.actions.nexttrack(),'fontanna'],['previoustrack',()=>e.actions.previoustrack(),'etage-zero'],['tune',()=>e.window.Pavoia.tune('closing'),'closing']];
  for(const [what,act,expected] of steps){act();assert.deepEqual([stage(),e.urls(),e.position()],[expected,['/?station='+expected],0],what+' rewrites the one entry');}
  for(let i=0;i<10;i++){e.key('ArrowRight');assert.deepEqual([e.urls(),e.url()],[['/?station='+stage()],'/?station='+stage()],'ten arrows, one entry that names the station each time');}
+ const heard=stage();e.click();e.change('07');
+ assert.deepEqual([stage(),e.window.Pavoia.getState().viewing,e.urls()],[heard,'fontanna',['/?station=fontanna']],'while the radio plays, ?station names the station shown, not the station heard');
  const x=setup({journey:true});await flush();
  x.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>'#history'})},preventDefault(){}});await flush();
  const opened=x.urls();assert.equal(opened.length,2,'opening the explorer adds its one entry');
@@ -1220,17 +1239,17 @@ test('leaving the Bus adds one entry, and Back shows the current station with no
  const e=setup({search:'?station=fontanna'});await flush();e.click();e.playing();
  e.location.hash='#bus';e.window.emit('hashchange');await flush();
  assert.deepEqual(e.urls(),['/?station=fontanna','/?station=fontanna#bus'],'the Bus link adds one entry, as today');
- e.change('09');await flush();e.playing();
- assert.deepEqual([e.urls(),e.document.body.getAttribute('data-bus')],[['/?station=fontanna','/?station=fontanna#bus','/?station=closing'],null],'a station picked on the Bus adds one entry, as today, named after it');
- const calls=e.audio.calls.length,src=e.audio.src;
+ const calls=e.audio.calls.length,src=e.audio.src,both=()=>[e.window.Pavoia.getState().viewing,e.window.Pavoia.getState().stage];
+ e.change('09');await flush();
+ assert.deepEqual([e.urls(),e.document.body.getAttribute('data-bus'),...both(),e.audio.calls.length,e.audio.src],[['/?station=fontanna','/?station=fontanna#bus','/?station=closing'],null,'closing','fontanna',calls,src],'a station picked on the Bus adds one entry, as today, named after it; it shows that station and keeps the sound');
  e.history.back();await flush();
- assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.document.body.getAttribute('data-bus'),e.audio.calls.length,e.audio.src,e.audio.paused],['/?station=closing#bus','closing','',calls,src,false],'Back shows the Bus over the current station, and the music goes on untouched');
+ assert.deepEqual([e.url(),...both(),e.document.body.getAttribute('data-bus'),e.audio.calls.length,e.audio.src,e.audio.paused],['/?station=closing#bus','closing','fontanna','',calls,src,false],'Back shows the Bus over the station shown, and the music goes on untouched');
  e.history.back();await flush();
- assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.audio.calls.length,e.audio.paused],['/?station=closing','closing',calls,false],'Back again: the current station, never the old one');
- e.history.go(2);await flush();assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.urls().length],['/?station=closing','closing',3],'Forward the same');
+ assert.deepEqual([e.url(),...both(),e.audio.calls.length,e.audio.paused],['/?station=closing','closing','fontanna',calls,false],'Back again: the station shown, never the old one');
+ e.history.go(2);await flush();assert.deepEqual([e.url(),...both(),e.urls().length],['/?station=closing','closing','fontanna',3],'Forward the same');
  e.location.hash='#bus';e.window.emit('hashchange');await flush();
  e.elements['player-stage'].children[0].emit('click');await flush();
- assert.deepEqual([e.urls(),e.position(),e.document.body.getAttribute('data-bus'),e.audio.calls.length,e.audio.src,e.audio.paused],[['/?station=closing','/?station=closing#bus','/?station=closing','/?station=closing#bus','/?station=closing'],4,null,calls,src,false],'the door leaves the Bus with exactly one entry, and the music goes on untouched');
+ assert.deepEqual([e.urls(),e.position(),e.document.body.getAttribute('data-bus'),...both(),e.audio.calls.length,e.audio.src,e.audio.paused],[['/?station=closing','/?station=closing#bus','/?station=closing','/?station=closing#bus','/?station=fontanna'],4,null,'fontanna','fontanna',calls,src,false],'the door leaves the Bus with exactly one entry onto the station heard, and the music goes on untouched');
 });
 
 test('the station heard carries data-hearing and a description only while the sound is wanted',async()=>{
@@ -1251,7 +1270,9 @@ test('the station heard carries data-hearing and a description only while the so
  e.elements.ways.children[1].emit('click');
  assert.deepEqual([described('04'),described('03')],['line-04 hearing-note','line-03'],'and back by stage, in German');
  e.change('03');
- assert.deepEqual([marked(),described('04'),described('03')],[['03'],'line-04','line-03 hearing-note'],'the mark and the note follow the station heard');
+ assert.deepEqual([marked(),described('04'),described('03')],[['04'],'line-04 hearing-note','line-03'],'a change while it plays leaves the mark and the note on the station heard');
+ e.elements['play-shown'].emit('click');
+ assert.deepEqual([marked(),described('04'),described('03')],[['03'],'line-04','line-03 hearing-note'],'the hero\'s play moves them to the station shown, which is now the one heard');
  e.click();
  assert.deepEqual([marked(),described('03'),note.textContent],[['03'],'line-03','Diesen Sender hörst du'],'a pause keeps the mark, which the stylesheet hides, and takes the note away');
  e.setLanguage('en');assert.equal(note.textContent,'You hear this station');
@@ -1323,16 +1344,21 @@ test('startup stores nothing; a change and a play store the station',async()=>{
  assert.deepEqual(fresh.saved,{},'a first visit stores nothing');
  first.change('03');assert.equal(fresh.saved['pavoia-station'],'palac-dance','a change remembers the station without a play');
  first.key('ArrowRight');assert.equal(fresh.saved['pavoia-station'],'palac-feel','so do the arrows');
- const back=setup({storage:fresh.storage});await flush();assert.equal(back.window.Pavoia.getState().stage,'palac-feel','the next visit opens there');
+ first.click();first.change('06');assert.equal(fresh.saved['pavoia-station'],'palac-feel','while it plays, a change keeps the station heard');
+ first.elements['play-shown'].emit('click');assert.equal(fresh.saved['pavoia-station'],'etage-zero','the hero\'s play stores the station shown');
+ first.change('07');first.click();first.click();assert.deepEqual([first.audio.src,fresh.saved['pavoia-station']],['/stream/etage-zero.mp3','etage-zero'],'a play while another station shows stores the station it plays');
+ const back=setup({storage:fresh.storage});await flush();assert.equal(back.window.Pavoia.getState().stage,'etage-zero','the next visit opens there');
 });
 
 test('a replaceState that throws changes nothing else',async()=>{
  const {saved,storage}=remembered(),e=setup({storage});await flush();
  e.history.replaceState=()=>{throw new Error('SecurityError: too many calls to the History API');};
  e.click();e.change('03');e.playing();
- assert.deepEqual([e.window.Pavoia.getState().stage,e.audio.src,e.audio.paused,e.elements['station-text'].textContent,saved['pavoia-station'],e.url()],['palac-dance','/stream/palac-dance.mp3',false,'3 / 9','palac-dance','/?station=palac-feel'],'the station, the stream, the position and the memory change; only the address lags');
+ assert.deepEqual([e.window.Pavoia.getState().viewing,e.window.Pavoia.getState().stage,e.audio.src,e.audio.paused,e.elements['station-text'].textContent,saved['pavoia-station'],e.url()],['palac-dance','palac-feel','/stream/palac-feel.mp3',false,'3 / 9','palac-feel','/?station=palac-feel'],'the station shown and the position change, the stream and the memory stay on the station heard; only the address lags');
+ e.elements['play-shown'].emit('click');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.audio.src,saved['pavoia-station']],['palac-dance','/stream/palac-dance.mp3','palac-dance'],'the hero\'s play still moves the stream and the memory');
  e.key('ArrowRight');e.location.hash='#bus';e.window.emit('popstate');
- assert.deepEqual([e.window.Pavoia.getState().stage,e.document.body.getAttribute('data-bus')],['palac-feel',''],'the arrows step, and Back or a link still draws its scene');
+ assert.deepEqual([e.window.Pavoia.getState().viewing,e.window.Pavoia.getState().stage,e.document.body.getAttribute('data-bus')],['palac-feel','palac-dance',''],'the arrows step, and Back or a link still draws its scene');
 });
 
 test('every way into the explorer lands on music: the record on air, or one line when nothing is',async()=>{
@@ -1595,8 +1621,8 @@ test('an #explore link opened before the radio answers lands on the record once 
  assert.equal(typing.location.hash,'#explore','a field the listener started to fill keeps the search page');
 });
 
-test('a station change during a preview plays the new station when the radio was on',async()=>{
- for(const [on,why] of [[true,'the radio was on, so the new station plays'],[false,'the radio was paused, so it stays paused']]){
+test('a station change during a preview keeps the preview, and its end gives the radio back to the station it paused',async()=>{
+ for(const [on,why] of [[true,'the radio was on: the bar keeps the station it paused'],[false,'the radio was paused: the bar takes the station shown']]){
   const e=setup({journey:true});await flush();
   e.discovery=()=>({entity:{id:'trk_0123456789ab',type:'track',title:'T',previewUrl:'/api/discovery/preview/trk_0123456789ab'},included:[]});
   e.elements['preview-audio'].play=async()=>{};
@@ -1604,9 +1630,16 @@ test('a station change during a preview plays the new station when the radio was
   e.visit('#explore/trk_0123456789ab');await flush();
   e.elements['entity-inspector'].querySelector('.preview-toggle').emit('click');await flush();
   assert.equal(e.window.Pavoia.getState().wanted,false,'the preview pauses the radio');
-  e.key('ArrowRight');
-  assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.audio.src],['etage-zero',on,on?'/stream/etage-zero.mp3':undefined],why);
-  assert.equal(e.elements['entity-inspector'].querySelector('.preview-toggle').getAttribute('data-playing'),null,'and the preview ends');
+  const toggle=()=>e.elements['entity-inspector'].querySelector('.preview-toggle'),s=()=>e.window.Pavoia.getState();
+  const playing=toggle().getAttribute('data-playing');assert.notEqual(playing,null,'the preview plays');
+  e.change('06');
+  assert.deepEqual([s().viewing,s().stage,s().wanted,e.audio.src,toggle().getAttribute('data-playing')],['etage-zero',on?'palac-feel':'etage-zero',false,undefined,playing],why+', and the preview goes on');
+  toggle().emit('click');await flush();
+  assert.deepEqual([s().stage,s().wanted,e.audio.src,toggle().getAttribute('data-playing')],[on?'palac-feel':'etage-zero',on,on?'/stream/palac-feel.mp3':undefined,null],on?'its end plays the station it paused':'its end plays nothing');
+  if(!on)continue;
+  toggle().emit('click');await flush();assert.equal(s().wanted,false,'a second preview holds the radio again');
+  e.elements['play-shown'].emit('click');await flush();
+  assert.deepEqual([s().stage,s().wanted,e.audio.src,toggle().getAttribute('data-playing')],['etage-zero',true,'/stream/etage-zero.mp3',null],'the hero\'s play ends the preview and plays the station shown');
  }
 });
 
@@ -1693,8 +1726,7 @@ test('the explorer frame stops above the player bar and its controls read in Int
 const byClass=(root,name)=>root.descendants().filter(n=>(n.className||n.attrs?.class||'').split(' ').includes(name));
 const inspector=e=>e.elements['entity-inspector'];
 
-// The radio heard and the station shown come apart in the next step; until then a test sets them apart by hand.
-const showApart=(e,stage)=>e.run(`currentMood=moodOf('${stage}')`);
+// One of the explorer's hooks on window.Pavoia, stood in for: it counts its calls and answers value.
 const counting=(e,name,value)=>{const calls=[];e.window.Pavoia[name]=()=>{calls.push(name);return value;};return calls;};
 
 test('the radio is on while its sound is wanted, or while a preview holds it to give it back',async()=>{
@@ -1729,23 +1761,28 @@ test('playShown() plays the station shown: on the station heard it plays or ends
  assert.deepEqual([e.audio.calls.length,stopped.length],[calls,1],'playing the station heard, it only ends a preview: no new connection');
  // The stream drops and waits to try again; then the listener plays the station shown.
  e.error();assert.equal(e.elements['playback-status'].textContent,'Reconnecting…');
- const cancelled=counting(e,'cancelPreview',undefined);showApart(e,'fontanna');
- const asked=e.requests.length;e.run('playShown()');
+ const cancelled=counting(e,'cancelPreview',undefined),asked=e.requests.length;e.change('07');
+ assert.deepEqual([e.window.Pavoia.getState().viewing,e.window.Pavoia.getState().apart,e.elements['playback-status'].textContent],['fontanna',true,'Reconnecting…'],'the rail shows another station, and the reconnect goes on');
+ e.run('playShown()');
  assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.window.Pavoia.getState().wanted,e.audio.src,saved['pavoia-station']],['fontanna',false,true,'/stream/fontanna.mp3','fontanna'],'apart, the bar takes the station shown, plays it and remembers it');
  assert.deepEqual([cancelled.length,stopped.length],[1,1],'a preview is cancelled, not ended into the old station');
  assert.equal(e.elements['playback-status'].textContent,'Connecting…','a new station connects; the old one\'s reconnect is over');
  assert.ok(![...e.timers.values()].some(t=>t.delay===1000),'its retry is cleared');
  assert.deepEqual([e.elements['player-title'].textContent,e.elements['player-stage'].children[0]],['Loading track…','Fontanna'],'the bar names the station at once, and waits for its track');
- assert.deepEqual(e.requests.slice(asked).map(r=>r.url),['/api/radio/fontanna'],'and asks what it has on air');
+ assert.deepEqual(e.requests.slice(asked).map(r=>r.url),['/api/radio/fontanna'],'and asks what it has on air, once while the change still asks it');
  assert.equal(e.run('air.has("palac-feel")'),false,'the station left is followed no more');
  e.error();assert.ok([...e.timers.values()].some(t=>t.delay===1000),'a loss on the new station starts the ladder from its first step');
- const paused=setup();await flush();showApart(paused,'closing');paused.run('playShown()');
+ const paused=setup();await flush();paused.click();paused.playing();paused.change('09');await flush();paused.click();
+ const again=paused.requests.length;paused.run('playShown()');
  assert.deepEqual([paused.window.Pavoia.getState().stage,paused.window.Pavoia.getState().wanted,paused.audio.src],['closing',true,'/stream/closing.mp3'],'apart and paused, it plays the station shown');
+ assert.deepEqual(paused.requests.slice(again).map(r=>r.url),['/api/radio/closing'],'and asks again what it has on air');
 });
 
 test('tuneShown() gives the bar the station shown and starts nothing',async()=>{
  const {saved,storage}=remembered();const e=setup({storage});await flush();
- showApart(e,'fontanna');e.run('lost=true;retries=3;retryTimer=setTimeout(connect,1000)');e.run('tuneShown()');
+ e.click();e.playing();e.change('07');e.click();
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart],['palac-feel',true],'paused while another station shows');
+ e.run('lost=true;retries=3;retryTimer=setTimeout(connect,1000)');e.run('tuneShown()');
  assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.window.Pavoia.getState().wanted,e.audio.src,saved['pavoia-station']],['fontanna',false,false,undefined,'fontanna']);
  assert.deepEqual([e.run('lost'),e.run('retries'),[...e.timers.values()].some(t=>t.delay===1000)],[false,0,false],'no trace of the old station\'s reconnect');
  assert.deepEqual([e.elements['player-title'].textContent,e.elements['player-stage'].children[0]],['Loading track…','Fontanna'],'the bar names it at once');
@@ -1754,54 +1791,65 @@ test('tuneShown() gives the bar the station shown and starts nothing',async()=>{
 });
 
 test('Switch to this station moves the music by itself, with a station change that only shows',async()=>{
- // selectMood() still cuts; here it only shows, as it will, so tune() alone moves the music or the bar.
- const only=e=>e.run('selectMood=id=>{currentMood=moods.find(mood=>mood.id===id);}');
- const e=setup();await flush();e.click();e.playing();only(e);e.window.Pavoia.tune('closing');
- assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.audio.src],['closing',false,'/stream/closing.mp3'],'while the radio is on, the music moves to it');
- const {saved,storage}=remembered();const x=setup({storage});await flush();only(x);x.window.Pavoia.tune('closing');
+ // selectMood() only shows while the radio is on, so tune() alone moves the music.
+ const e=setup();await flush();e.click();e.playing();const calls=e.audio.calls.length;e.window.Pavoia.tune('closing');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.audio.src,e.audio.calls.length],['closing',false,'/stream/closing.mp3',calls+1],'while the radio is on, the music moves to it, in one connection');
+ const {saved,storage}=remembered();const x=setup({storage});await flush();x.window.Pavoia.tune('closing');
  assert.deepEqual([x.window.Pavoia.getState().stage,x.window.Pavoia.getState().apart,x.audio.src,saved['pavoia-station']],['closing',false,undefined,'closing'],'while it is off, the bar takes it and nothing plays');
 });
 
 test('Switch to this station, the media keys and the keys in the explorer go through playShown() while the radio is on',async()=>{
- const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage;const stopped=counting(e,'stopPreview',false);
+ const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage,viewing=()=>e.window.Pavoia.getState().viewing;
+ // playShown() on another station cancels a preview first, as its one mark here; play() does too, so each act is counted alone.
+ const stopped=counting(e,'stopPreview',false),cancelled=counting(e,'cancelPreview',undefined);
  e.window.Pavoia.tune('fontanna');e.actions.nexttrack();e.elements.explorer.open=true;e.key('2');e.key('ArrowRight');
- assert.deepEqual([stage(),e.audio.src,stopped.length],['palac-dance',undefined,0],'paused, each one only changes the station');
+ assert.deepEqual([stage(),e.audio.src,stopped.length,cancelled.length],['palac-dance',undefined,0,0],'paused, each one only changes the station');
  e.elements.explorer.open=false;e.click();e.playing();
- for(const [what,act,expected] of [['tune',()=>e.window.Pavoia.tune('closing'),'closing'],['nexttrack',()=>e.actions.nexttrack(),'essentials'],['previoustrack',()=>e.actions.previoustrack(),'closing'],
-  ['2, explorer closed',()=>e.key('2'),'bermuda-evening'],['ArrowRight, explorer closed',()=>e.key('ArrowRight'),'palac-dance']]){
-  const before=stopped.length;act();
-  assert.deepEqual([stage(),e.audio.src,stopped.length-before],[expected,'/stream/'+expected+'.mp3',/explorer closed/.test(what)?0:1],what);
+ for(const [what,act,heard,shown] of [['tune',()=>e.window.Pavoia.tune('closing'),'closing','closing'],['nexttrack',()=>e.actions.nexttrack(),'essentials','essentials'],['previoustrack',()=>e.actions.previoustrack(),'closing','closing'],
+  ['2, explorer closed',()=>e.key('2'),'closing','bermuda-evening'],['ArrowRight, explorer closed',()=>e.key('ArrowRight'),'closing','palac-dance']]){
+  const before=cancelled.length;act();
+  assert.deepEqual([stage(),viewing(),e.audio.src,cancelled.length-before],[heard,shown,'/stream/'+heard+'.mp3',/explorer closed/.test(what)?0:1],what);
  }
  e.elements.explorer.open=true;
  for(const [what,act,expected] of [['4 in the explorer',()=>e.key('4'),'palac-feel'],['ArrowLeft in the explorer',()=>e.key('ArrowLeft'),'palac-dance']]){
-  const before=stopped.length;act();assert.deepEqual([stage(),e.audio.src,stopped.length-before],[expected,'/stream/'+expected+'.mp3',1],what);
+  const before=cancelled.length;act();assert.deepEqual([stage(),viewing(),e.audio.src,cancelled.length-before],[expected,expected,'/stream/'+expected+'.mp3',1],what);
  }
- e.window.Pavoia.pause();e.window.Pavoia.previewResume=()=>true;const cancelled=counting(e,'cancelPreview',undefined);
- e.key('3');assert.deepEqual([stage(),e.audio.src,cancelled.length,stopped.length],['palac-dance',undefined,0,5],'in the explorer, the key of the station already shown and heard leaves a preview playing');
- e.key('4');assert.deepEqual([stage(),e.audio.src,cancelled.length],['palac-feel','/stream/palac-feel.mp3',2],'another key ends it and plays the station picked');
+ e.window.Pavoia.pause();e.window.Pavoia.previewResume=()=>true;const held=cancelled.length;
+ e.key('3');assert.deepEqual([stage(),e.audio.src,cancelled.length-held,stopped.length],['palac-dance',undefined,0,0],'in the explorer, the key of the station already shown and heard leaves a preview playing');
+ e.key('4');assert.deepEqual([stage(),e.audio.src,cancelled.length-held],['palac-feel','/stream/palac-feel.mp3',1],'another key ends it and plays the station picked');
 });
 
 test('the media keys step from the station heard, and a key in the explorer plays the station shown',async()=>{
  const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage;
- e.click();e.playing();showApart(e,'fontanna');e.actions.nexttrack();
+ e.click();e.playing();e.change('07');e.actions.nexttrack();
  assert.deepEqual([stage(),e.window.Pavoia.getState().viewing,e.audio.src],['etage-zero','etage-zero','/stream/etage-zero.mp3'],'next after Lost in Feelings, the station heard, not after Fontanna, the station shown');
- showApart(e,'fontanna');e.actions.previoustrack();assert.equal(stage(),'palac-feel','previous too');
- showApart(e,'fontanna');e.elements.explorer.open=true;e.key('6');
+ e.change('07');e.actions.previoustrack();assert.equal(stage(),'palac-feel','previous too');
+ e.change('07');e.elements.explorer.open=true;e.key('6');
  assert.deepEqual([stage(),e.window.Pavoia.getState().apart,e.audio.src],['fontanna',false,'/stream/fontanna.mp3'],'the key of the station shown moves the music to it');
 });
+test('paused apart, next on the lock screen and a key in the explorer tune the bar to the station shown, and play nothing',async()=>{
+ const run=async act=>{const {saved,storage}=remembered();const e=setup({journey:true,storage});await flush();e.click();e.playing();e.key('ArrowRight');e.click();await flush();
+  const s=()=>e.window.Pavoia.getState(),calls=e.audio.calls.length;
+  assert.deepEqual([s().stage,s().viewing,s().wanted],['palac-feel','etage-zero',false],'paused while the station after the one heard shows');
+  act(e);await flush();
+  return [s().stage,s().viewing,s().apart,s().wanted,e.audio.calls.length-calls,e.audio.src,e.mediaSession.metadata?.album,e.mediaSession.playbackState,saved['pavoia-station'],e.elements['play-shown'].hidden];
+ };
+ const tuned=['etage-zero','etage-zero',false,false,0,undefined,'Etage 0','paused','etage-zero',true];
+ assert.deepEqual(await run(e=>e.actions.nexttrack()),tuned,'next steps from the station heard to the station shown: the bar and the lock screen take it');
+ assert.deepEqual(await run(e=>{e.elements.explorer.open=true;e.key('5');}),tuned,'in the explorer, the key of the station shown tunes the bar, as Switch to this station does');
+ assert.deepEqual(await run(e=>e.key('5')),['palac-feel','etage-zero',true,false,0,undefined,'Lost in Feelings · Pałac','paused','palac-feel',false],'with the hero in sight, the key of the station shown changes nothing: its play is there');
+});
 test('a preview that holds the radio counts as the radio on, and the arrows in the explorer step from the station shown',async()=>{
- // selectMood() still cuts, so it still ends a preview and sets the two stations together; here it only shows, as it will.
- const only=e=>e.run('selectMood=id=>{currentMood=moods.find(mood=>mood.id===id);}');
- const held=async()=>{const e=setup();await flush();only(e);e.window.Pavoia.previewResume=()=>true;return {e,cancelled:counting(e,'cancelPreview',undefined)};};
+ const held=async()=>{const e=setup();await flush();e.window.Pavoia.previewResume=()=>true;return {e,cancelled:counting(e,'cancelPreview',undefined)};};
  const state=e=>[e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.audio.src];
  const next=await held();next.e.actions.nexttrack();
  assert.deepEqual([...state(next.e),next.cancelled.length],['etage-zero',true,'/stream/etage-zero.mp3',1],'the lock screen\'s next ends the preview and plays the next station');
  const tuned=await held();tuned.e.window.Pavoia.tune('closing');
  assert.deepEqual([...state(tuned.e),tuned.cancelled.length],['closing',true,'/stream/closing.mp3',1],'Switch to this station too');
- const e=setup();await flush();e.click();e.playing();only(e);showApart(e,'fontanna');e.elements.explorer.open=true;e.key('ArrowRight');
+ const e=setup();await flush();e.click();e.playing();e.change('07');e.elements.explorer.open=true;e.key('ArrowRight');
  assert.deepEqual(state(e),['ambiance',true,'/stream/ambiance.mp3'],'after Fontanna, the station shown, not after Lost in Feelings, the station heard');
- showApart(e,'fontanna');e.key('ArrowLeft');assert.equal(e.window.Pavoia.getState().stage,'etage-zero','and before it');
- showApart(e,'fontanna');e.window.Pavoia.tune('fontanna');
+ e.elements.explorer.open=false;e.change('07');e.elements.explorer.open=true;e.key('ArrowLeft');assert.equal(e.window.Pavoia.getState().stage,'etage-zero','and before it, not before Ambiance, the station heard');
+ e.change('07');e.window.Pavoia.tune('fontanna');
  assert.deepEqual(state(e),['fontanna',true,'/stream/fontanna.mp3'],'Switch to this station on the station shown, while another plays, moves the music to it');
 });
 
@@ -1813,6 +1861,159 @@ test('Switch to this station leaves a preview playing on the station already sho
  e.window.Pavoia.tune('closing');
  assert.deepEqual([e.window.Pavoia.getState().stage,e.audio.src],['closing','/stream/closing.mp3'],'another station ends it and plays');
 });
+// Look without losing the music: while the radio is on, a station change shows the station, and the hero's play moves
+// the music there in one cut.
+test('while the radio plays, the rail, the sheet, the swipe, the arrows and 1 to 9 show a station and ask for no stream',async()=>{
+ const e=setup({media:['(max-width: 760px)']});await flush();e.click();e.playing();
+ const calls=e.audio.calls.length,src=e.audio.src,s=()=>e.window.Pavoia.getState(),poster=e.elements.poster;poster.setPointerCapture=()=>{};
+ const swipe=dx=>{poster.emit('pointerdown',{pointerType:'touch',isPrimary:true,pointerId:1,clientX:200,clientY:300,target:{closest:()=>null}});poster.emit('pointerup',{pointerId:1,clientX:200+dx,clientY:300});};
+ for(const [what,act,shown] of [['the rail',()=>e.change('01'),'bermuda-day'],['the sheet',()=>{e.elements['open-stations'].emit('click');e.change('02');},'bermuda-evening'],
+  ['a swipe',()=>swipe(-120),'palac-dance'],['ArrowRight',()=>e.key('ArrowRight'),'palac-feel'],['ArrowRight again',()=>e.key('ArrowRight'),'etage-zero'],['ArrowLeft',()=>e.key('ArrowLeft'),'palac-feel'],
+  ['a swipe back',()=>swipe(120),'palac-dance'],['6',()=>digit(e,6),'fontanna'],['the keypad 1',()=>e.key('Numpad1',undefined,{key:'1'}),'bermuda-day']]){
+  act();
+  assert.deepEqual([s().viewing,s().stage,s().wanted,e.audio.calls.length,e.audio.src,e.audio.paused,e.elements['player-title'].textContent,Boolean(e.elements['stations-sheet'].open)],[shown,'palac-feel',true,calls,src,false,'First',false],what+' shows the station, and the music heard goes on');
+ }
+});
+
+test('the hero\'s play shows only while the bar holds another station, never on the Bus, and names what the station shown plays',async()=>{
+ const e=setup();await flush();const control=e.elements['play-shown'];
+ const read=()=>[control.hidden,e.elements['play-shown-text'].textContent,control.getAttribute('aria-label'),control.title];
+ assert.equal(control.hidden,true,'at the start the bar holds the station shown');
+ e.change('03');assert.equal(control.hidden,true,'paused, a change tunes the bar too: there is nothing else to play');
+ e.click();e.playing();
+ let reply;const audience=status('x').audience;e.air=id=>id==='bermuda-day'?new Promise(resolve=>{reply=resolve;}):{track:{id:'1',title:'Dance',artist:'A'},audience};
+ e.change('01');
+ assert.deepEqual(read(),[false,'Loading track…','Play Under the Sun, Loading track…','Play Under the Sun'],'while its answer is on its way, it says so, and its name holds its words');
+ reply({track:{id:'9',title:'Rumba',artist:'Bawrut'},audience});await flush();
+ assert.deepEqual(read(),[false,'Rumba · Bawrut','Play Under the Sun, now Rumba · Bawrut','Play Under the Sun'],'a track: its title and artist, as the bar writes them');
+ e.air=id=>id==='bermuda-day'?{track:{id:'8',title:'',artist:''},audience}:{track:null,audience};await e.poll();
+ assert.deepEqual(read(),[false,'Untitled track · Unknown artist','Play Under the Sun, now Untitled track · Unknown artist','Play Under the Sun'],'a track with no title or artist');
+ e.air=id=>({track:null,audience});await e.poll();
+ assert.deepEqual(read(),[false,'Play','Play Under the Sun','Play Under the Sun'],'no track announced: the word Play');
+ e.air=id=>({track:{id:'9',title:'Rumba',artist:'Bawrut'},audience});await e.poll();e.air=()=>null;await e.poll();
+ assert.deepEqual(read(),[false,'Play','Play Under the Sun','Play Under the Sun'],'a failed answer: Play, never a track it may no longer play');
+ e.air=id=>({track:{id:'9',title:'Rumba',artist:'Bawrut'},audience});await e.poll();
+ e.setLanguage('de');
+ assert.deepEqual(read(),[false,'Rumba · Bawrut','Under the Sun abspielen, gerade Rumba · Bawrut','Under the Sun abspielen'],'in German');
+ e.air=()=>({track:null,audience});await e.poll();
+ assert.deepEqual(read(),[false,'Abspielen','Under the Sun abspielen','Under the Sun abspielen'],'and its play word');
+ e.setLanguage('en');
+ e.visit('#bus');assert.equal(control.hidden,true,'the Bus has no stream: it hides');
+ e.history.back();assert.equal(control.hidden,false,'leaving the Bus brings it back');
+ e.change('03');assert.equal(control.hidden,true,'back on the station heard, it goes');
+ const html=web('index.html'),rules=cssRules();
+ assert.match(html,/<span id="mood-fact">Pałac stage<\/span><button type="button" id="play-shown" class="play-shown" hidden><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle [^>]+\/><path [^>]+\/><\/svg><span id="play-shown-text"><\/span><\/button>/,'a button after the stage, hidden until needed: a ring with a triangle, unread, then its words');
+ assert.match(rules.get('#mood-stage:has(#play-shown:not([hidden]))'),/display:flex; align-items:center; gap:var\(--s3\); width:0; min-width:100%;/,'it shares the eyebrow row, which never widens the title block');
+ assert.match(rules.get('.play-shown'),/min-width:0; height:44px; margin-block:calc\(\(1lh - 44px\) \/ 2\);.*border:0; background:none; color:var\(--cream\); font:inherit;/,'a 44px target that overhangs the line evenly, in the eyebrow\'s letters');
+ assert.match(rules.get('.play-shown'),/margin-inline:-10px calc\(100% - max\(100%, 46em\) - 10px\); padding:0 10px;/,'past a short title block, the track runs on to a full one, and the target keeps 10px at each side');
+ assert.equal(cssRules('(max-width:760px)').get('.play-shown').trim(),'margin-inline-end:-10px;','on a phone the title block is the hero\'s width, so the track ends with it');
+ assert.doesNotMatch(web('style.css'),/container-type|\dcq[whib]/,'no query container: an engine that gives one layout containment would draw the hero\'s photo inside the poster');
+ assert.match(rules.get('.play-shown:focus-visible'),/outline-offset:-6px;/,'its focus ring stays inside the 44px target, clear of the title');
+ assert.match(rules.get('.play-shown span'),/min-width:0; padding:var\(--s4\); margin:calc\(-1 \* var\(--s4\)\); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;/,'a long track ends in an ellipsis, with its clip a halo\'s width out');
+ assert.match(rules.get('#mood-fact'),/flex-shrink:0/,'and the stage keeps its words');
+ assert.match(rules.get('.play-shown:is(:hover, :focus-visible) span'),/text-decoration:underline/,'its words underline under the pointer and under the keyboard, as the other text buttons do');
+});
+
+test('one press on the hero\'s play is one cut to the station shown',async()=>{
+ const e=setup();await flush();e.click();e.playing();e.change('03');await flush();
+ const calls=e.audio.calls.length,old=e.audio.calls.at(-1),order=[],control=e.elements['play-shown'],play=e.elements.play;
+ const {pause,load}=e.audio,start=e.audio.play;
+ e.audio.pause=()=>{order.push('pause');pause();};e.audio.load=()=>{order.push('load');load();};e.audio.play=()=>{order.push('play '+e.audio.src);return start();};
+ assert.equal(e.document.body.getAttribute('data-away'),'','away while another station shows');
+ control.focus();control.emit('click');
+ assert.deepEqual([e.audio.calls.length,e.audio.src,order],[calls+1,'/stream/palac-dance.mp3',['pause','load','play /stream/palac-dance.mp3']],'one new connection, after the old stream is released');
+ assert.deepEqual([control.hidden,e.document.body.getAttribute('data-away'),e.document.activeElement===play,play.focusOptions?.preventScroll],[true,null,true,true],'the control goes, the page is no longer away, and focus is on Play, with no scroll');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.window.Pavoia.getState().wanted,e.elements['playback-status'].textContent],['palac-dance',false,true,'Connecting…'],'the bar holds the station shown, and connects to it');
+ old.reject(Object.assign(new Error(),{name:'AbortError'}));await flush();e.playing();
+ assert.equal(e.elements['playback-status'].textContent,'Playing','the old stream\'s end changes nothing');
+});
+
+test('the bar\'s button and Space pause the station heard while another station shows',async()=>{
+ const e=setup();await flush();e.click();e.playing();e.change('03');const s=()=>e.window.Pavoia.getState();
+ e.click();
+ assert.deepEqual([s().wanted,e.audio.src,s().stage,s().viewing,e.elements.play.getAttribute('aria-label')],[false,undefined,'palac-feel','palac-dance','Play'],'the button pauses the music heard in one press');
+ assert.equal(e.key('Space').prevented,true);
+ assert.deepEqual([s().wanted,e.audio.src,s().stage,s().viewing],[true,'/stream/palac-feel.mp3','palac-feel','palac-dance'],'Space plays it again, not the station shown');
+ e.playing();e.key('Space');
+ assert.deepEqual([s().wanted,e.audio.src,s().viewing],[false,undefined,'palac-dance'],'and Space pauses it, in one press');
+});
+
+test('a pause while apart keeps the bar on the station paused; its play resumes it, the hero\'s play starts the other',async()=>{
+ const {saved,storage}=remembered();const e=setup({storage});await flush();e.click();e.playing();e.change('03');e.click();const s=()=>e.window.Pavoia.getState();
+ assert.deepEqual([s().stage,s().apart,textOf(e.elements['player-stage']),e.elements['player-title'].textContent,e.elements['play-shown'].hidden],['palac-feel',true,'Tuned to Lost in Feelings','First',false],'paused, the bar still holds the station paused, says so, and the hero still offers the other');
+ e.click();assert.deepEqual([e.audio.src,s().stage,saved['pavoia-station']],['/stream/palac-feel.mp3','palac-feel','palac-feel'],'the bar\'s play resumes the station paused');
+ e.click();e.elements['play-shown'].emit('click');
+ assert.deepEqual([e.audio.src,s().stage,s().apart,saved['pavoia-station']],['/stream/palac-dance.mp3','palac-dance',false,'palac-dance'],'the hero\'s play starts the station shown');
+ // A start the browser blocks is a pause: the bar keeps its station with the words, and the next change moves the bar.
+ const tried=e.audio.calls.length;e.change('06');e.audio.calls.at(-1).reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
+ assert.deepEqual([s().wanted,s().stage,s().viewing,e.elements['playback-status'].textContent],[false,'palac-dance','etage-zero','Press play to start'],'blocked: the bar keeps the station it tried');
+ e.change('07');assert.deepEqual([s().stage,s().apart,e.audio.calls.length,e.elements.player.dataset.status],['fontanna',false,tried,'paused'],'the next station change tunes the bar to it, plays nothing, and the refused start is a plain pause again');
+});
+
+test('a pause while apart, then Switch to the station shown, tunes the bar to it and plays nothing',async()=>{
+ const {saved,storage}=remembered();const e=setup({journey:true,storage});await flush();e.discovery={items:[]};
+ e.click();e.playing();e.change('01');e.click();const calls=e.audio.calls.length;
+ const hearing=()=>e.document.querySelectorAll('.mood').filter(label=>'data-hearing' in label.attrs).map(label=>label.querySelector('input').value);
+ const content=await stagePlace(e,'#statistics/bermuda-day'),button=byClass(content,'stage-switch')[0];
+ assert.deepEqual([button.hidden,hearing()],[false,['04']],'the station shown is not the one in the bar, so Switch shows');
+ button.emit('click');await flush();
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.window.Pavoia.getState().wanted,e.audio.calls.length,e.audio.src,textOf(e.elements['player-stage']),saved['pavoia-station']],['bermuda-day',false,false,calls,undefined,'Under the Sun · Bermuda','bermuda-day'],'the bar takes the station shown, and nothing plays');
+ assert.deepEqual([button.hidden,e.elements['play-shown'].hidden,hearing()],[true,true,['01']],'Switch goes, the hero\'s play too, and the mark moves to the station tuned');
+});
+
+test('two stations apart are polled each 10 s, one station once; a station left is forgotten',async()=>{
+ const e=setup();await flush();e.air=id=>status('Track '+id);
+ let said=0;e.window.addEventListener('pavoia:radio',()=>{said++;});
+ const tick=async()=>{const from=e.airRequests.length,before=said;await e.poll();await flush();return [e.airRequests.slice(from).map(r=>r.id).sort(),said-before];};
+ assert.deepEqual(await tick(),[['palac-feel'],1],'one station: one request per tick, announced once');
+ e.click();e.playing();e.change('03');await flush();
+ assert.deepEqual(await tick(),[['palac-dance','palac-feel'],2],'apart: the station shown and the station heard, one announcement per answer');
+ assert.deepEqual([e.elements['player-title'].textContent,e.elements['play-shown-text'].textContent],['Track palac-feel','Track palac-dance · Artist Track palac-dance'],'each answer lands in its own place');
+ let from=e.airRequests.length;e.document.hidden=false;e.document.emit('visibilitychange');await flush();
+ assert.deepEqual(e.airRequests.slice(from).map(r=>r.id).sort(),['palac-dance','palac-feel'],'a page shown again asks both');
+ e.change('06');await flush();
+ assert.deepEqual([e.run('air.has("palac-dance")'),e.run('polls.has("palac-dance")')],[false,false],'a station left behind is forgotten');
+ assert.deepEqual(await tick(),[['etage-zero','palac-feel'],2],'and asked no more');
+ e.change('04');await flush();
+ assert.deepEqual(await tick(),[['palac-feel'],1],'back on the station heard: one request again');
+});
+
+test('the lock screen keeps the station heard: metadata, album and playbackState',async()=>{
+ const e=setup({journey:true});await flush();const audience=status('x').audience;
+ e.air=id=>({track:{id:'1'+id.length,title:id==='palac-feel'?'Heard':'Shown',artist:'A'},audience});await e.poll();
+ e.click();e.playing();e.change('03');await flush();await e.poll();await flush();
+ const lock=()=>[e.mediaSession.metadata?.title,e.mediaSession.metadata?.album,e.mediaSession.playbackState];
+ assert.deepEqual(lock(),['Heard','Lost in Feelings · Pałac','playing'],'another station shows: the lock screen keeps the one heard');
+ e.air=id=>id==='palac-dance'?null:{track:{id:'1'+id.length,title:'Heard',artist:'A'},audience};await e.poll();await flush();
+ assert.deepEqual(lock(),['Heard','Lost in Feelings · Pałac','playing'],'a failed answer of the station shown leaves it alone');
+ e.click();await flush();assert.deepEqual(lock(),['Heard','Lost in Feelings · Pałac','paused'],'a pause is a pause of the station heard');
+ e.click();e.playing();e.air=id=>({track:{id:'1'+id.length,title:'Next',artist:'A'},audience});e.actions.nexttrack();await flush();
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.audio.src,...lock()],['etage-zero','/stream/etage-zero.mp3','Next','Etage 0','playing'],'next steps from the station heard and plays it');
+});
+
+test('the hero\'s play gives focus to the play button when it goes: on a press, an arrow key and Back to the Bus',async()=>{
+ const e=setup();await flush();e.click();e.playing();const control=e.elements['play-shown'],play=e.elements.play;
+ const focusControl=()=>{control.focus();play.focusOptions=undefined;assert.equal(control.hidden,false);};
+ const onPlay=()=>[e.document.activeElement===play,play.focusOptions?.preventScroll,control.hidden];
+ e.change('03');focusControl();control.emit('click');assert.deepEqual(onPlay(),[true,true,true],'a press');
+ e.change('02');focusControl();e.key('ArrowRight');assert.deepEqual([...onPlay(),e.window.Pavoia.getState().apart],[true,true,true,false],'an arrow back to the station heard');
+ e.visit('#bus');e.change('01');focusControl();e.history.back();assert.deepEqual([...onPlay(),e.location.hash],[true,true,true,'#bus'],'Back to the Bus');
+ e.history.go(1);focusControl();e.setLanguage('de');assert.equal(e.document.activeElement,control,'a language switch keeps its focus');
+ e.setLanguage('en');const link=e.elements['bus-link'];link.focus();e.change('03');
+ assert.deepEqual([control.hidden,e.document.activeElement===link],[true,true],'a control that goes without focus moves none');
+});
+test('while another station shows, the hero\'s playlist, sleeve and portrait are the station shown\'s, and the bar\'s cover the station heard\'s',async()=>{
+ const e=setup({journey:true});await flush();const audience=status('x').audience,n=id=>id==='palac-feel'?1:2;
+ e.air=id=>({track:{id:'1',title:'T '+id,artist:'A',coverUrl:`/api/radio/${id}/artwork/${n(id)}/cover?v=${'a'.repeat(16)}`,artistImageUrl:`/api/radio/${id}/artwork/${n(id)}/portrait?v=${'b'.repeat(16)}`},audience});
+ await e.poll();await flush();e.click();e.playing();await flush();
+ const read=()=>[e.elements['stage-spotify'].hidden,e.elements['stage-spotify'].href,e.elements['hero-cover'].src,e.elements['painted-artist'].src,e.elements['dock-cover'].src];
+ assert.deepEqual(read(),[false,'https://open.spotify.com/playlist/4ZyQd8CWhF3uO8C6sHcACS',`/api/radio/palac-feel/artwork/1/cover?v=${'a'.repeat(16)}`,`/api/radio/palac-feel/artwork/1/portrait?v=${'b'.repeat(16)}`,`/api/radio/palac-feel/artwork/1/cover?v=${'a'.repeat(16)}`],'one station: its playlist, its record');
+ e.change('03');await flush();
+ assert.deepEqual(read(),[false,'https://open.spotify.com/playlist/7kl1EQc1ZnvLq8vZXH3qaJ',`/api/radio/palac-dance/artwork/2/cover?v=${'a'.repeat(16)}`,`/api/radio/palac-dance/artwork/2/portrait?v=${'b'.repeat(16)}`,`/api/radio/palac-feel/artwork/1/cover?v=${'a'.repeat(16)}`],'another station shown: the hero is that station\'s, the bar\'s cover stays the one heard');
+ e.change('06');await flush();assert.equal(e.elements['stage-spotify'].hidden,true,'a station with no playlist has no link, while the music heard has one');
+});
+
+
 const cls=n=>n.className||n.attrs?.class;
 const links=(over={})=>[{kind:'wikidata',url:'https://www.wikidata.org/wiki/Q1'},{kind:'other',url:'https://www.after.life/'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},
  {kind:'musicbrainz',url:'https://musicbrainz.org/artist/1'},{kind:'twitter',url:'https://twitter.com/a'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},{kind:'juno',url:'https://www.junodownload.com/artists/A'},
@@ -2450,6 +2651,12 @@ test('the track on air reads Now on the live stage, and the first page follows t
  e.historyReply=page('800');follow(e,stageLink(e,'bermuda-day'));await flush();assert.equal(nowRows().length,0,'another stage has no Now');
  follow(e,stageLink(e,e.window.Pavoia.getState().stage));await flush();e.elements['history-day'].value='2026-03-28';e.elements['history-day'].emit('change');await flush();assert.equal(nowRows().length,0,'nor has another day');
  e.elements['history-day'].value=localDay(new Date());e.elements['history-day'].emit('change');await flush();assert.equal(nowRows().length,1,'today does');
+ // While the radio plays one station and the page shows another, a bare #history opens the one shown, and Now stays on the one heard.
+ const x=setup({journey:true});await flush();x.click();x.playing();x.change('03');await flush();
+ const now=()=>historyRows(x).filter(r=>r.getAttribute('aria-current')==='true').length;
+ x.historyReply=page('123');routeTo(x,'#history');await flush();
+ assert.deepEqual([x.location.hash,now()],['#history/palac-dance',0],'the station shown, whose first row is not Now');
+ follow(x,stageLink(x,'palac-feel'));await flush();assert.deepEqual([x.location.hash,now()],['#history/palac-feel',1],'Now is on the station heard');
 });
 
 test('History keeps its rows through a lost radio answer or a failed refresh, and a half-typed day asks for nothing',async()=>{
@@ -2725,6 +2932,8 @@ test('Switch to this stage tunes the radio without starting it, then gives way t
  assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,textOf(e.elements['player-stage']),button.hidden,textOf(kind),e.document.activeElement===title,sameRows(content.children,shown)],['bermuda-day',false,'Under the Sun · Bermuda',true,'Bermuda stage ·\u00a0On air',true,true],'the player bar shows the station and its stage, still paused; the button goes, its focus to the name, and On air shows');
  e.window.Pavoia.tune('palac-feel');await flush();
  assert.deepEqual([button.hidden,textOf(kind),sameRows(content.children,shown)],[false,'Bermuda stage',true],'another station tuned elsewhere brings the button back and puts the dot out');
+ e.click();e.playing();const calls=e.audio.calls.length;button.emit('click');await flush();
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.audio.src,e.audio.calls.length,button.hidden,textOf(kind)],['bermuda-day',true,'/stream/bermuda-day.mp3',calls+1,true,'Bermuda stage ·\u00a0On air'],'while the radio plays, Switch moves the music in one cut, and On air moves with it');
  assert.match(cssRules().get('#explorer :is(#music-status button, #history-more, .stage-switch)'),/border:1px solid var\(--line\)/,'a bordered button');
 });
 
@@ -3318,6 +3527,9 @@ test('a station\'s place in Statistics carries its stage over its name',async()=
  e.setLanguage('en');await flush();
  await stagePlace(e,'#statistics/closing',{scope:'closing'});assert.deepEqual(eyebrow(),['Selected by Gaende'],'Gaende\'s own selections say so');
  await stagePlace(e,'#statistics/radio',{scope:'radio'});assert.deepEqual(eyebrow(),[],'All stations has no eyebrow');
+ e.click();e.playing();e.change('01');
+ await stagePlace(e,'#statistics/bermuda-day');assert.deepEqual(eyebrow(),['Bermuda stage'],'while another station plays, the station shown is not on air in the ears');
+ await stagePlace(e,'#statistics/palac-feel',{scope:'palac-feel'});assert.deepEqual(eyebrow(),['Pałac stage ·\u00a0On air'],'the station heard is');
 });
 
 test('a thin line parts the groups of the station row',()=>{
@@ -3854,11 +4066,16 @@ test('a preview pauses a reconnecting radio, and its end brings the radio back',
  assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.src,e.elements['playback-status'].textContent],[true,'/stream/palac-feel.mp3','Connecting…'],'the preview ends and the radio connects again');
 });
 
-test('a station change during a reconnect connects the new station from the first step of the ladder',async()=>{
+test('a station change during a reconnect leaves the ladder of the station heard; play on the station shown connects it from the first step',async()=>{
  const e=setup();await flush();const waits=()=>[...e.timers.values()].map(t=>t.delay).filter(d=>d!==3000&&d!==6000);
  e.click();e.playing();e.error();e.fire(1000);e.error();assert.equal(e.elements['playback-status'].textContent,'Reconnecting…');
  e.change('03');
- assert.deepEqual([e.audio.src,e.elements.player.dataset.state,e.elements['playback-status'].textContent],['/stream/palac-dance.mp3','connecting','Connecting…'],'a new station is a first try');
+ assert.deepEqual([e.audio.src,e.elements.player.dataset.state,e.elements['playback-status'].textContent,waits()],[undefined,'retrying','Reconnecting…',[2000]],'a station change leaves the ladder where it was');
+ e.fire(2000);assert.equal(e.audio.src,'/stream/palac-feel.mp3','its next try connects the station heard, not the station shown');
+ e.error();e.window.emit('online');assert.equal(e.audio.src,'/stream/palac-feel.mp3','so does the network coming back');
+ e.error();e.document.emit('visibilitychange');assert.equal(e.audio.src,'/stream/palac-feel.mp3','and the page shown again');
+ e.error();e.elements['play-shown'].emit('click');
+ assert.deepEqual([e.audio.src,e.elements.player.dataset.state,e.elements['playback-status'].textContent],['/stream/palac-dance.mp3','connecting','Connecting…'],'play on the station shown is a first try');
  e.error();assert.deepEqual([waits(),e.elements['playback-status'].textContent],[[1000],'Reconnecting…'],'and its ladder starts again');
 });
 
@@ -3873,18 +4090,23 @@ test('a start the browser blocks during a reconnect stops trying and asks for pl
 const digit=(e,n,extra={})=>e.key('Digit'+n,undefined,{key:String(n),...extra});
 const keysMarkup=()=>{const html=web('index.html');return html.slice(html.indexOf('<details id="keys"'),html.indexOf('</details>')+10);};
 
-test('1 to 9 go to the station at that place on screen, as the rail does, and never start playback',async()=>{
+test('1 to 9 show the station at that place on screen; with the explorer open and the radio on, they move the music',async()=>{
  const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage,length=e.entries().length;
  digit(e,5);assert.equal(stage(),'etage-zero','5 is the fifth station by stage');
  assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.calls.length,e.audio.src],[false,0,undefined],'a paused radio stays paused and asks for no stream');
  assert.deepEqual([e.url(),e.entries().length],['/?station=etage-zero',length],'the address names it in place, as the rail does');
  e.key('Numpad1',undefined,{key:'1'});assert.equal(stage(),'bermuda-day','the keypad gives the same key');
  digit(e,0);assert.equal(stage(),'bermuda-day','0 names no station');
- e.click();const calls=e.audio.calls.length;
- digit(e,3);assert.deepEqual([stage(),e.audio.calls.length,e.audio.src],['palac-dance',calls+1,'/stream/palac-dance.mp3'],'a playing radio connects once to the new station');
- digit(e,3);assert.equal(e.audio.calls.length,calls+1,'its own number changes nothing');
- press(e,'feeling');digit(e,2);assert.equal(stage(),'fontanna','By feeling, 2 is the second station of that order');
- digit(e,6);assert.equal(stage(),'palac-feel','and 6 the sixth');
+ e.click();const calls=e.audio.calls.length,viewing=()=>e.window.Pavoia.getState().viewing;
+ digit(e,3);assert.deepEqual([viewing(),stage(),e.audio.calls.length,e.audio.src],['palac-dance','bermuda-day',calls,'/stream/bermuda-day.mp3'],'a playing radio stays on the station heard, and asks for no stream');
+ digit(e,3);assert.equal(e.audio.calls.length,calls,'its own number changes nothing');
+ e.elements.explorer.open=true;
+ digit(e,3);assert.deepEqual([stage(),e.audio.calls.length,e.audio.src],['palac-dance',calls+1,'/stream/palac-dance.mp3'],'with the explorer open, the number of the station shown moves the music there, in one connection');
+ digit(e,3);assert.equal(e.audio.calls.length,calls+1,'then its own number changes nothing');
+ digit(e,4);assert.deepEqual([stage(),e.audio.calls.length,e.audio.src],['palac-feel',calls+2,'/stream/palac-feel.mp3'],'and another number moves the music to its station');
+ e.elements.explorer.open=false;
+ press(e,'feeling');digit(e,2);assert.deepEqual([viewing(),stage()],['fontanna','palac-feel'],'By feeling, 2 is the second station of that order');
+ digit(e,6);assert.equal(viewing(),'palac-feel','and 6 the sixth');
  e.click();e.location.hash='#bus';e.window.emit('hashchange');await flush();const before=e.urls().length;
  digit(e,9);
  assert.deepEqual([stage(),e.urls().length,e.document.body.getAttribute('data-bus'),e.window.Pavoia.getState().wanted,e.audio.src],['essentials',before+1,null,false,undefined],'from the Bus a number leaves it with one entry, as the rail does, and stays paused');
@@ -3954,7 +4176,7 @@ test('? opens the shortcuts under the roots button, in both languages, only whil
  const words=e.run('words'),copied=[...block.matchAll(/data-copy="(\w+)"/g)].map(m=>m[1]);
  assert.deepEqual(copied.map(key=>[words.en[key],words.de[key]]),[
   ['Keyboard shortcuts','Tastenkürzel'],['Space','Leertaste'],['Play or pause','Abspielen oder pausieren'],['Left and right arrows','Pfeiltasten links und rechts'],
-  ['Previous or next station','Vorheriger oder nächster Sender'],['The station at that place in the list','Der Sender an dieser Stelle der Liste'],['Sound off, and on again','Ton aus und wieder an'],
+  ['Show the previous or next station','Vorherigen oder nächsten Sender zeigen'],['Show the station at that place in the list','Den Sender an dieser Stelle der Liste zeigen'],['Sound off, and on again','Ton aus und wieder an'],
   ['In the Index: filter the names','Im Index: Namen filtern'],['Back to listening','Zurück zum Radio'],['Show or hide these shortcuts','Diese Kürzel zeigen oder verbergen']],'every words in English and German');
  const rules=cssRules();
  assert.match(rules.get('.stage-notes summary, .keys summary'),/min-height:44px; line-height:44px; font-size:12px; color:var\(--soft\)/,'the summary is the Statistics notes\' quiet 12px button');
@@ -4249,6 +4471,8 @@ test('History\'s All stations lists the nine stations in screen order with what 
  // By feeling, the rows follow that order.
  const f=setup({journey:true,storage:{getItem:key=>key==='pavoia-way'?'feeling':null,setItem(){}}});await flush();await airOpen(f,id=>airAt(t0,id));
  assert.deepEqual(airRows(f).map(a=>a.children[1].children[0].textContent),byFeeling.map(id=>'Title '+id),'the order on screen');
+ const a=setup({journey:true});await flush();a.air=id=>airAt(t0,id);a.click();a.playing();a.change('03');await flush();await airOpen(a,id=>airAt(t0,id));
+ assert.deepEqual(airRows(a).map(r=>r.attrs['aria-current']??null),byStage.map(id=>id==='palac-feel'?'true':null),'while another station shows, Now is on the station heard alone');
 });
 
 test('each station refreshes after its track ends, between 20 s and 2 min, and nothing is asked while hidden',async()=>{

@@ -1,4 +1,5 @@
-// A number key on a playing radio: the station at that place on screen plays, and only one stream is open at a time.
+// A number key on a playing radio shows the station at that place on screen and asks for no stream; the hero's play then
+// plays it, and only one stream is open at a time.
 // This check plays, so it runs only on the fake preview (design/stage-direction/fakeserve.py), whose
 // /stream/** is a local tone that is never relayed: its first action asks /__mode?set=ok, and it stops unless the answer
 // is "ok". On serve.py or the live site that address is not "ok", so the check never counts as a listener.
@@ -30,8 +31,12 @@ async page => {
     Object.defineProperty(audio, 'src', { configurable: true, get: () => src.get.call(audio), set: value => { window.keysMedia.push('src:' + new URL(value, location.href).pathname); src.set.call(audio, value); } });
   });
   await page.keyboard.press('2');
+  await page.waitForFunction(() => window.Pavoia.getState().viewing === 'bermuda-evening');
+  await page.waitForTimeout(500);
+  assert(events.filter(([kind]) => kind === 'start').length === 1 && await page.locator('#audio').getAttribute('src') === '/stream/palac-feel.mp3' && !(await page.locator('#audio').evaluate(audio => audio.paused)), '2 shows the second station by stage and asks for no stream: ' + JSON.stringify(events));
+  await page.locator('#play-shown').click();
   await playing('bermuda-evening');
-  assert(await page.locator('#audio').getAttribute('src') === '/stream/bermuda-evening.mp3', '2 plays the second station by stage');
+  assert(await page.locator('#audio').getAttribute('src') === '/stream/bermuda-evening.mp3', 'the hero\'s play plays the second station by stage');
   const media = await page.evaluate(() => window.keysMedia);
   assert(media.at(-1) === 'src:/stream/bermuda-evening.mp3' && media.length > 1 && media.slice(0, -1).every(step => step === 'load:'), 'the old source is dropped before the new one is set: ' + JSON.stringify(media));
   for (let i = 0; i < 40 && !events.some(([kind, path]) => kind === 'end' && path === '/stream/palac-feel.mp3'); i++) await page.waitForTimeout(50);

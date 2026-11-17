@@ -9,7 +9,7 @@ async page => {
   await page.waitForFunction(() => window.Pavoia?.getState);
   const wanted = () => page.evaluate(() => window.Pavoia.getState().wanted);
   const photoOnly = () => page.evaluate(() => document.body.hasAttribute('data-photo-only'));
-  const stage = () => page.evaluate(() => window.Pavoia.getState().stage);
+  const stage = () => page.evaluate(() => window.Pavoia.getState().viewing);
   const space = async () => { await page.keyboard.down('Space'); await page.keyboard.up('Space'); };
   const toggleButton = page.locator('#artwork-toggle');
   assert(!(await wanted()), 'the page starts paused');

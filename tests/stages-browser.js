@@ -25,7 +25,7 @@ async page => {
   const visit=async(width,height)=>{await page.setViewportSize({width,height});await page.goto(origin+'/');await page.evaluate(()=>localStorage.clear());await page.goto(origin+'/');await ready(page);};
   // The language and the way as a script presses them, wherever the switch stands.
   const set=async(p,lang,way)=>{if(lang)await p.locator('#language [value='+lang+']').dispatchEvent('click');if(way)await p.locator('#ways [value='+way+']').dispatchEvent('click');};
-  const stage=p=>p.evaluate(()=>window.Pavoia.getState().stage);
+  const stage=p=>p.evaluate(()=>window.Pavoia.getState().viewing);
   const silent=async(p,what)=>assert(await p.evaluate(()=>document.getElementById('audio').getAttribute('src'))===null,'10: the audio has a source after '+what);
   const byStage=['bermuda-day','bermuda-evening','palac-dance','palac-feel','etage-zero','fontanna','ambiance','closing','essentials'];
   const byFeeling=['bermuda-day','fontanna','bermuda-evening','palac-dance','etage-zero','palac-feel','closing','ambiance','essentials'];
@@ -131,7 +131,7 @@ async page => {
   for(const [way,next] of [['stage','etage-zero'],['feeling','closing']]){
     await m.locator('#open-stations').tap();await sheetOpen(true);
     await m.locator('#ways [value='+way+']').tap();await m.locator('#moods input[value="04"]').tap();await sheetOpen(false);
-    await swipe();await m.waitForFunction(id=>window.Pavoia.getState().stage===id,next,{timeout:5000}).catch(()=>{});
+    await swipe();await m.waitForFunction(id=>window.Pavoia.getState().viewing===id,next,{timeout:5000}).catch(()=>{});
     const landed=await stage(m);assert(landed===next,`7: a swipe left from Lost in Feelings by ${way} lands on ${landed}, not ${next}`);swipes.push(`${way} -> ${landed}`);
   }
   await silent(m,'the swipes');

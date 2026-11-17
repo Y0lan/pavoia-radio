@@ -75,6 +75,22 @@ h1 { font:clamp(56px,7vw,112px)/.94 var(--serif); letter-spacing:-.025em; text-s
 /* One fact over the title: the festival stage of the station, in both ways. Its 11px letters keep 4.5:1 on the
    brightest photo with a dark halo, tight and wide, under the hero's shadow; the group words share it. */
 #mood-stage { margin-bottom:var(--s3); color:var(--cream); text-shadow:0 0 2px var(--ink), 0 1px 4px var(--ink), 0 0 10px var(--ink), 0 2px 18px rgb(0 0 0 / .45); }
+/* While the bar holds another station, the eyebrow offers the one shown: a ring with the bar's triangle, then what it
+   plays now, in the eyebrow's own letters. The 44px target overhangs the line by as much above as below, so the line,
+   the title and the rail keep their places. The row takes the title block's width and never sets it. Its end margin
+   lets the track run on past a short title block, as far as a title block with a full place line (46em of these
+   letters), which the hero always holds above 760px; on a phone the title block is the hero's width, and the track
+   ends with it. A longer track ends in an ellipsis there.
+   The 10px of padding at each side keep the focus ring, drawn 4px inside the target, clear of the ring and the words. */
+#mood-stage:has(#play-shown:not([hidden])) { display:flex; align-items:center; gap:var(--s3); width:0; min-width:100%; }
+#mood-fact { flex-shrink:0; }
+.play-shown { display:inline-flex; align-items:center; gap:var(--s2); min-width:0; height:44px; margin-block:calc((1lh - 44px) / 2); margin-inline:-10px calc(100% - max(100%, 46em) - 10px); padding:0 10px; border:0; background:none; color:var(--cream); font:inherit; letter-spacing:inherit; text-transform:inherit; text-shadow:inherit; cursor:pointer; }
+.play-shown svg { flex-shrink:0; filter:drop-shadow(0 0 2px var(--ink)) drop-shadow(0 1px 4px var(--ink)); }
+.play-shown:focus-visible { outline-offset:-6px; }
+/* The clip of the ellipsis stands a halo's width out of the words, so the eyebrow's halo fades as it does on the stage
+   name, and the words keep their box. */
+.play-shown span { min-width:0; padding:var(--s4); margin:calc(-1 * var(--s4)); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; text-underline-offset:3px; }
+.play-shown:is(:hover, :focus-visible) span { text-decoration:underline; }
 .place { max-width:52ch; min-height:2lh; margin-top:14px; font:italic 21px/1.45 var(--serif); color:var(--cream); text-shadow:0 2px 18px rgb(0 0 0 / .45); text-wrap:pretty; }
 .stage-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px 24px; min-height:44px; }
 .stage-action { font-size:14px; line-height:44px; color:var(--muted); }
@@ -531,6 +547,7 @@ html[data-page-hidden] *, html[data-page-hidden] *::after { animation-play-state
   .poster { position:relative; isolation:isolate; display:flex; flex-direction:column; justify-content:end; min-height:calc(100svh - var(--bar)); padding:clamp(180px,30svh,300px) var(--gutter) 24px; touch-action:pan-y pinch-zoom; }
   .poster::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none; background:linear-gradient(180deg,rgb(11 10 9 / .75),rgb(11 10 9 / .6) 16%,rgb(11 10 9 / .15) 30%,rgb(11 10 9 / .72) 48%,rgb(11 10 9 / .94) 72%,var(--ink)); }
   .bottom { width:100%; min-width:0; }
+  .play-shown { margin-inline-end:-10px; }
   h1 { font-size:clamp(44px,12vw,66px); text-wrap:balance; }
   .place { margin-top:14px; max-width:44ch; font:italic 19px/1.45 var(--serif); }
   .station-controls { display:flex; align-items:center; flex-wrap:wrap; gap:4px 8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }

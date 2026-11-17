@@ -1,7 +1,8 @@
 async (page) => {
   const assert = (value, message) => { if (!value) throw new Error(message); };
   const root = 'https://pavoia.gaende.box.ca/';
-  const choose = async id => { if(await page.locator('#open-stations').isVisible())await page.locator('#open-stations').click(); await page.locator(`input[name="mood"][value="${id}"]`).check(); };
+  // A station change while the radio plays only shows the station; the hero's play then moves the music there.
+  const choose = async id => { if(await page.locator('#open-stations').isVisible())await page.locator('#open-stations').click(); await page.locator(`input[name="mood"][value="${id}"]`).check(); if(await page.locator('#play-shown').isVisible())await page.locator('#play-shown').click(); };
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.emulateMedia({ reducedMotion: 'reduce' });

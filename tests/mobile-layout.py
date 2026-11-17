@@ -114,7 +114,7 @@ with sync_playwright() as p:
     cdp.send('Input.dispatchTouchEvent',{'type':'touchMove','touchPoints':[{'x':x+dx*step/6,'y':y+dy*step/6}]})
    cdp.send('Input.dispatchTouchEvent',{'type':'touchEnd','touchPoints':[]})
   def stage_is(identifier):
-   wait_for('(id)=>window.Pavoia.getState().stage===id',arg=identifier)
+   wait_for('(id)=>window.Pavoia.getState().viewing===id',arg=identifier)
   select('05');swipe_photo(-160);stage_is('bermuda-day')
   assert page.locator('#station-text').inner_text()=='1 / 9'
   assert page.locator('#audio').evaluate('a=>a.paused&&!a.getAttribute("src")')
@@ -144,8 +144,12 @@ with sync_playwright() as p:
   assert page.locator('#change-photo').get_attribute('aria-label').startswith('Nächstes Foto, ')
   assert page.locator('#audio').evaluate('a=>!a.paused')
   page.locator('#language [value=en]').dispatch_event('click')
+  # While the radio plays, a swipe shows the next station and the music goes on; the hero's play moves it there.
   swipe_photo(-160);stage_is('etage-zero')
-  wait_for('window.Pavoia.getState().playbackState==="playing"')
+  assert page.locator('#audio').get_attribute('src')==source and page.locator('#audio').evaluate('a=>!a.paused')
+  # A tap while the swipe's fling still runs only stops it, as on a phone, so the tap waits for it to settle.
+  page.wait_for_timeout(1500);page.locator('#play-shown').tap()
+  wait_for('window.Pavoia.getState().stage==="etage-zero"&&window.Pavoia.getState().playbackState==="playing"')
   assert page.locator('#audio').get_attribute('src')=='/stream/etage-zero.mp3'
   swipe_photo(160);stage_is('palac-feel')
   wait_for('window.Pavoia.getState().playbackState==="playing"')
