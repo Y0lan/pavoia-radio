@@ -307,11 +307,13 @@
     if(dialog.open&&view!=='explore'){fillRow();loadMusic();}
   }
   // Every move into or inside the explorer comes through go(): opening adds the explorer's one entry,
-  // and a move inside replaces it.
+  // and a move inside replaces it. A link goes to its place's one address, so a link to the place shown,
+  // written short or by an old name, changes nothing.
   function go(hash) {
-    if(closing||(dialog.open&&hash===location.hash))return;
-    if(dialog.open)history.replaceState(history.state,'',hash);
-    else history.pushState({explorer:life},'',hash);
+    const to=placeOf(hash).address;
+    if(closing||(dialog.open&&to===location.hash))return;
+    if(dialog.open)history.replaceState(history.state,'',to);
+    else history.pushState({explorer:life},'',to);
     radio.renderScene();restore();
   }
   // A hop paints twice, and nothing moves once it shows. The header comes at once from a record already fetched, or
@@ -354,7 +356,7 @@
     // Its payload, the credited artists of a track or a small release, then the fewest neighbours that name the rest.
     const named=(async()=>{
       const data=await fetched(id),e=data.entity;if(hop!==controller)return;
-      if(id!==e.id){history.replaceState(history.state,'','#explore/'+e.id);radio.renderScene();}
+      if(id!==e.id){aliases.set('#explore/'+id,'#explore/'+e.id);history.replaceState(history.state,'','#explore/'+e.id);radio.renderScene();}
       // A header drawn from an included copy has no preview: the record's own payload draws it again, before the body,
       // and focus in it stays on the title.
       if(selected&&e.previewUrl&&!selected.previewUrl&&!bodyShown){const held=$('entity-inspector').contains(document.activeElement);renderEntity(e);if(held)recordTitle.focus({preventScroll:true});}
@@ -813,11 +815,12 @@
   }
   function setView(next) {
     // Leaving History or the Index keeps its place: the row opened from it, and how far History was scrolled or how high
-    // the Index's row stood. That is the row clicked, by pointer, touch or Enter, when it links where the explorer went: a
-    // track played twice links twice, and a tap focuses no link. The Index keeps its first row under the stage bar
-    // otherwise, and gives focus back only to a row clicked.
+    // the Index's row stood. That is the row clicked, by pointer, touch or Enter, when it links to the place the explorer
+    // went, by that place's address or by an old one (a plex_ link or a name, opened before): a track played twice links
+    // twice, and a tap focuses no link. The Index keeps its first row under the stage bar otherwise, and gives focus back
+    // only to a row clicked.
     if((view==='history'||view==='index')&&next!==view){
-      const content=$('music-content'),opened=r=>content.contains(r)&&r.getAttribute('href')===location.hash;
+      const content=$('music-content'),went=placeOf(location.hash).address,opened=r=>content.contains(r)&&placeOf(r.getAttribute('href')||'').address===went;
       if(view==='history')musicPlace={key:content.dataset.key,top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
       else{const row=opened(clicked)?clicked:rowUnderBar();musicPlace=row&&{key:content.dataset.key,row,y:row.getBoundingClientRect().top-dialog.getBoundingClientRect().top,focus:row===clicked};}
     }
@@ -853,11 +856,12 @@
   }
   // #explore/artist/{name} and #explore/label/{name} open the one record of that type and name, or search for the name.
   async function byName(type,name) {
+    const asked=location.hash;
     setView('explore');hideRecord();selected=null;hop?.abort();const c=new AbortController(),timeout=setTimeout(()=>c.abort(),10000);hop=c;
     $('discovery-results').hidden=true;$('discovery-status').textContent=word('loading');
     let hit=null;try{hit=await lookup(type,name,c.signal);}catch{/* The search page says what went wrong. */}finally{clearTimeout(timeout);}
     if(hop!==c)return;
-    if(hit){history.replaceState(history.state,'','#explore/'+hit.id);radio.renderScene();loadEntity(hit.id);}
+    if(hit){aliases.set(asked,'#explore/'+hit.id);history.replaceState(history.state,'','#explore/'+hit.id);radio.renderScene();loadEntity(hit.id);}
     else{history.replaceState(history.state,'','#explore?q='+encodeURIComponent(name));restore();}
   }
   // "Various Artists" and a name left empty are no one to open.
@@ -1076,9 +1080,9 @@
     field.placeholder=word(musicKind==='artists'?'filterArtists':'filterLabels');field.setAttribute('aria-label',field.placeholder);
     $('music-view').dataset.by=indexBy;$('index-rail').setAttribute('aria-label',word(indexBy==='tracks'?'railCounts':'railLetters'));
   }
-  // The marks of the order shown: the letters A to Z then #, or the bands of track counts. A mark says what it stands
-  // for and how many names it holds, or that it holds none.
-  const markList=()=>indexBy==='tracks'?bands.map(b=>b===1?'1':b+'+'):letters;
+  // The marks of an order, the one shown unless another is named: the letters A to Z then #, or the bands of track
+  // counts. A mark says what it stands for and how many names it holds, or that it holds none.
+  const markList=(by=indexBy)=>by==='tracks'?bands.map(b=>b===1?'1':b+'+'):letters;
   const markLabel=(mark,n)=>{
     const name=mark==='#'?word('symbols'):indexBy!=='tracks'?mark:mark==='1'?word('band1'):word('band').replace('{n}',mark.slice(0,-1)),artists=musicKind==='artists';
     return word(!n?(artists?'markArtists0':'markLabels0'):(artists?'markArtist':'markLabel')+(n===1?'1':'s')).replace('{mark}',name).replace('{n}',number(n));
@@ -1496,9 +1500,17 @@
     if(historyPage.more){if(stale()){const rows=[...$('music-content').children];rows.forEach((n,i)=>{if(n.localName==='h3')n.textContent=dayName(new Date(rows[i+1].children[0].dateTime));});historyPage.drawn=today();}return;}
     if(radio.getState().dataFresh&&(stale()||onAir()!==historyPage.live))loadMusic(false,true);
   }
-  function restore(){
-    landing=false;
-    const [path,params='']=location.hash.split('?');
+  // The addresses a record had before its own: a plex_ one the roots renamed, a name the search found. Each leads to
+  // the record's address for the rest of the page's life.
+  const aliases=new Map();
+  // Where an address leads, read from it alone: its section, and a record by its id or its name, or the stage, the side,
+  // the day, the order, the filter and the mark of History, Statistics or the Index; and the one address of that place.
+  // A bare or unknown stage is the one on air, but in the Index All stages, and the whole library is All stages, which
+  // holds every playlist. A day that is not a real one before today is none, an unknown side is Artists, a mark not of
+  // the order of the address is none, and other parameters go. A record keeps its address, or takes the one its old
+  // address led to; an address outside the explorer has no section and stays as it is. It writes nothing.
+  function placeOf(hash){
+    const [path,params='']=hash.split('?');
     // Each part of the path as written; one that cannot be read is an empty part.
     const parts=path.slice(1).split('/').map(part=>{try{return decodeURIComponent(part);}catch{return '';}});
     let [section,first,second]=parts,query=new URLSearchParams(params);
@@ -1506,30 +1518,35 @@
     if(section==='statistics'&&['artists','labels'].includes(second)){[section,first,second]=['index',second,first];query=new URLSearchParams('by=tracks');}
     const id=section==='explore'&&parts.length===2&&entityID(first)?first:null;
     const name=section==='explore'&&parts.length===3&&['artist','label'].includes(first)&&second&&second.length<=200?second:'';
-    if(!['explore','history','statistics','index'].includes(section)||(section==='explore'&&parts.length>1&&!id&&!name)){if(dialog.open)shut();return;}
+    if(!['explore','history','statistics','index'].includes(section)||(section==='explore'&&parts.length>1&&!id&&!name))return {section:'',address:hash};
+    if(section==='explore')return {section,type:first,id,name,typed:query.get('q')||'',address:aliases.get(hash)||hash};
+    const statistics=section==='statistics',index=section==='index',stage=index?second:first,known=[...radio.stations.map(s=>s.id),...index?[]:['radio']].includes(stage);
+    const scope=known?stage:index||statistics&&first==='library'?'radio':radio.getState().stage;
+    const kind=index?first==='labels'?'labels':'artists':'';
+    const day=section==='history'&&scope!=='radio'&&pastDay(second||'')?second:'';
+    const by=index?query.get('by')==='tracks'?'tracks':'name':'';
+    const q=index?(query.get('q')||'').slice(0,200):'';
+    // The Index keeps the mark it was scrolled to only when it is one of the order of the address.
+    const mark=index&&markList(by).includes(query.get('at'))?query.get('at'):'';
+    return {section,scope,kind,day,by,q,mark,address:section==='history'?historyAt(scope,day):index?indexAt({kind,scope,by,q,at:mark}):'#statistics/'+scope};
+  }
+  function restore(){
+    landing=false;
+    const place=placeOf(location.hash),{section,type,id,name}=place;
+    if(!section){if(dialog.open)shut();return;}
     // Going back landed on another explorer entry, so the page was not right under: close in place.
     if(closing){shut();history.replaceState(null,'',location.pathname+location.search);radio.renderScene();return;}
     // An entry the browser added itself, such as a typed URL, may not sit right above the page.
     if(!history.state?.explorer)history.replaceState({...history.state,explorer:true},'');
     open();
     if(id)return loadEntity(id);
-    if(name)return byName(first,name);
-    // History, Statistics and the Index read their stage from the address, History its day, and the Index its side, its
-    // order and its filter. A bare or unknown stage is the one on air, but in the Index All stages, and the whole library
-    // is All stages, which holds every playlist. A day that is not a real one before today is none, an unknown side is
-    // Artists, and other parameters go: the address is rewritten to say so, and the tab keeps it.
+    if(name)return byName(type,name);
+    // History, Statistics and the Index read their place from the address, which is rewritten to its one form, and the
+    // tab keeps it.
     if(section!=='explore'){
-      const statistics=section==='statistics',index=section==='index',at=index?second:first,known=[...radio.stations.map(s=>s.id),...index?[]:['radio']].includes(at);
-      musicScope=known?at:index||statistics&&first==='library'?'radio':radio.getState().stage;
-      musicKind=index?first==='labels'?'labels':'artists':'';
-      musicDay=section==='history'&&musicScope!=='radio'&&pastDay(second||'')?second:'';
-      indexBy=index?query.get('by')==='tracks'?'tracks':'name':'';
-      indexQuery=index?(query.get('q')||'').slice(0,200):'';
-      // The Index keeps the mark it was scrolled to only when it is one of the order shown.
-      indexMark=index&&markList().includes(query.get('at'))?query.get('at'):'';
-      const place=section==='history'?historyAt(musicScope,musicDay):index?indexAt({kind:musicKind,scope:musicScope,by:indexBy,q:indexQuery,at:indexMark}):'#statistics/'+musicScope;
-      if(location.hash!==place)history.replaceState(history.state,'',place);
-      for(const link of document.querySelectorAll('.explorer-nav a'))if(tab(link)===section)link.setAttribute('href',place);
+      ({scope:musicScope,kind:musicKind,day:musicDay,by:indexBy,q:indexQuery,mark:indexMark}=place);
+      if(location.hash!==place.address)history.replaceState(history.state,'',place.address);
+      for(const link of document.querySelectorAll('.explorer-nav a'))if(tab(link)===section)link.setAttribute('href',place.address);
     }
     setView(section);
     // The History tab or the Index tab, from a record or another tab, brings back the same rows without a reload, with
@@ -1556,7 +1573,7 @@
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.
     hop?.abort();hop=null;selected=null;hideRecord();
-    const typed=query.get('q')||'';$('discovery-query').value=typed;
+    const {typed}=place;$('discovery-query').value=typed;
     const again=Boolean(typed.trim())&&typed===shownQuery&&$('discovery-results').children.length>0;
     $('discovery-results').hidden=!again;$('discovery-status').replaceChildren(again?found(shownCount):'');
     if(finePointer.matches)$('discovery-query').focus();

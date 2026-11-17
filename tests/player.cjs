@@ -1067,6 +1067,9 @@ const firstLink=root=>root.descendants().find(n=>n.localName==='a');
 const follow=(e,a)=>e.document.emit('click',{button:0,target:{closest:()=>a},preventDefault(){}});
 // An element's text with its children's, as a browser reads it.
 const textOf=n=>typeof n==='string'?n:(n.textContent||'')+n.children.map(textOf).join('');
+// How many times the page writes the address with history.pushState or history.replaceState from now on; a write
+// that only changes the state is not counted.
+const countWrites=e=>{let n=0;for(const name of ['pushState','replaceState']){const write=e.history[name];e.history[name]=function(state,title,url){const from=e.location.hash;write.call(this,state,title,url);if(e.location.hash!==from)n++;};}return ()=>n;};
 
 test('the explorer opens over an inert page, keeps the player, and ✕, Escape or Back go back to the page in one step',async()=>{
  const e=setup({journey:true});await flush();const explorer=e.elements.explorer,main=e.elements.main,footer=e.elements['roots-footer'];
@@ -1269,10 +1272,12 @@ test('however deep the digging, the explorer keeps one entry and closing reaches
 
 test('the current tab keeps its history entry, and a new language searches again',async()=>{
  const e=setup({journey:true});await flush();const click=(href,more={})=>{const event={button:0,target:{closest:()=>({getAttribute:()=>href})},prevented:false,preventDefault(){event.prevented=true;},...more};e.document.emit('click',event);return event.prevented;};
- e.visit('#history');await flush();
- const kept=e.entries().length;
- assert.equal(click('#history'),true);assert.equal(e.entries().length,kept,'a link to the view already shown changes nothing');
- assert.equal(click('#statistics'),true);assert.deepEqual([e.location.hash,e.entries().length],['#statistics/palac-feel',kept],'another tab replaces the explorer\'s one entry');
+ e.historyReply=()=>({items:[],next:null});e.visit('#history');await flush();
+ // The tab's href is #history/palac-feel by now: a link written short, as the page's own links are, is the same place.
+ const kept=e.entries(),asked=e.historyRequests.length,writes=countWrites(e);
+ assert.equal(click('#history'),true);await flush();
+ assert.deepEqual([e.entries(),e.historyRequests.length,writes()],[kept,asked,0],'a link to the view already shown changes nothing: no request, no entry, no address written');
+ assert.equal(click('#statistics'),true);assert.deepEqual([e.location.hash,e.entries().length],['#statistics/palac-feel',kept.length],'another tab replaces the explorer\'s one entry');
  e.visit('#explore/art_0123456789ab');await flush();assert.equal(click('#explore/art_0123456789ab'),true,'the player title linking to the record shown is stopped too');
  assert.deepEqual([click('#explore/art_0123456789ab',{ctrlKey:true}),click('#explore/art_0123456789ab',{metaKey:true}),click('#explore/art_0123456789ab',{shiftKey:true}),click('#explore/art_0123456789ab',{button:1})],[false,false,false,false],'a new tab or window still opens it');
  e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.split('/').pop());
@@ -1280,6 +1285,47 @@ test('the current tab keeps its history entry, and a new language searches again
  const searches=()=>e.discoveryRequests.filter(r=>r.url.includes('/search?')).length,before=searches();
  e.elements['explorer-close'].emit('click');await flush();e.setLanguage('de');await flush();
  e.visit(e.elements['roots-tab'].getAttribute('href'));await flush();assert.ok(searches()>before,'results drawn in English are searched again in German');
+});
+
+test('a link to the place shown, written short, changes nothing',async()=>{
+ const e=await indexed();const click=href=>{const event={button:0,target:{closest:()=>({getAttribute:()=>href})},prevented:false,preventDefault(){event.prevented=true;}};e.document.emit('click',event);return event.prevented;};
+ const asked=()=>[e.requests.length,e.namesRequests.length,e.discoveryRequests.length,e.historyRequests.length,e.changesRequests.length];
+ for(const [shown,link] of [['#index/artists','#index'],['#statistics/palac-feel','#statistics']]){
+  e.visit(link);await flush();assert.equal(e.location.hash,shown,'the page shows '+link+' at its one address');
+  const kept=e.entries(),before=asked(),writes=countWrites(e);
+  assert.equal(click(link),true);await flush();
+  assert.deepEqual([e.location.hash,e.entries(),asked(),writes()],[shown,kept,before,0],link+' while '+shown+' shows sends no request, adds no entry and writes no address');
+ }
+});
+
+test('each address from the page is one entry at its canonical address',async()=>{
+ const e=await indexed();e.historyReply=()=>({items:[],next:null});
+ const link=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
+ const day='2020-02-29';
+ for(const [href,address] of [
+  ['#history','#history/palac-feel'],['#history/radio','#history/radio'],['#history/palac-feel/'+day,'#history/palac-feel/'+day],
+  ['#statistics/radio','#statistics/radio'],['#statistics/palac-feel/artists','#index/artists/palac-feel?by=tracks'],
+  ['#index/labels/fontanna?by=tracks&q=a','#index/labels/fontanna?by=tracks&q=a'],
+  // A mark of the address's own order, which the Index shown last does not use.
+  ['#index/artists?at=K','#index/artists?at=K'],
+ ]){
+  const writes=countWrites(e);link(href);
+  assert.deepEqual([e.entries(),e.position(),writes()],[['',address],1,1],href+' from the closed page is one entry, written once, at '+address);
+  await flush();assert.equal(e.location.hash,address,href+' stays at '+address);
+  e.elements['explorer-close'].emit('click');await flush();assert.equal(e.elements.explorer.open,false);
+ }
+});
+
+test('a link by an old name of the record shown changes nothing',async()=>{
+ const e=setup({journey:true});await flush();
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_0123456789ab',type:'artist',title:'Jimi Jules'}]}:entity(url.includes('plex_')?'trk_0123456789ab':url.split('/').pop());
+ const click=href=>{const event={button:0,target:{closest:()=>({getAttribute:()=>href})},prevented:false,preventDefault(){event.prevented=true;}};e.document.emit('click',event);return event.prevented;};
+ for(const [old,address] of [['#explore/plex_7','#explore/trk_0123456789ab'],['#explore/artist/Jimi%20Jules','#explore/art_0123456789ab']]){
+  click(old);await flush();assert.equal(e.location.hash,address,old+' opens as '+address);
+  const kept=e.entries(),asked=e.discoveryRequests.length,writes=countWrites(e);
+  assert.equal(click(old),true);await flush();
+  assert.deepEqual([e.location.hash,e.entries(),e.discoveryRequests.length,writes()],[address,kept,asked,0],old+' while '+address+' shows sends no request, adds no entry and writes no address');
+ }
 });
 
 test('a reload keeps the explorer entry and the Forward ones, and its ✕ closes in place',async()=>{
@@ -2062,6 +2108,31 @@ test('the History tab brings back the same rows where they were, with focus on t
  assert.equal(e.historyRequests.length,sent+1,'Statistics in between loads History again');
  e.elements['explorer-close'].emit('click');await flush();routeTo(e,'#history');await flush();
  assert.equal(e.historyRequests.length,sent+2,'so does a new visit');
+});
+
+test('a row opened again by an old address of its record comes back with its place and its focus, in History and the Index',async()=>{
+ // History links a track by plex_, which the roots rename; the Index links a name, which the search finds. Once opened,
+ // the link leads to the record's own address, and the row is still the one opened.
+ const e=await indexed();const explorer=e.elements.explorer,content=e.elements['music-content'];
+ e.discovery=url=>url.includes('/search?')?{items:[{id:'art_00000000aa11',type:'artist',title:'Amelie Lens'}]}:entity(url.includes('plex_')?'trk_'+url.split('plex_').pop().padStart(12,'0'):url.split('/').pop());
+ // Two pages: a list with earlier pages follows nothing, so its rows stay drawn while a record shows.
+ e.historyReply=answer(played(50,0,'9:1'));routeTo(e,'#history');await flush();
+ e.historyReply=answer(played(50,50,null));e.elements['history-more'].emit('click');await flush();
+ const track=historyRows(e)[69],shown=[...content.children];
+ for(const top of [2000,1500,1000]){
+  explorer.scrollTop=top;track.focus();follow(e,track);await flush();assert.equal(e.location.hash,'#explore/trk_000000001069');
+  routeTo(e,'#history');await flush();
+  assert.deepEqual([sameRows(content.children,shown),explorer.scrollTop,e.document.activeElement===track],[true,top,true],'History, scrolled to '+top+': the same rows, the same place, focus on the row');
+ }
+ routeTo(e,'#index/artists');await flush();
+ const name=rowOf(e,'Amelie Lens');explorer.clientHeight=600;
+ name.getBoundingClientRect=()=>({top:1000-explorer.scrollTop,bottom:1056-explorer.scrollTop});
+ assert.equal(name.getAttribute('href'),'#explore/artist/Amelie%20Lens');
+ for(const top of [700,600,500]){
+  explorer.scrollTop=top;follow(e,name);await flush();assert.equal(e.location.hash,'#explore/art_00000000aa11');
+  routeTo(e,e.elements['index-tab'].getAttribute('href'));await flush();
+  assert.deepEqual([e.document.activeElement===name,explorer.scrollTop],[true,top],'the Index, scrolled to '+top+': the row where it stood, focused');
+ }
 });
 
 test('the track on air reads Now on the live stage, and the first page follows the radio',async()=>{
@@ -4049,4 +4120,15 @@ test('a release can be cut too, and a record painted from a copy, before its own
  e.discovery=url=>url.endsWith(one.id)?{entity:one,included:[copy]}:null;
  e.visit('#explore/'+one.id);await flush();e.visit('#explore/'+artist);await flush();
  assert.deepEqual([textOf(region().children[0]),byClass(region(),'collection-note').length],['On the radio 1',0],'the tracks at hand, with no claim about the rest');
+});
+
+test('a move inside the open explorer writes the canonical address once',async()=>{
+ const e=await indexed();e.historyReply=()=>({items:[],next:null});
+ const link=href=>e.document.emit('click',{button:0,target:{closest:()=>({getAttribute:()=>href})},preventDefault(){}});
+ link('#explore/art_000000000a01');await flush();assert.equal(e.elements.explorer.open,true);
+ for(const [href,address] of [['#history','#history/palac-feel'],['#statistics/palac-feel/artists','#index/artists/palac-feel?by=tracks'],['#index','#index/artists'],['#statistics','#statistics/palac-feel']]){
+  const writes=countWrites(e);link(href);
+  assert.deepEqual([e.location.hash,writes()],[address,1],href+' from another place is written once, at '+address);
+  await flush();assert.deepEqual([e.location.hash,writes()],[address,1],'and nothing renames it after');
+ }
 });
