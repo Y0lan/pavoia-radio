@@ -249,10 +249,10 @@ Known test debt:
 
 - [tests/mobile-layout.py](../tests/mobile-layout.py) is stale. It targets
   production and opens real streams.
-- Eleven browser tests press play. The local preview,
+- Twelve browser tests press play. The local preview,
   `design/stage-direction/serve.py`, relays `/stream/<id>.mp3` to production,
   so a play there opens a real audio connection and counts in the audience.
-  Each of the eleven therefore asks `GET /__mode?set=ok` first and stops unless
+  Each of the twelve therefore asks `GET /__mode?set=ok` first and stops unless
   the answer is `ok`, which only the fake preview gives:
   `python3 design/stage-direction/fakeserve.py`, the same preview with a local
   tone for every stream. A test run never counts as a listener.
@@ -260,8 +260,9 @@ Known test debt:
     [polish](../tests/polish-browser.js),
     [keys-play](../tests/keys-play-browser.js),
     [history](../tests/history-browser.js),
-    [stations](../tests/stations-browser.js) and
-    [photos](../tests/photos-browser.js).
+    [stations](../tests/stations-browser.js),
+    [photos](../tests/photos-browser.js) and
+    [steps](../tests/steps-browser.js), part two.
   - Guarded, and not yet seen passing on the fake preview:
     [corrections](../tests/corrections-browser.js),
     [explore](../tests/explore-browser.js),
@@ -278,6 +279,7 @@ Known test debt:
 - Several browser tests need fixtures, because the local discovery service
   does not run on a developer machine.
 - [tests/radio-tracks-browser.js](../tests/radio-tracks-browser.js) carries its own records and blocks the stream, so it runs on `serve.py`.
+- [tests/steps-browser.js](../tests/steps-browser.js) walks the explorer with Back, Forward, ✕ and Escape at 1440 and 390 px, with its own records. Part one blocks the stream and runs on `serve.py`; part two plays, so it runs only on the fake preview.
 
 ## Waiting
 
