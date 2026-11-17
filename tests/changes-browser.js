@@ -1,5 +1,6 @@
-// Playwright CLI callback. Added and removed, in a station's Statistics place and merged under All stations. Every
-// changes record, statistics document and plays document here is browser-only test data; the stream is never asked for.
+// Playwright CLI callback. Added and removed, in a station's Statistics place and merged under All stations, and the place
+// kept on Back from a record. Every changes record, statistics document and plays document here is browser-only test
+// data; the stream is never asked for.
 async page => {
  const assert=(ok,message)=>{if(!ok)throw new Error(message);};
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
@@ -10,7 +11,7 @@ async page => {
  const now=Date.now(),at=day=>new Date(now-60000-day*86400000).toISOString().replace(/\.\d+Z$/,'Z');
  const feed=(stage,n,per)=>Array.from({length:n},(_,i)=>({sequence:String(n-i),kind:i%3===2?'removed':'added',id:String(700000+n-i),title:stage+' change '+(n-i),artist:'Test artist '+(n-i),album:'Test album',observedAt:at(Math.floor(i/per))}));
  const sets={records:{fontanna:feed('fontanna',23,9),essentials:feed('essentials',12,12)},merge:{fontanna:feed('fontanna',3,1),essentials:feed('essentials',12,12)}},feeds=sets.records;
- let mode='records',held=null,hold=false;const asked=[];
+ let mode='records',held=null,hold=false;const asked=[],numbers=[];
  await page.route('**/api/radio/*/changes?**',async route=>{
   const url=new URL(route.request().url()),stage=url.pathname.split('/')[3],limit=Number(url.searchParams.get('limit')),before=Number(url.searchParams.get('before')||Infinity);asked.push(stage+(url.searchParams.get('before')?' before '+url.searchParams.get('before'):''));
   if(hold){hold=false;await new Promise(resolve=>{held=resolve;});}
@@ -18,9 +19,9 @@ async page => {
   const rest=(sets[mode]?.[stage]||[]).filter(r=>Number(r.sequence)<before),out=rest.slice(0,limit);
   await route.fulfill({json:{trackingSince:mode==='pending'?null:'2026-10-07T00:15:13Z',changes:out,next:rest.length>limit?out.at(-1).sequence:null}}).catch(()=>{});
  });
- await page.route('**/api/library/statistics?**',route=>{const scope=new URL(route.request().url()).searchParams.get('scope');
+ await page.route('**/api/library/statistics?**',route=>{const scope=new URL(route.request().url()).searchParams.get('scope');numbers.push('statistics '+scope);
   route.fulfill({json:{scope,updatedAt:new Date(now).toISOString(),tracks:400,artists:300,releases:200,durationMs:90000000,coverage:{artists:400,labels:400,years:400,releases:400,genres:0},topArtists:[{name:'Test artist',count:9}],labels:[{name:'Test label',count:8}],years:[{name:'2020',count:300},{name:'2024',count:100}],genres:[],stages:[]}});});
- await page.route('**/api/radio/*/music',route=>route.fulfill({json:{from:new Date(now-30*86400000).toISOString(),until:new Date(now).toISOString(),earliest:'2026-10-06T23:27:25Z',tracks:400,plays:900,distinctPlayed:400,unplayed:0,top:[]}}));
+ await page.route('**/api/radio/*/music',route=>{numbers.push('music');return route.fulfill({json:{from:new Date(now-30*86400000).toISOString(),until:new Date(now).toISOString(),earliest:'2026-10-06T23:27:25Z',tracks:400,plays:900,distinctPlayed:400,unplayed:0,top:[]}});});
  const region='#music-content section[aria-labelledby=r-changes]',rows=region+' li > a.row',more=region+' > button';
  const drawn=()=>page.waitForFunction(()=>document.querySelector('#music-content .entity-heading')&&!document.getElementById('music-content').hasAttribute('aria-busy'));
  const visit=async stage=>{await page.locator(`#stage-row a[href="#statistics/${stage}"]`).click();await drawn();};
@@ -106,7 +107,26 @@ async page => {
  for(let i=0;!held&&i<100;i++)await page.waitForTimeout(20);
  await visit('essentials');held();await page.waitForTimeout(200);
  assert(await page.locator(rows).count()===10&&(await page.locator(rows).first().textContent()).includes('essentials'),'A page of the station left landed in the next one');
+ // Back from a record opened from the place: the same rows, the same scroll, focus on the row opened, and no request for
+ // the numbers, the plays or the changes. The record itself does not matter here: it may fail to load.
+ const kept=[];
+ for(const [width,height] of [[1440,900],[390,844]]){
+  await page.setViewportSize({width,height});await visit('essentials');await visit('fontanna');
+  await page.evaluate(()=>{document.getElementById('explorer').scrollTop=600;});await page.locator(more).click();
+  await page.waitForFunction(r=>document.querySelectorAll(r).length===20,rows);
+  await page.locator(rows).nth(4).evaluate(a=>{a.dataset.opened='';a.scrollIntoView({block:'center'});});await page.waitForTimeout(100);
+  const left=await page.evaluate(r=>[document.querySelectorAll(r).length,document.getElementById('explorer').scrollTop],rows),sent=[asked.length,numbers.length],href=await page.locator(rows).nth(4).getAttribute('href');
+  await page.locator(rows).nth(4).click();
+  await page.waitForFunction(h=>location.hash===h&&document.getElementById('music-view').hidden&&document.getElementById('discovery-status').textContent!=='Loading…',href);
+  await page.evaluate(()=>{document.getElementById('explorer').scrollTop=0;history.back();});
+  await page.waitForFunction(()=>location.hash.startsWith('#statistics/')&&!document.getElementById('music-view').hidden);await drawn();await page.waitForTimeout(200);
+  const back=await page.evaluate(r=>[document.querySelectorAll(r).length,document.getElementById('explorer').scrollTop,document.activeElement===document.querySelector('[data-opened]'),document.activeElement.closest('#music-content')!==null],rows);
+  assert(back[0]===left[0]&&Math.abs(back[1]-left[1])<=1,`At ${width} Back did not bring the place back: ${left} then ${back}`);
+  assert(back[2]&&back[3],`At ${width} focus is not on the row opened`);
+  assert(asked.length===sent[0]&&numbers.length===sent[1],`At ${width} Back asked again: ${asked.slice(sent[0])} ${numbers.slice(sent[1])}`);
+  kept.push({width,rows:back[0],scrollTop:[left[1],back[1]],requests:asked.length-sent[0]+numbers.length-sent[1]});
+ }
  assert(await page.locator('#audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Statistics started audio');
  assert(errors.length===0,errors.join('; '));
- return {checks:'rows, time or day, paging busy/append/Try again/last page focus, since date, EN/DE, widths, All stations merge and paging, empty, not watched, 503, race, paused audio',widths:[320,360,390,760,1100,1440],pageErrors:errors};
+ return {checks:'rows, time or day, paging busy/append/Try again/last page focus, since date, EN/DE, widths, All stations merge and paging, empty, not watched, 503, race, Back keeps the place, paused audio',widths:[320,360,390,760,1100,1440],kept,pageErrors:errors};
 }

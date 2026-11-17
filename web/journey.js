@@ -195,6 +195,12 @@
   // Each move in it is a history entry above the page's, so Back and Forward walk the visit, and ✕
   // goes back over all of it to the page in one step.
   const dialog=$('explorer'),behind=document.querySelectorAll('main, .roots-footer');
+  // Where the explorer shows its content whole: under its bar where the bar stays, and over its bottom. A place given
+  // back with no link to focus gives focus to what shows there, since a title scrolled out of view would bring the place
+  // back to its top at the first Tab: the first link that shows whole in a panel.
+  const framed=()=>{const frame=dialog.getBoundingClientRect?.();return {bar:Math.max(dialog.querySelector('.explorer-top')?.getBoundingClientRect?.().bottom??0,frame?.top??0),end:frame?.bottom??0};};
+  const inFrame=(box,{bar,end})=>Boolean(box)&&box.top>=bar&&box.bottom<=end;
+  const linkShown=(panel,frame)=>[...panel.querySelectorAll('a')].find(a=>{const box=a.getBoundingClientRect?.();return a.getAttribute('href')&&box?.height>0&&inFrame(box,frame);});
   // An entry this page opened carries this page's life in its state, so Back and Forward, which keep
   // the page, keep it too; any other explorer entry is marked as found, not owned. Each entry of a visit
   // also holds its depth over the visit's first one (owned when the page is right under that one), the
@@ -434,7 +440,7 @@
     const arrive=(at=place)=>{
       reveal();$('discovery-status').textContent='';workspace.hidden=false;
       renderEntity(selected);renderBody(selected,at.open,at.more);dialog.scrollTop=at.top;
-      const panel=$('entity-inspector'),frame=dialog.getBoundingClientRect?.(),bar=Math.max(dialog.querySelector('.explorer-top')?.getBoundingClientRect?.().bottom??0,frame?.top??0),end=frame?.bottom??0;
+      const panel=$('entity-inspector'),frame=framed(),{bar}=frame;
       // The line over the title may show now where it did not, as Forward on the first record of a visit. Where it shows
       // at the place left, under the bar, it stays in view and the record stands lower by its height. Where it is scrolled
       // out of view, the scroll moves by its height, so the title and all under it stand where they stood, under the
@@ -446,7 +452,7 @@
       // Focus goes to the link followed. With none, it goes to the title where the title shows. A title scrolled out
       // of view would bring the record back to its top at the first Tab, so focus then goes to the first link that
       // shows whole in the explorer, under its bar where the bar stays, or to the explorer itself.
-      const inView=at.top>0&&[...panel.querySelectorAll('a')].find(a=>{const box=a.getBoundingClientRect?.();return a.getAttribute('href')&&box&&box.height>0&&box.top>=bar&&box.bottom<=end;});
+      const inView=at.top>0&&linkShown(panel,frame);
       if([dialog,document.body,had].includes(document.activeElement))(link||(at.top>0?inView||dialog:recordTitle)).focus({preventScroll:true});
     };
     // Its payload, the credited artists of a track or a small release, then the fewest neighbours that name the rest.
@@ -624,7 +630,8 @@
   // one itself.
   const redraw=()=>{if(pending)return;if(view==='statistics'){if(shownStage)renderStage(...shownStage);return;}if(!selected)return;const body=bodyShown;renderEntity(selected);if(body)renderBody(selected);};
   // Under the map, a caption says what the map means, or why the name in focus is there, and offers the list; over
-  // the list, it offers the map. The caption's words repeat the names' links, so screen readers skip them.
+  // the list, it offers the map. The caption's words repeat the names' links, so screen readers skip them. It returns
+  // how the map lays out, for a stage place shown again to follow the window.
   function drawMap(panel,map,e) {
     const caption=node('p','neighbourhood-caption'),hint=node('span'),toggle=action(word(map?'showList':'showMap'),()=>{
       listView=Boolean(map);try{localStorage.setItem('pavoia-explorer-view',listView?'list':'map');}catch{/* Storage is optional. */}
@@ -652,6 +659,7 @@
     mapWatch=new ResizeObserver(draw);mapWatch.observe(map);document.fonts.ready.then(draw);
     for(const type of ['pointerover','focusin'])map.addEventListener(type,event=>light(event.target.closest?.('.region li')));
     for(const type of ['pointerleave','focusout'])map.addEventListener(type,()=>light(null));
+    return draw;
   }
   // The map's sides: which regions sit left and right of the record, and how each shows its names. rank: 3 pictured of
   // 9; full: 4 pictured of 14, down the whole side; r1: up to 4, pictured only; r2: up to 14, plain only.
@@ -883,7 +891,7 @@
     if(!/^#explore(?:\?|$)/.test(location.hash))return;
     searchPage('');hop?.abort();hop=null;shownQuery='';hideResults();$('discovery-status').textContent='';
   });
-  let view='explore',musicRequest=null,historyPage=null,musicPlace=null,clicked=null,musicScope='',musicKind='',musicDay='',indexBy='',indexQuery='',shownStage=null,naming=null,paging=null;
+  let view='explore',musicRequest=null,historyPage=null,musicPlace=null,clicked=null,musicScope='',musicKind='',musicDay='',indexBy='',indexQuery='',shownStage=null,stageDraw=null,naming=null,paging=null;
   const stationName = id => radio.stations.find(s=>s.id===id)?.name || id;
   // A place in Statistics by name: a station, or all stations together, which hold the whole collection.
   const scopeName = id => id==='radio'?word('allStages'):stationName(id);
@@ -950,14 +958,22 @@
   // Leaving a view keeps its place and stops its work; showing one sets what shows. A move by Back or Forward to a record
   // leaves at once and shows when the record paints.
   function leaveView(next) {
-    // Leaving History or the Index keeps its place: the row opened from it, and how far History was scrolled or how high
-    // the Index's row stood. That is the row clicked, by pointer, touch or Enter, when it links to the place the explorer
-    // went, by that place's address or by an old one (a plex_ link or a name, opened before): a track played twice links
-    // twice, and a tap focuses no link. The Index keeps its first row under the stage bar otherwise, and gives focus back
-    // only to a row clicked.
-    if((view==='history'||view==='index')&&next!==view){
+    // Leaving History, Statistics or the Index keeps its place: the row opened from it, and how far History and Statistics
+    // were scrolled or how high the Index's row stood. That is the row clicked, by pointer, touch or Enter, when it links to
+    // the place the explorer went, by that place's address or by an old one (a plex_ link or a name, opened before): a track
+    // played twice links twice, and a tap focuses no link. The Index keeps its first row under the stage bar otherwise, and
+    // gives focus back only to a row clicked. Statistics also keeps how high its row stood and which of the links to the
+    // same place it was, in the layout it was drawn in, for a place drawn again for another width.
+    if((view==='history'||view==='index'||view==='statistics')&&next!==view){
       const content=$('music-content'),went=placeOf(location.hash).address,opened=r=>content.contains(r)&&placeOf(r.getAttribute('href')||'').address===went;
       if(view==='history')musicPlace={key:content.dataset.key,top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
+      else if(view==='statistics'){
+        // With no row clicked, as on Forward, the link that shows in the explorer comes before one scrolled out of view: a
+        // track of Most played is linked again from its change, far under it.
+        const links=[...content.querySelectorAll('a')],frame=dialog.getBoundingClientRect(),seen=a=>{const r=a.getBoundingClientRect();return r.height>0&&r.bottom>frame.top&&r.top<frame.bottom;};
+        const row=opened(clicked)?clicked:links.filter(opened).find(seen)||links.find(opened),href=row?.getAttribute('href');
+        musicPlace={key:content.dataset.key,top:dialog.scrollTop,row,href,nth:links.filter(a=>a.getAttribute('href')===href).indexOf(row),y:row?row.getBoundingClientRect().top-dialog.getBoundingClientRect().top:0,map:mapOn(),phone:phone.matches};
+      }
       else{const row=opened(clicked)?clicked:rowUnderBar();musicPlace=row&&{key:content.dataset.key,row,y:row.getBoundingClientRect().top-dialog.getBoundingClientRect().top,focus:row===clicked};}
     }
     clicked=null;
@@ -1105,7 +1121,7 @@
     const regions=[['mostTracksBy',names('artist',data.topArtists),data.artists,every&&list('artists','allArtists',data.artists,'text-button')],['mostTracksOn',names('label',data.labels),every?labelsOn:null,every&&list('labels','allLabels',labelsOn,'text-button')],[station?'sharesWith':'stages',stages,stages.length]]
       .filter(([,items])=>items.length).map(([key,items,count,all])=>regionSection(key,items,'','r',Boolean(map),count,all||null));
     if(map){map.append(heading,...regions);content.append(map);}else{content.append(heading);grid.append(...regions);}
-    if(wide.matches)drawMap(content,map,{type:'stage'});
+    stageDraw=wide.matches?drawMap(content,map,{type:'stage'}):null;
     // Release years in one strip, a bar a year from the first to the last, the empty ones kept as a line.
     const notes=node('section','region release-years'),details=node('details','stage-notes'),years=data.years.filter(y=>/^\d{4}$/.test(y.name)).map(y=>[Number(y.name),y.count]);
     if(years.length){
@@ -1717,6 +1733,28 @@
       // A track that came on air while a record was open, or a new day, shows now, not at the next radio answer. On air now
       // asks every station again, which restarts their timers, unless it is asking or waiting already.
       return musicScope==='radio'?air&&!airRuns()&&refreshAir():followRadio();
+    }
+    // The Statistics tab, or Back or Forward, brings back the same place without a request: its rows, the pages of changes
+    // loaded, its scroll and focus on the row that was opened, or else on the station's name where it shows, or on the
+    // first link that shows. Its title is the one focus falls back to again, and a page of changes left while it loaded
+    // asks again. A place drawn for a map that the window or the listener has since turned to a list, or for the other
+    // side of 760px, is drawn again from the numbers it showed; a map kept follows the window again. The row opened
+    // stands at the height it stood, also in a window narrowed or turned since, which wraps the text over it. The place is
+    // used once.
+    if(section==='statistics'&&$('music-content').dataset.key===musicKey()){
+      const content=$('music-content'),place=musicPlace?.key===musicKey()?musicPlace:null,changes=shownStage[3];musicPlace=null;
+      recordTitle=content.querySelector('.entity-heading').querySelector('h3');
+      if(changes){changes.busy=changes.failed=false;sayChanges(changes);}
+      const again=Boolean(place)&&(place.map!==mapOn()||place.phone!==phone.matches),map=content.querySelector('.neighbourhood');
+      if(again){renderStage(...shownStage);content.dataset.key=musicKey();}
+      else if(map&&stageDraw){mapWatch=new ResizeObserver(stageDraw);mapWatch.observe(map);}
+      if(place){
+        const row=again?[...content.querySelectorAll('a')].filter(a=>a.getAttribute('href')===place.href)[place.nth]:content.contains(place.row)&&place.row;
+        if(!again)dialog.scrollTop=place.top;else if(!row)dialog.scrollTop=0;
+        if(row)dialog.scrollTop+=row.getBoundingClientRect().top-dialog.getBoundingClientRect().top-place.y;
+        const frame=framed();(row||(inFrame(recordTitle.getBoundingClientRect(),frame)?recordTitle:linkShown(content,frame)||dialog)).focus({preventScroll:true});
+      }
+      stageAir();return;
     }
     if(section!=='explore')return loadMusic();
     // The Roots tab returns to the last results, searches again for a changed query, or lands on the record on air.

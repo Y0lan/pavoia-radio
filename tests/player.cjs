@@ -4624,6 +4624,133 @@ test('the last page of changes hands focus to the first row that opens a track, 
  assert.equal(page.signal.aborted,true,'leaving Statistics drops the page');
 });
 
+// Step D1: a Statistics place comes back as it was left, as History does. Requests that count: the numbers, the plays and
+// the changes; a name search sent again is not counted.
+const placeAsks=e=>e.requests.filter(r=>/^\/api\/(library\/statistics\?|radio\/[a-z-]+\/music$)/.test(r.url)).length+e.changesRequests.length;
+const changeRows=e=>byClass(changeRegion(e),'row');
+
+test('Back and the Statistics tab bring a station place back with its rows, its pages, its scroll and focus on the row opened, with no request',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>url.includes('/search?')?{items:[]}:entity(url.split('/').pop(),'track');
+ const records=changeFeed(23,9,clock.now);e.changes=changePage(records);
+ const content=await stagePlace(e,'#statistics/bermuda-day'),explorer=e.elements.explorer,title=content.querySelector('.entity-heading').querySelector('h3');
+ changeRegion(e).children.at(-1).emit('click');await flush();
+ const shown=[...content.children],rows=changeRows(e),row=rows[14],asked=placeAsks(e);
+ assert.equal(rows.length,20,'one page more: twenty rows');
+ explorer.scrollTop=3000;row.focus();follow(e,row);await flush();
+ assert.equal(e.location.hash,'#explore/plex_9009');explorer.scrollTop=40;
+ e.history.back();await flush();
+ assert.deepEqual([e.location.hash,sameRows(content.children,shown),sameRows(changeRows(e),rows),explorer.scrollTop,e.document.activeElement===row,placeAsks(e)],['#statistics/bermuda-day',true,true,3000,true,asked],'Back: the same rows and pages, scrolled where they were, focus on the row opened, and no request');
+ // Forward opens the record again with no click; Back finds the row by its link.
+ e.history.go(1);await flush();assert.equal(e.location.hash,'#explore/plex_9009');e.document.activeElement=e.document.body;
+ e.history.back();await flush();
+ assert.deepEqual([sameRows(changeRows(e),rows),explorer.scrollTop,e.document.activeElement===row,placeAsks(e)],[true,3000,true,asked],'Forward, then Back: the row is found by its link');
+ follow(e,row);await flush();explorer.scrollTop=40;
+ const tab=e.document.querySelectorAll('.explorer-nav a').find(a=>a.getAttribute('href').startsWith('#statistics'));
+ assert.equal(tab.getAttribute('href'),'#statistics/bermuda-day','the tab keeps the place');
+ follow(e,tab);await flush();
+ assert.deepEqual([e.location.hash,sameRows(content.children,shown),sameRows(changeRows(e),rows),explorer.scrollTop,e.document.activeElement===row,placeAsks(e)],['#statistics/bermuda-day',true,true,3000,true,asked],'the Statistics tab: the same');
+ // The Roots tab opens no row of the place: Back gives focus to the station's name, not to the record's hidden title.
+ routeTo(e,'#explore');await flush();
+ assert.ok(inspector(e).descendants().some(n=>n.localName==='h3'),'the Roots tab shows a record');
+ e.history.back();await flush();
+ assert.deepEqual([e.location.hash,sameRows(content.children,shown),e.document.activeElement===title,content.contains(e.document.activeElement),placeAsks(e)],['#statistics/bermuda-day',true,true,true,asked],'with no row to focus, the station\'s name inside the place');
+ // Scrolled past the station's name, that name is out of view, and the first Tab would bring the place back to its top:
+ // focus goes to the first link that shows whole, inside the place. The explorer shows 800px; the name stands at 200px
+ // and each link 40px under the one before, from 300px.
+ const P=e.Element.prototype,base=P.getBoundingClientRect,box=top=>({left:0,right:300,width:300,top,bottom:top+40,height:40});
+ P.getBoundingClientRect=function(){
+  if(this===explorer)return {left:0,right:300,width:300,top:0,bottom:800,height:800};
+  if(this===title)return box(200-explorer.scrollTop);
+  const links=content.querySelectorAll('a');return links.includes(this)?box(300+links.indexOf(this)*40-explorer.scrollTop):base.call(this);
+ };
+ try{
+  explorer.scrollTop=600;routeTo(e,'#explore');await flush();explorer.scrollTop=0;e.history.back();await flush();
+  const links=content.querySelectorAll('a'),shownFirst=links.find(a=>a.getAttribute('href')&&a.getBoundingClientRect().top>=0);
+  assert.deepEqual([explorer.scrollTop,links.indexOf(e.document.activeElement),e.document.activeElement===title,content.contains(e.document.activeElement),placeAsks(e)],[600,links.indexOf(shownFirst),false,true,asked],'scrolled: the first link that shows, inside the place');
+  assert.equal(links.indexOf(shownFirst),8,'links 0 to 7 stand over the explorer\'s top');
+ }finally{P.getBoundingClientRect=base;}
+ const more=changeRegion(e).children.at(-1);more.focus();more.emit('click');await flush();
+ assert.deepEqual([changeRows(e).length,e.document.activeElement===changeRows(e)[20],content.contains(e.document.activeElement)],[23,true,true],'the last page after Back hands focus to its first row, inside the place');
+ // On the map, the place kept follows the window again: a live observer on the stage's map.
+ const m=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(m);await flush();m.discovery=url=>url.includes('/search?')?{items:[]}:entity(url.split('/').pop(),'track');m.changes=changePage(records);
+ const placed=await stagePlace(m,'#statistics/bermuda-day'),map=byClass(placed,'neighbourhood')[0],live=()=>m.observers.filter(o=>o.targets.includes(map));
+ assert.equal(live().length,1,'the map watches the window');
+ const watching=()=>m.observers.filter(o=>o.targets.length).length,calm=watching();
+ const sent=placeAsks(m);follow(m,changeRows(m)[4]);await flush();
+ assert.deepEqual([m.location.hash,live().length],['#explore/plex_9019',0],'the record took the observer');
+ m.history.back();await flush();
+ assert.deepEqual([byClass(placed,'neighbourhood')[0]===map,live().length,placeAsks(m)],[true,1,sent],'Back: the same map, watched again, with no request');
+ assert.equal(watching(),calm,'and the record\'s hidden map is watched no more');
+ m.mapWidth=1100;live()[0].fn();
+ assert.ok(nodesOf(map).some(n=>n.style.top),'and its observer lays the map out');
+});
+
+test('a station place left for a record while the window crosses 1100 px comes back drawn for the new width, with the opened row at the same height, and no request',async()=>{
+ const e=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(e);await flush();e.discovery=url=>url.includes('/search?')?{items:[]}:entity(url.split('/').pop(),'track');
+ // The row opened links to a track that Most played links to as well, higher up.
+ const records=changeFeed(23,9,clock.now).map((r,i)=>i===14?{...r,id:'4'}:r);e.changes=changePage(records);
+ // A row stands lower on the map, under its 900px box, than in the list, under a 300px header: 40px a row, scrolled.
+ const content=e.elements['music-content'],explorer=e.elements.explorer,P=e.Element.prototype,base=P.getBoundingClientRect;
+ P.getBoundingClientRect=function(){
+  if(!(this.className||'').split(' ').includes('row')||!content.contains(this))return base.call(this);
+  const top=(byClass(content,'neighbourhood').length?900:300)+byClass(content,'row').indexOf(this)*40-explorer.scrollTop;return {left:0,top,width:300,height:40,right:300,bottom:top+40};
+ };
+ await stagePlace(e,'#statistics/bermuda-day');changeRegion(e).children.at(-1).emit('click');await flush();
+ const titles=()=>byClass(changeRegion(e),'row-name').map(textOf),before=titles(),row=changeRows(e)[14],href=row.getAttribute('href'),asked=placeAsks(e);
+ explorer.scrollTop=2000;const y=row.getBoundingClientRect().top;row.focus();follow(e,row);await flush();explorer.scrollTop=0;
+ e.queries.get('(min-width:1100px)').change(false);await flush();
+ e.history.back();await flush();
+ const again=changeRows(e).find(a=>a.getAttribute('href')===href);
+ assert.deepEqual([e.location.hash,byClass(content,'neighbourhood').length,titles(),again===row,again.getBoundingClientRect().top,e.document.activeElement===again,placeAsks(e)],
+  ['#statistics/bermuda-day',0,before,false,y,true,asked],'drawn again as a list from the numbers it showed: the same rows, the row opened at its height and in focus, and no request');
+ assert.equal(e.document.activeElement===content.querySelector('.entity-heading').querySelector('h3'),false);
+ // A crossing of 760px draws the place again too, from the same numbers.
+ const f=setup({journey:true});await flush();f.discovery=e.discovery;f.changes=changePage(records);
+ const list=await stagePlace(f,'#statistics/bermuda-day'),shown=changeRows(f),sent=placeAsks(f);
+ follow(f,shown[6]);await flush();f.queries.get('(max-width:760px)').change(true);f.history.back();await flush();
+ assert.deepEqual([sameRows(changeRows(f),shown),byClass(changeRegion(f),'row-name').map(textOf),f.document.activeElement===changeRows(f)[6],list.contains(f.document.activeElement),placeAsks(f)],[false,shown.map(a=>textOf(a.children[1].children[0])),true,true,sent],'a phone width: drawn again, focus on the row with the same link, and no request');
+ // A window narrowed or turned inside one layout wraps the text over the row, so the row stands lower at the same scroll:
+ // the place is not drawn again, and the scroll moves so that the row opened stands where it stood.
+ const g=setup({journey:true});await flush();g.discovery=e.discovery;g.changes=changePage(records);
+ const kept=g.elements['music-content'],scroller=g.elements.explorer,Q=g.Element.prototype,own=Q.getBoundingClientRect;let pitch=40;
+ Q.getBoundingClientRect=function(){
+  if(this===scroller)return {left:0,top:0,width:300,height:800,right:300,bottom:800};
+  if(!(this.className||'').split(' ').includes('row')||!kept.contains(this))return own.call(this);
+  const top=300+byClass(kept,'row').indexOf(this)*pitch-scroller.scrollTop;return {left:0,top,width:300,height:pitch,right:300,bottom:top+pitch};
+ };
+ await stagePlace(g,'#statistics/bermuda-day');changeRegion(g).children.at(-1).emit('click');await flush();
+ const rowsBefore=changeRows(g),opened=rowsBefore[14],gone=placeAsks(g);scroller.scrollTop=500;const at=opened.getBoundingClientRect().top;
+ opened.focus();follow(g,opened);await flush();scroller.scrollTop=0;pitch=60;
+ g.history.back();await flush();
+ assert.deepEqual([sameRows(changeRows(g),rowsBefore),opened.getBoundingClientRect().top,scroller.scrollTop,g.document.activeElement===opened,placeAsks(g)],[true,at,500+byClass(kept,'row').indexOf(opened)*20,true,gone],'narrowed: the same rows, the row opened at its height and in focus, and no request');
+ // Forward opens the record again with no click. Most played links to the same track, far over the view: Back gives
+ // focus to the link that showed when the place was left, the change, not to the first one in the place.
+ const twin=kept.querySelectorAll('a').filter(a=>a.getAttribute('href')===opened.getAttribute('href'));
+ scroller.scrollTop+=300;const lower=opened.getBoundingClientRect().top;
+ assert.deepEqual([twin.length,twin.indexOf(opened),twin[0].getBoundingClientRect().bottom<=0,lower>0&&lower<800],[2,1,true,true],'two links to the track: the first one over the view, the change in it');
+ g.history.go(1);await flush();scroller.scrollTop=0;g.document.activeElement=g.document.body;g.history.back();await flush();
+ assert.deepEqual([g.document.activeElement===opened,opened.getBoundingClientRect().top,placeAsks(g)],[true,lower,gone],'Forward, then Back: focus on the link that showed, at its height');
+});
+
+test('a page of changes left while it loads comes back with Show earlier changes ready',async()=>{
+ const e=setup({journey:true});await flush();e.discovery=url=>url.includes('/search?')?{items:[]}:entity(url.split('/').pop(),'track');
+ const records=changeFeed(23,9,clock.now);e.changes=changePage(records);
+ await stagePlace(e,'#statistics/bermuda-day');const more=changeRegion(e).children.at(-1);
+ // The page never answers; leaving drops it, as a browser rejects an aborted fetch.
+ e.changes=(url,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted'))));
+ more.emit('click');await flush();
+ const page=e.changesRequests.at(-1);assert.deepEqual([more.textContent,more.getAttribute('aria-busy')],['Loading…','true']);
+ follow(e,changeRows(e)[3]);await flush();assert.equal(page.signal.aborted,true,'leaving drops the page');
+ e.history.back();await flush();
+ assert.deepEqual([changeRegion(e).children.at(-1)===more,more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),changeRows(e).length],[true,'Show earlier changes',null,null,10],'the same button, ready to ask again');
+ e.changes=changePage(records);more.emit('click');await flush();
+ assert.deepEqual([changeRows(e).length,new URL(e.changesRequests.at(-1).url,'http://radio').searchParams.get('before')],[20,'14'],'and it asks for the same page');
+ // A page that failed says Try again. Left and come back to, the place offers the page in its own words again.
+ e.changes=()=>null;more.emit('click');await flush();assert.equal(more.textContent,'Try again');
+ follow(e,changeRows(e)[3]);await flush();e.history.back();await flush();
+ assert.deepEqual([changeRegion(e).children.at(-1)===more,more.textContent,more.getAttribute('aria-disabled'),changeRows(e).length],[true,'Show earlier changes',null,20],'a page that failed offers itself again');
+});
+
 // Step 6, On air now: History's All stations. Each station's answer from one function of its id; a track started a minute
 // before t0 that has `left` ms to run then, so its row asks again when it ends, 5 s after, between 20 s and 2 min.
 const airAt=(t0,id,{left=300000,listeners=1,available=true,track=true}={})=>({track:track?{id:'7'+byStage.indexOf(id),title:'Title '+id,artist:'Artist '+id,startedAt:new Date(t0-60000).toISOString(),durationMs:60000+left}:null,
