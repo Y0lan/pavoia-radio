@@ -69,8 +69,11 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     replaceChildren(...children){this.textContent='';this.children=[];this.append(...children);}
     normalize(){this.children=this.children.reduce((out,c)=>typeof c==='string'&&typeof out.at(-1)==='string'?[...out.slice(0,-1),out.at(-1)+c]:[...out,c],[]);}
     descendants(){return this.children.flatMap(c=>typeof c==='object'?[c,...c.descendants()]:[]);}
-    // A class (.name), a tag, an attribute ([name]), or the journey's [data-kind] lookup.
+    // A class (.name), a tag, an attribute ([name]), a tag of a class with an attribute (a.row[href]), or the journey's
+    // [data-kind] lookup.
     querySelector(selector){
+      const whole=/^([a-z]+)\.([\w-]+)\[([a-z-]+)\]$/.exec(selector);
+      if(whole)return this.descendants().find(c=>c.localName===whole[1]&&c.className?.split(' ').includes(whole[2])&&c.getAttribute(whole[3])!==null)||null;
       if(selector.startsWith('.'))return this.descendants().find(c=>c.className?.split(' ').includes(selector.slice(1)))||null;
       if(/^\[[a-z-]+\]$/.test(selector))return this.descendants().find(c=>c.attrs&&selector.slice(1,-1) in c.attrs)||null;
       if(/^[a-z]+$/.test(selector))return this.descendants().find(c=>c.localName===selector)||null;
@@ -173,12 +176,13 @@ function setup({deferFetch=false,deferImages=false,saveData=false,hash='',search
     getComputedStyle:el=>({getPropertyValue:()=>'',...el.computed}),
     // env.discovery is one reply for every discovery path, or a function of the path; env.historyReply, once set, answers History the same way;
     // env.names, once set, holds the names document of each kind, or is a function of the path and the signal; env.changes,
-    // once set, answers each page of a station's changes as a function of the path; env.air, once set, answers each
+    // once set, answers each page of a station's changes as a function of the path, and until then every station has none
+    // yet (each page asked is counted in env.changesRequests either way); env.air, once set, answers each
     // station's /api/radio/<id> as a function of its id (data, null for a failed answer, or a promise of either), for the
     // page's own poll too, as the server does unless the data names another stage, and drops one aborted.
     fetch:(url,{signal})=>/^\/api\/radio\/[a-z-]+$/.test(url)&&env.air ? (()=>{const id=url.split('/').pop();env.airRequests.push({id,at:clock.now,signal});
       return new Promise((resolve,reject)=>{signal?.addEventListener('abort',()=>reject(new Error('aborted')));Promise.resolve(env.air(id)).then(data=>resolve({ok:Boolean(data),json:async()=>data&&{stage:{id},...data}}),reject);});})() :
-      url.includes('/changes?')&&env.changes ? (env.changesRequests.push({url,signal}),Promise.resolve(env.changes(url,signal)).then(data=>({ok:Boolean(data),json:async()=>data}))) :
+      url.includes('/changes?') ? (env.changesRequests.push({url,signal}),Promise.resolve(env.changes?env.changes(url,signal):{trackingSince:null,changes:[],next:null}).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.startsWith('/api/discovery/') ? (env.discoveryRequests.push({url,signal}),Promise.resolve(typeof env.discovery==='function'?env.discovery(url):env.discovery).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.startsWith('/api/library/names?')&&env.names ? (env.namesRequests.push({url,signal}),Promise.resolve(typeof env.names==='function'?env.names(url,signal):env.names[new URL(url,'http://radio').searchParams.get('kind')]).then(data=>({ok:Boolean(data),json:async()=>data}))) :
       url.includes('/history?')&&env.historyReply ? (env.historyRequests.push({url,signal}),Promise.resolve(env.historyReply(url)).then(data=>({ok:Boolean(data),json:async()=>data}))) : url.startsWith('/api/audience?') ? (env.audienceCalls++,Promise.resolve(env.audienceHold).then(()=>({ok:!(env.audienceResponse instanceof Error),json:async()=>env.audienceResponse || env.response.audience}))) : new Promise((resolve,reject)=>{
@@ -3283,36 +3287,56 @@ test('a place left after the labels document came, before its changes did, leave
 // A station's changes: n records over syncs of `per`, newest first, sequence n down to 1, one observedAt per sync, a day
 // apart, every third one removed.
 const changeFeed=(n,per,newest)=>Array.from({length:n},(_,i)=>({sequence:String(n-i),kind:i%3===2?'removed':'added',id:String(9000+n-i),title:'Change '+(n-i),artist:'Artist '+(n-i),album:'Album',observedAt:new Date(newest-Math.floor(i/per)*86400000).toISOString()}));
-// A page as the server answers it, from limit and before, with next only when more records wait.
-const changePage=(records,since='2026-10-07T00:15:13Z')=>url=>{const q=new URL(url,'http://radio').searchParams,limit=Number(q.get('limit')||30),before=Number(q.get('before')||Infinity),rest=records.filter(r=>Number(r.sequence)<before),out=rest.slice(0,limit);
+// A page as the server answers it, from limit and before, with next only when more records wait; `most`, when set, is a
+// server that answers fewer records than the limit asks, which the page follows by next as well.
+const changePage=(records,since='2026-10-07T00:15:13Z',most=100)=>url=>{const q=new URL(url,'http://radio').searchParams,limit=Math.min(Number(q.get('limit')||30),most),before=Number(q.get('before')||Infinity),rest=records.filter(r=>Number(r.sequence)<before),out=rest.slice(0,limit);
  return {trackingSince:since,changes:out,next:rest.length>limit?out.at(-1).sequence:null};};
 const changeRegion=e=>byClass(e.elements['music-content'],'region').find(r=>r.attrs['aria-labelledby']==='r-changes');
 const notesOf=e=>byClass(byClass(e.elements['music-content'],'stage-notes')[0],'collection-note').map(textOf);
-test('Added and removed lists the newest ten changes, pages in place, and hides when empty or failing',async()=>{
+test('Added and removed lists the newest ten changes from pages of 100, shows ten more from memory before it asks, keeps them through a redraw, and hides when empty or failing',async()=>{
  const e=setup({journey:true});await flush();e.discovery={items:[]};
- const records=changeFeed(23,9,clock.now);let reply=null;e.changes=changePage(records);
+ // 123 changes: a page of 100, then one of 23.
+ const records=changeFeed(123,9,clock.now);let reply=null;e.changes=changePage(records);
  const content=await stagePlace(e,'#statistics/bermuda-day'),since=sinceDay('2026-10-06T23:27:25Z');let region=changeRegion(e);
- const rows=()=>byClass(region,'row'),read=a=>[a.getAttribute('href'),a.children[0].localName,a.children[0].dateTime,...a.children.map(textOf)];
- assert.deepEqual([byClass(content,'region').map(r=>textOf(r.children[0])).slice(-2),region.children[0].id,e.changesRequests.map(r=>r.url)],[['Most played since '+since,'Added and removed'],'r-changes',['/api/radio/bermuda-day/changes?limit=10']],'one request for the first ten, and the region after Most played, labelled by its heading');
- assert.deepEqual([rows().length,read(rows()[0]),read(rows()[2]).at(-1),read(rows()[9])],[10,['#explore/plex_9023','time',records[0].observedAt,new Date(records[0].observedAt).toLocaleTimeString('en',{timeStyle:'short'}),'Change 23Artist 23','added'],'removed',
-  ['#explore/plex_9014','time',records[9].observedAt,sinceDay(records[9].observedAt),'Change 14Artist 14','added']],'each row: the time today or the day before, the title over its artist, and what happened; it opens its track');
- const more=region.children.at(-1),first=rows();
+ const rows=()=>byClass(region,'row'),read=a=>[a.getAttribute('href'),a.children[0].localName,a.children[0].dateTime,...a.children.map(textOf)],titles=()=>byClass(region,'row-name').map(textOf);
+ assert.deepEqual([byClass(content,'region').map(r=>textOf(r.children[0])).slice(-2),region.children[0].id,e.changesRequests.map(r=>r.url)],[['Most played since '+since,'Added and removed'],'r-changes',['/api/radio/bermuda-day/changes?limit=100']],'one request for a page of 100, and the region after Most played, labelled by its heading');
+ assert.deepEqual([rows().length,read(rows()[0]),read(rows()[2]).at(-1),read(rows()[9])],[10,['#explore/plex_9123','time',records[0].observedAt,new Date(records[0].observedAt).toLocaleTimeString('en',{timeStyle:'short'}),'Change 123Artist 123','added'],'removed',
+  ['#explore/plex_9114','time',records[9].observedAt,sinceDay(records[9].observedAt),'Change 114Artist 114','added']],'the newest ten; each row: the time today or the day before, the title over its artist, and what happened; it opens its track');
+ let more=region.children.at(-1);const first=rows();
  assert.deepEqual([more.localName,cls(more),more.textContent,notesOf(e).includes('Changes are recorded since '+sinceDay('2026-10-07T00:15:13Z')+'.')],['button','text-button','Show earlier changes',true]);
+ more.focus();more.emit('click');
+ assert.deepEqual([rows().length,sameRows(rows().slice(0,10),first),e.changesRequests.length,more.textContent,more.getAttribute('aria-busy'),e.document.activeElement===more],[20,true,1,'Show earlier changes',null,true],'ten more wait in memory: the first press shows them at once, under the rows shown, and asks for nothing');
+ // A redraw, here across 760px and back, shows the rows the place showed.
+ const twenty=titles();
+ for(const phone of [true,false]){e.queries.get('(max-width:760px)').change(phone);await flush();region=changeRegion(e);assert.deepEqual([titles(),region.children.at(-1).textContent],[twenty,'Show earlier changes'],'drawn again with its twenty rows');}
+ more=region.children.at(-1);
+ for(let n=30;n<=100;n+=10){more.emit('click');await flush();assert.equal(rows().length,n);}
+ assert.equal(e.changesRequests.length,1,'the first page gives a hundred rows, with no request');
+ const hundred=rows();
  e.changes=url=>new Promise(resolve=>{reply=ok=>resolve(ok?changePage(records)(url):null);});
  more.focus();more.emit('click');await flush();
- assert.deepEqual([more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.document.activeElement===more,new URL(e.changesRequests.at(-1).url,'http://radio').searchParams.get('before')],['Loading…','true','true',true,'14'],'busy in place, still focused, asking from the oldest change shown');
+ assert.deepEqual([more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.document.activeElement===more,e.changesRequests.at(-1).url],['Loading…','true','true',true,'/api/radio/bermuda-day/changes?limit=100&before=24'],'then it asks for the next page of 100, from the oldest change read; busy in place and still focused');
  const sent=e.changesRequests.length;more.emit('click');assert.equal(e.changesRequests.length,sent,'a second press while it loads asks for nothing');
+ reply(false);await flush();
+ assert.deepEqual([more.textContent,rows().length,more.getAttribute('aria-disabled'),e.document.activeElement===more],['Try again',100,null,true],'a failure says so on the button and keeps the rows');
+ more.emit('click');await flush();assert.equal(e.changesRequests.at(-1).url,'/api/radio/bermuda-day/changes?limit=100&before=24','Try again asks for the same page');
  reply(true);await flush();
- assert.deepEqual([rows().length,sameRows(rows().slice(0,10),first),more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.document.activeElement===more],[20,true,'Show earlier changes',null,null,true],'ten more under the rows shown, and focus stays on the button');
- more.emit('click');await flush();reply(false);await flush();
- assert.deepEqual([more.textContent,rows().length,more.getAttribute('aria-disabled'),e.document.activeElement===more],['Try again',20,null,true],'a failure says so on the button and keeps the rows');
- more.emit('click');await flush();assert.equal(new URL(e.changesRequests.at(-1).url,'http://radio').searchParams.get('before'),'4','Try again asks for the same changes');
- reply(true);await flush();
- assert.deepEqual([rows().length,region.children.includes(more),e.document.activeElement===rows()[20],read(rows()[22]).slice(0,2)],[23,false,true,['#explore/plex_9001','time']],'the last page takes the button away, and focus moves to the first change it showed');
+ assert.deepEqual([rows().length,sameRows(rows().slice(0,100),hundred),more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),e.document.activeElement===more],[110,true,'Show earlier changes',null,null,true],'ten more under the rows shown, and focus stays on the button');
+ more.emit('click');await flush();assert.deepEqual([rows().length,e.changesRequests.length,region.children.includes(more)],[120,sent+1,true],'the rest of that page waits in memory too');
+ more.emit('click');await flush();
+ assert.deepEqual([rows().length,region.children.includes(more),e.document.activeElement===rows()[120],read(rows()[122]).slice(0,2),e.changesRequests.length],[123,false,true,['#explore/plex_9001','time'],sent+1],'the last rows take the button away, and focus moves to the first change they showed');
+ // A language switch draws the place again from its top, from the journal kept: no request.
  e.changes=changePage(records);e.setLanguage('de');await flush();region=changeRegion(e);
- assert.deepEqual([textOf(region.children[0]),byClass(region,'row-fact').slice(0,3).map(textOf),region.children.at(-1).textContent,notesOf(e).find(t=>t.startsWith('Änderungen'))],
-  ['Hinzugefügt und entfernt',['hinzugefügt','hinzugefügt','entfernt'],'Frühere Änderungen anzeigen','Änderungen werden seit '+new Date('2026-10-07T00:15:13Z').toLocaleDateString('de',{day:'numeric',month:'short'})+' erfasst.']);
+ assert.deepEqual([textOf(region.children[0]),rows().length,byClass(region,'row-fact').slice(0,3).map(textOf),region.children.at(-1).textContent,notesOf(e).find(t=>t.startsWith('Änderungen')),e.changesRequests.length],
+  ['Hinzugefügt und entfernt',10,['hinzugefügt','hinzugefügt','entfernt'],'Frühere Änderungen anzeigen','Änderungen werden seit '+new Date('2026-10-07T00:15:13Z').toLocaleDateString('de',{day:'numeric',month:'short'})+' erfasst.',sent+1]);
  e.setLanguage('en');await flush();
+ // The map and the list draw the place again too: with the map, then the list, the same rows.
+ const m=setup({journey:true,media:['(min-width:1100px)']});mapBoxes(m);await flush();m.discovery={items:[]};m.changes=changePage(records);
+ const placed=await stagePlace(m,'#statistics/bermuda-day'),mapped=()=>byClass(changeRegion(m),'row-name').map(textOf),toggle=()=>byClass(placed,'neighbourhood-caption')[0].children.at(-1);
+ changeRegion(m).children.at(-1).emit('click');await flush();changeRegion(m).children.at(-1).emit('click');await flush();
+ const thirty=mapped();assert.deepEqual([thirty.length,byClass(placed,'neighbourhood').length],[30,1]);
+ toggle().emit('click');await flush();assert.deepEqual([mapped(),byClass(placed,'neighbourhood').length,m.changesRequests.length],[thirty,0,1],'the list: the same thirty rows, and no request');
+ toggle().emit('click');await flush();assert.deepEqual([mapped(),byClass(placed,'neighbourhood').length],[thirty,1],'the map again: the same');
  for(const [place,answer,line,why] of [['#statistics/fontanna',()=>({trackingSince:'2026-10-07T00:15:13Z',changes:[],next:null}),true,'no change yet: no region, and the date the radio began to watch'],['#statistics/etage-zero',()=>({trackingSince:null,changes:[],next:null}),false,'not watched yet: nothing'],
   ['#statistics/closing',()=>null,false,'a feed that fails: no region, and the rest of the place'],['#statistics/ambiance',()=>({trackingSince:'2026-10-07T00:15:13Z',changes:'none'}),false,'a feed that cannot be read: the same']]){
   e.changes=answer;e.response={...status('First'),...stageStats({scope:place.split('/')[1]}),...stageMusic()};routeTo(e,place);await flush();
@@ -3326,6 +3350,8 @@ test('Added and removed lists the newest ten changes, pages in place, and hides 
  assert.deepEqual([byClass(region,'row-name').map(n=>n.textContent),region.children.at(-1).localName],[['Change 2','Change 1'],'ol'],'a record of another kind, without a title or without a time does not show, and a next that is no sequence offers no earlier changes');
  e.changes=()=>({trackingSince:'soon',changes:[],next:'5'});e.response={...status('First'),...stageStats({scope:'essentials'}),...stageMusic()};routeTo(e,'#statistics/essentials');await flush();
  assert.deepEqual([changeRegion(e),notesOf(e).some(t=>t.startsWith('Changes are recorded since')),e.elements['music-status'].textContent],[undefined,false,''],'an empty page with a next shows nothing, and a date that is not one names no date');
+ // Five minutes on, every station is read again.
+ e.clock.now+=300001;
  // On All stations, an empty page with a next holds no other station back.
  e.changes=url=>url.includes('/ambiance/')?{trackingSince:'2026-10-07T00:15:13Z',changes:[],next:'5'}:url.includes('/fontanna/')?changePage(good)(url):null;
  e.response={...status('First'),...stageStats({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();region=changeRegion(e);
@@ -3340,30 +3366,38 @@ test('Added and removed lists the newest ten changes, pages in place, and hides 
 test('All stations merges the nine feeds by time, and pages only the stations that have more',async()=>{
  const e=setup({journey:true});await flush();e.discovery={items:[]};
  const t1=clock.now-3600000,t2=t1-86400000,t3=t2-86400000,rec=(stage,seq,t,kind='added')=>({sequence:String(seq),kind,id:String(seq),title:stage+' '+seq,artist:'Artist',album:'',observedAt:new Date(t).toISOString()});
- // Essentials, last on screen, has more than a page; Under the Sun, first, ties with it a day ago and has an older change;
- // Fontanna ties with it an hour ago, after a newer change of its own.
- let feeds={essentials:[...[15,14,13,12,11].map(s=>rec('essentials',s,t1)),...[10,9,8,7,6,5,4,3,2,1].map(s=>rec('essentials',s,t2))],'bermuda-day':[rec('bermuda-day',3,t2),rec('bermuda-day',2,t2,'removed'),rec('bermuda-day',1,t3)],fontanna:[rec('fontanna',2,t1+60000),rec('fontanna',1,t1)]};
+ const down=(from,to)=>Array.from({length:from-to+1},(_,i)=>from-i);
+ // Essentials, last on screen, has more than a page of 100; Under the Sun, first, ties with it a day ago and has an older
+ // change; Fontanna ties with it an hour ago, after a newer change of its own.
+ let feeds={essentials:[...down(105,101).map(s=>rec('essentials',s,t1)),...down(100,1).map(s=>rec('essentials',s,t2))],'bermuda-day':[rec('bermuda-day',3,t2),rec('bermuda-day',2,t2,'removed'),rec('bermuda-day',1,t3)],fontanna:[rec('fontanna',2,t1+60000),rec('fontanna',1,t1)]};
  let failing='';const stageOfUrl=url=>url.split('/')[3];
  e.changes=url=>stageOfUrl(url)===failing?null:changePage(feeds[stageOfUrl(url)]||[],stageOfUrl(url)==='fontanna'?'2026-10-15T04:48:36Z':'2026-10-07T00:15:13Z')(url);
  e.response={...status('First'),...stageStats({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();
- let region=changeRegion(e);const titles=()=>byClass(region,'row').map(a=>byClass(a,'row-name')[0].textContent);
- const order=[...e.window.Pavoia.stations].map(s=>s.id),first=['fontanna 2','fontanna 1','essentials 15','essentials 14','essentials 13','essentials 12','essentials 11','bermuda-day 3','bermuda-day 2','essentials 10','essentials 9','essentials 8','essentials 7','essentials 6'];
+ let region=changeRegion(e);const titles=()=>byClass(region,'row').map(a=>byClass(a,'row-name')[0].textContent),press=()=>region.children.at(-1).emit('click');
+ const order=[...e.window.Pavoia.stations].map(s=>s.id),first=['fontanna 2','fontanna 1',...down(105,101).map(s=>'essentials '+s),'bermuda-day 3','bermuda-day 2','essentials 100'];
  assert.deepEqual([e.changesRequests.map(r=>r.url),titles(),byClass(byClass(region,'row')[0],'row-line')[0].textContent,byClass(byClass(region,'row')[8],'row-fact')[0].textContent],
-  [order.map(id=>'/api/radio/'+id+'/changes?limit=10'),first,'Fontanna · Artist','removed'],'one first page per station, its station first on each row; newest first, ties in the order on screen, and no change older than the oldest one loaded of a station with more');
+  [order.map(id=>'/api/radio/'+id+'/changes?limit=100'),first,'Fontanna · Artist','removed'],'one first page of 100 per station, its station first on each row; newest first, ties in the order on screen');
  assert.equal(cls(region),'region changes','the region reads across the columns before the last one, as Release years does');
  assert.ok(notesOf(e).includes('Changes are recorded since '+sinceDay('2026-10-15T04:48:36Z')+'.'),'since the last station began to be watched');
+ press();await flush();
+ assert.deepEqual([e.changesRequests.length,titles(),region.children.at(-1).localName],[9,[...first,...down(99,90).map(s=>'essentials '+s)],'button'],'ten more held in memory: no request');
+ for(let i=0;i<8;i++){press();await flush();}
+ assert.deepEqual([e.changesRequests.length,titles().length,titles().at(-1)],[9,100,'essentials 10'],'no change older than the oldest one loaded of a station with more');
  const shown=byClass(region,'row'),more=region.children.at(-1);more.focus();more.emit('click');await flush();
- assert.deepEqual([e.changesRequests.slice(9).map(r=>r.url),titles(),sameRows(byClass(region,'row').slice(0,14),shown),region.children.includes(more),e.document.activeElement===byClass(region,'row')[14]],
-  [['/api/radio/essentials/changes?limit=10&before=6'],[...first,'essentials 5','essentials 4','essentials 3','essentials 2','essentials 1','bermuda-day 1'],true,false,true],'only the station with more asks again; its changes append, then the older one it held back');
- failing='closing';follow(e,stageLink(e,'fontanna'));await flush();follow(e,stageLink(e,'radio'));await flush();region=changeRegion(e);
+ assert.deepEqual([e.changesRequests.slice(9).map(r=>r.url),titles().slice(100),sameRows(byClass(region,'row').slice(0,100),shown),region.children.includes(more),e.document.activeElement===byClass(region,'row')[100]],
+  [['/api/radio/essentials/changes?limit=100&before=6'],[...down(9,1).map(s=>'essentials '+s),'bermuda-day 1'],true,false,true],'only the station with more asks again; its changes append, then the older one it held back');
+ // Five minutes on, every station is read again.
+ e.clock.now+=300001;failing='closing';follow(e,stageLink(e,'fontanna'));await flush();follow(e,stageLink(e,'radio'));await flush();region=changeRegion(e);
  assert.deepEqual([titles(),notesOf(e).some(t=>t.startsWith('Changes are recorded since'))],[first,false],'a station that fails leaves the others merged, and no date');
  // Under the Sun, first on screen, has more changes of the sync Essentials ties with: Essentials waits until they are in.
- failing='';feeds={'bermuda-day':Array.from({length:12},(_,i)=>rec('bermuda-day',12-i,t2)),essentials:[rec('essentials',2,t2),rec('essentials',1,t2)]};
+ e.clock.now+=300001;failing='';feeds={'bermuda-day':down(112,1).map(s=>rec('bermuda-day',s,t2)),essentials:[rec('essentials',2,t2),rec('essentials',1,t2)]};
  follow(e,stageLink(e,'fontanna'));await flush();follow(e,stageLink(e,'radio'));await flush();region=changeRegion(e);
- const day=Array.from({length:12},(_,i)=>'bermuda-day '+(12-i));
- assert.deepEqual(titles(),day.slice(0,10),'a tie with a station earlier on screen that has more waits for it');
- region.children.at(-1).emit('click');await flush();
- assert.deepEqual(titles(),[...day,'essentials 2','essentials 1'],'then follows it');
+ const day=down(112,1).map(s=>'bermuda-day '+s);
+ assert.deepEqual(titles(),day.slice(0,10),'the newest ten');
+ for(let i=0;i<9;i++){press();await flush();}
+ assert.deepEqual([titles(),e.changesRequests.at(-1).url],[day.slice(0,100),'/api/radio/essentials/changes?limit=100'],'a tie with a station earlier on screen that has more waits for it');
+ press();await flush();press();await flush();
+ assert.deepEqual([titles(),e.changesRequests.at(-1).url],[[...day,'essentials 2','essentials 1'],'/api/radio/bermuda-day/changes?limit=100&before=13'],'then follows it');
 });
 
 // The Index: every artist and label of the playlists, from the names documents, A to Z or most tracks first.
@@ -4614,12 +4648,22 @@ test('the last page of changes hands focus to the first row that opens a track, 
  await stagePlace(e,'#statistics/bermuda-day');const region=changeRegion(e),more=region.children.at(-1);
  more.focus();more.emit('click');await flush();
  const rows=byClass(region,'row');
- assert.deepEqual([rows.length,rows[10].getAttribute('href'),rows[11].getAttribute('href'),e.document.activeElement===rows[11]],[12,null,'#explore/plex_9001',true],'the first new row is no link, so focus goes to the next one');
- // A page still out when the listener leaves is aborted.
- const f=setup({journey:true});await flush();f.discovery={items:[]};f.changes=changePage(changeFeed(23,9,clock.now));
+ assert.deepEqual([rows.length,rows[10].getAttribute('href'),rows[11].getAttribute('href'),e.document.activeElement===rows[11],e.changesRequests.length],[12,null,'#explore/plex_9001',true,1],'the last rows came from memory; the first new row is no link, so focus goes to the next one');
+ // From a page asked for, the same: 105 changes, the last 5 on a second page.
+ const g=setup({journey:true});await flush();g.discovery={items:[]};g.changes=changePage(changeFeed(105,9,clock.now).map(r=>r.sequence==='5'?{...r,id:'x y'}:r));
+ await stagePlace(g,'#statistics/bermuda-day');const asked=changeRegion(g).children.at(-1);
+ for(let i=0;i<9;i++){asked.emit('click');await flush();}
+ asked.focus();asked.emit('click');await flush();
+ const all=byClass(changeRegion(g),'row');
+ assert.deepEqual([all.length,g.changesRequests.map(r=>r.url),all[100].getAttribute('href'),changeRegion(g).children.includes(asked),g.document.activeElement===all[101]],
+  [105,['/api/radio/bermuda-day/changes?limit=100','/api/radio/bermuda-day/changes?limit=100&before=6'],null,false,true],'the last page asked for: its first row is no link, so focus goes to the next one');
+ // A page still out when the listener leaves is aborted. The first 100 changes come in memory, and only the next page is asked.
+ const f=setup({journey:true});await flush();f.discovery={items:[]};f.changes=changePage(changeFeed(105,9,clock.now));
  await stagePlace(f,'#statistics/bermuda-day');const button=changeRegion(f).children.at(-1);
+ for(let i=0;i<9;i++){button.emit('click');await flush();}
+ assert.deepEqual([byClass(changeRegion(f),'row').length,f.changesRequests.length],[100,1]);
  f.changes=()=>new Promise(()=>{});button.emit('click');await flush();const page=f.changesRequests.at(-1);
- assert.deepEqual([new URL(page.url,'http://radio').searchParams.get('before'),page.signal.aborted],['14',false]);
+ assert.deepEqual([new URL(page.url,'http://radio').searchParams.get('before'),page.signal.aborted],['6',false]);
  routeTo(f,'#history');await flush();
  assert.equal(page.signal.aborted,true,'leaving Statistics drops the page');
 });
@@ -4734,7 +4778,8 @@ test('a station place left for a record while the window crosses 1100 px comes b
 
 test('a page of changes left while it loads comes back with Show earlier changes ready',async()=>{
  const e=setup({journey:true});await flush();e.discovery=url=>url.includes('/search?')?{items:[]}:entity(url.split('/').pop(),'track');
- const records=changeFeed(23,9,clock.now);e.changes=changePage(records);
+ // A server that answers pages of 10, so that the first press asks for a page.
+ const records=changeFeed(23,9,clock.now);e.changes=changePage(records,undefined,10);
  await stagePlace(e,'#statistics/bermuda-day');const more=changeRegion(e).children.at(-1);
  // The page never answers; leaving drops it, as a browser rejects an aborted fetch.
  e.changes=(url,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted'))));
@@ -4743,12 +4788,95 @@ test('a page of changes left while it loads comes back with Show earlier changes
  follow(e,changeRows(e)[3]);await flush();assert.equal(page.signal.aborted,true,'leaving drops the page');
  e.history.back();await flush();
  assert.deepEqual([changeRegion(e).children.at(-1)===more,more.textContent,more.getAttribute('aria-disabled'),more.getAttribute('aria-busy'),changeRows(e).length],[true,'Show earlier changes',null,null,10],'the same button, ready to ask again');
- e.changes=changePage(records);more.emit('click');await flush();
+ e.changes=changePage(records,undefined,10);more.emit('click');await flush();
  assert.deepEqual([changeRows(e).length,new URL(e.changesRequests.at(-1).url,'http://radio').searchParams.get('before')],[20,'14'],'and it asks for the same page');
  // A page that failed says Try again. Left and come back to, the place offers the page in its own words again.
  e.changes=()=>null;more.emit('click');await flush();assert.equal(more.textContent,'Try again');
  follow(e,changeRows(e)[3]);await flush();e.history.back();await flush();
  assert.deepEqual([changeRegion(e).children.at(-1)===more,more.textContent,more.getAttribute('aria-disabled'),changeRows(e).length],[true,'Show earlier changes',null,20],'a page that failed offers itself again');
+});
+
+// Step D2a: one journal of changes per station, for every place of the visit.
+test('Try again asks the page that failed, also when another station\'s page came, and a clock set back reads a journal again',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};
+ const stageOfUrl=url=>url.split('/')[3],feeds={fontanna:changeFeed(230,9,clock.now),essentials:changeFeed(150,9,clock.now)};let down=true;
+ // Both stations have a second page; Essentials' second page fails once.
+ e.changes=url=>{const id=stageOfUrl(url);return down&&id==='essentials'&&url.includes('before=')?null:changePage(feeds[id]||[])(url);};
+ e.response={...status('First'),...stageStats({scope:'radio'})};routeTo(e,'#statistics/radio');await flush();
+ const more=()=>changeRegion(e).children.at(-1),rows=()=>byClass(changeRegion(e),'row').length,press=()=>{more().emit('click');return flush();},first=e.changesRequests.length;
+ const asks=()=>e.changesRequests.slice(first).map(r=>stageOfUrl(r.url)+' '+new URL(r.url,'http://radio').searchParams.get('before'));
+ for(let i=0;i<40&&e.changesRequests.length===first;i++)await press();
+ assert.deepEqual([asks(),more().textContent],[['fontanna 131','essentials 51'],'Try again'],'one page came and one failed: Try again');
+ const shown=rows();down=false;await press();
+ assert.deepEqual([asks().slice(2).includes('essentials 51'),more().textContent,rows()],[true,'Show earlier changes',shown+10],'Try again asks the page that failed, and ten more rows show');
+ // A clock set back does not keep a journal longer than its 5 minutes: the next place reads the station again.
+ const before=e.changesRequests.length;e.clock.now-=60000;
+ try{
+  e.response={...status('First'),...stageStats({scope:'fontanna'}),...stageMusic()};routeTo(e,'#statistics/fontanna');await flush();
+  assert.deepEqual([e.changesRequests.length,e.changesRequests.at(-1).url],[before+1,'/api/radio/fontanna/changes?limit=100'],'a journal read after now is read again');
+ }finally{e.clock.now+=60000;}
+});
+
+test('each station\'s changes are read 100 at a time, page 1 at once and the next only on a press, kept 5 minutes and shared by the places, and a failed read is asked again',async()=>{
+ const e=setup({journey:true});await flush();e.discovery={items:[]};
+ const order=[...e.window.Pavoia.stations].map(s=>s.id),stageOfUrl=url=>url.split('/')[3],asked=id=>e.changesRequests.filter(r=>stageOfUrl(r.url)===id).length;
+ // Fontanna and Essentials have more than a page of 100; the other stations have no change yet.
+ const feeds={fontanna:changeFeed(125,9,clock.now),essentials:changeFeed(105,9,clock.now-3600000)},answers={};
+ e.changes=(url,signal)=>{const id=stageOfUrl(url);return answers[id]?answers[id](url,signal):changePage(feeds[id]||[])(url);};
+ const go=id=>{e.response={...status('First'),...stageStats({scope:id}),...(id==='radio'?{}:stageMusic())};routeTo(e,'#statistics/'+id);return flush();};
+ const titles=()=>byClass(changeRegion(e),'row-name').map(textOf),press=()=>{changeRegion(e).children.at(-1).emit('click');return flush();};
+ await go('radio');
+ assert.deepEqual(e.changesRequests.map(r=>r.url),order.map(id=>'/api/radio/'+id+'/changes?limit=100'),'a place asks each of its stations once, for its first page of 100');
+ e.clock.now+=299000;await go('fontanna');await go('essentials');
+ assert.deepEqual([e.changesRequests.length,titles()],[9,changeFeed(105,9,0).slice(0,10).map(r=>r.title)],'the places after, within 5 minutes, ask for nothing');
+ // A press that needs a page asks each station that has more, once.
+ await go('radio');
+ for(let i=0;i<30&&e.changesRequests.length===9;i++)await press();
+ assert.deepEqual(e.changesRequests.slice(9).map(r=>r.url),['/api/radio/fontanna/changes?limit=100&before=26','/api/radio/essentials/changes?limit=100&before=6'],'a press that needs a page asks every station that has more for its next page');
+ // Fontanna's place, after, shows the longer journal: every change, with no request.
+ await go('fontanna');
+ for(let i=0;i<12;i++)await press();
+ assert.deepEqual([titles(),changeRegion(e).children.at(-1).localName,e.changesRequests.length],[feeds.fontanna.map(r=>r.title),'ol',11],'the next place shows the journal read so far, with no request');
+ // Five minutes and one second after the first read, a place reads its station again.
+ e.clock.now+=2000;await go('essentials');
+ assert.deepEqual([e.changesRequests.length,e.changesRequests.at(-1).url],[12,'/api/radio/essentials/changes?limit=100'],'a journal older than 5 minutes is read again');
+ // A first page that fails is not kept: the next place asks again, and keeps what it then reads.
+ answers.closing=()=>null;await go('closing');await go('essentials');await go('closing');
+ assert.deepEqual([asked('closing'),changeRegion(e)],[3,undefined],'a failed first page is asked again by the next place');
+ delete answers.closing;await go('essentials');await go('closing');await go('essentials');await go('closing');
+ assert.equal(asked('closing'),4,'then kept');
+ // A first page that takes 12 s is dropped, and is asked again.
+ answers.ambiance=(url,signal)=>new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted'))));
+ await go('ambiance');e.fire(2000);await flush();const slow=e.changesRequests.at(-1);
+ assert.deepEqual([stageOfUrl(slow.url),slow.signal.aborted,byClass(e.elements['music-content'],'entity-heading').length,changeRegion(e)],['ambiance',false,1,undefined],'the place shows without it');
+ e.fire(12000);await flush();assert.equal(slow.signal.aborted,true,'12 s, and the read stops');
+ delete answers.ambiance;await go('essentials');await go('ambiance');
+ assert.equal(asked('ambiance'),3,'and the next place asks again');
+ // A place left while its journal loads still fills the journal for the next place.
+ let release;answers['palac-feel']=url=>new Promise(resolve=>{release=()=>resolve(changePage(changeFeed(4,4,clock.now))(url));});
+ await go('palac-feel');const held=e.changesRequests.at(-1);routeTo(e,'#history');await flush();
+ assert.deepEqual([stageOfUrl(held.url),held.signal.aborted],['palac-feel',false],'leaving the place lets the read go on');
+ release();await flush();delete answers['palac-feel'];await go('palac-feel');
+ assert.deepEqual([asked('palac-feel'),titles()],[2,['Change 4','Change 3','Change 2','Change 1']],'the next place shows it with no request');
+ // A next page that takes 12 s says Try again; a page that repeats a change read already shows it once.
+ const twice=changeFeed(110,9,clock.now);feeds['etage-zero']=twice;
+ answers['etage-zero']=(url,signal)=>url.includes('before=')?new Promise((_resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('aborted')))):changePage(twice)(url);
+ await go('etage-zero');for(let i=0;i<10;i++)await press();
+ const late=e.changesRequests.at(-1);assert.deepEqual([late.url,changeRegion(e).children.at(-1).textContent],['/api/radio/etage-zero/changes?limit=100&before=11','Loading…']);
+ e.fire(12000);await flush();
+ assert.deepEqual([late.signal.aborted,changeRegion(e).children.at(-1).textContent,titles().length],[true,'Try again',100],'12 s, and the page stops: Try again');
+ answers['etage-zero']=url=>url.includes('before=')?{trackingSince:'2026-10-07T00:15:13Z',changes:twice.slice(99),next:null}:changePage(twice)(url);
+ await press();await press();
+ assert.deepEqual([titles(),e.changesRequests.at(-1).url],[twice.map(r=>r.title),'/api/radio/etage-zero/changes?limit=100&before=11'],'every change once, newest first');
+ // Try again while one station's page is still out asks only the station that failed: the page out serves both presses.
+ const h=setup({journey:true});await flush();h.discovery={items:[]};let hold=null,fail=true;
+ h.changes=url=>{const id=stageOfUrl(url),page=changePage(({fontanna:feeds.fontanna,essentials:feeds.essentials})[id]||[])(url);return !url.includes('before=')?page:id==='fontanna'?fail?null:page:new Promise(resolve=>{hold=()=>resolve(page);});};
+ h.response={...status('First'),...stageStats({scope:'radio'})};routeTo(h,'#statistics/radio');await flush();
+ const pressed=()=>{changeRegion(h).children.at(-1).emit('click');return flush();},rowsOf=()=>byClass(changeRegion(h),'row').length;
+ for(let i=0;i<30&&h.changesRequests.length===9;i++)await pressed();
+ const before=rowsOf();assert.equal(changeRegion(h).children.at(-1).textContent,'Try again');
+ fail=false;await pressed();hold();await flush();
+ assert.deepEqual([h.changesRequests.slice(9).map(r=>r.url),rowsOf()-before,changeRegion(h).children.at(-1).textContent],[['/api/radio/fontanna/changes?limit=100&before=26','/api/radio/essentials/changes?limit=100&before=6','/api/radio/fontanna/changes?limit=100&before=26'],10,'Show earlier changes'],'Try again asks Fontanna again and waits for the page of Essentials still out');
 });
 
 // Step 6, On air now: History's All stations. Each station's answer from one function of its id; a track started a minute

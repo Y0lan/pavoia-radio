@@ -1040,11 +1040,35 @@
   // The listener's words with some {parts} as nodes, such as links in a sentence.
   const sentence = (text,parts) => text.split(/(\{\w+\})/).map((p,i)=>i%2?parts[p.slice(1,-1)]:p).filter(p=>p!=='');
   // A page of a station's changes, newest first: each record that reads as one, and the next page only after one.
-  const changesOf = (stage,signal,before='') => readJSON('/api/radio/'+stage+'/changes?limit=10'+(before?'&before='+before:''),signal).then(data=>{
+  const changesOf = (stage,signal,before='') => readJSON('/api/radio/'+stage+'/changes?limit=100'+(before?'&before='+before:''),signal).then(data=>{
     if(!Array.isArray(data?.changes))throw new Error('schema');
     const items=data.changes.filter(c=>['added','removed'].includes(c?.kind)&&typeof c.title==='string'&&typeof c.artist==='string'&&!isNaN(Date.parse(c.observedAt))).map(c=>({...c,stage}));
     return {stage,items,next:items.length&&/^\d{1,19}$/.test(data.next||'')?data.next:null,since:typeof data.trackingSince==='string'&&!isNaN(Date.parse(data.trackingSince))?data.trackingSince:null};
   });
+  // Each station's journal of changes, read 100 at a time and kept 5 minutes for every place of the visit: page 1 at once,
+  // the next pages only when a place asks. A place that leaves stops waiting, and the read still fills the journal; a read
+  // that fails or takes 12 s is not kept, so the next place asks again. Only journal() and journalMore() change a journal.
+  const journals=new Map();
+  const journal = stage => {
+    const kept=journals.get(stage),age=kept&&Date.now()-kept.at;if(kept&&age>=0&&age<300000)return kept.promise;
+    const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000),entry={at:Date.now(),value:null,more:null};
+    entry.promise=changesOf(stage,c.signal).then(page=>entry.value={...page,pages:1},error=>{if(journals.get(stage)===entry)journals.delete(stage);throw error;}).finally(()=>clearTimeout(timeout));
+    journals.set(stage,entry);return entry.promise;
+  };
+  // The next page of a journal that has one, appended with the records not read yet. A second call while it reads waits
+  // for the same page; a failure keeps the journal as it was. A place passes the journal it was given, and its signal,
+  // which drops the page when the place leaves.
+  const journalMore = (stage,signal,entry=journals.get(stage)) => {
+    const value=entry?.value;if(!value?.next)return Promise.resolve(value);
+    if(entry.more)return entry.more;
+    const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000),drop=()=>c.abort();signal?.addEventListener('abort',drop);
+    entry.more=changesOf(stage,c.signal,value.next).then(page=>{const read=new Set(value.items.map(i=>i.sequence));value.items.push(...page.items.filter(i=>!read.has(i.sequence)));value.next=page.next;value.pages++;return value;})
+      .finally(()=>{clearTimeout(timeout);signal?.removeEventListener('abort',drop);entry.more=null;});
+    return entry.more;
+  };
+  // A place's own copy of a station's journal, so that what it shows stays its own; it keeps the journal it came from,
+  // which only grows, also once a newer read of the station has taken its place.
+  const feedOf = from => () => {const {stage,items,next,since}=from.value;return {stage,items:[...items],next,since,from};};
   // The changes shown: the stations' feeds, each in its own order, merged newest first, ties in the order on screen. A
   // change shows only once no station with earlier pages could still add one before it, so a page that comes appends.
   const shownChanges = ({feeds}) => {
@@ -1068,21 +1092,25 @@
   // Show earlier changes says what it does next, and that it is disabled while its pages load: aria-disabled keeps focus on it.
   const sayChanges = changes => {const b=changes.more;if(!b)return;b.textContent=word(changes.busy?'loadingMore':changes.failed?'retry':'changesMore');
     if(changes.busy){b.setAttribute('aria-disabled','true');b.setAttribute('aria-busy','true');}else{b.removeAttribute('aria-disabled');b.removeAttribute('aria-busy');}};
-  // The next page of every station that has one, appended in place under the rows shown. A failure keeps the rows and says
-  // Try again on the button, which asks for the same pages. The button goes with the last page, its focus to the first
-  // row it showed that opens a track, or to the place's name. Leaving the place drops the request.
+  // Ten more changes under the rows shown: from the rows the place holds, or else with the next page of every station that
+  // has one, which its journal may hold already. A failure keeps the rows and says Try again on the button, which asks for
+  // the same pages. The button goes with the last row, its focus to the first row it showed that opens a track, or to the
+  // place's name. Leaving the place drops the request.
   async function earlierChanges(changes) {
     if(changes.busy)return;
-    const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000);paging=c;changes.busy=true;changes.failed=false;sayChanges(changes);
-    let pages=null;
-    try{pages=await Promise.all(changes.feeds.filter(f=>f.next).map(f=>changesOf(f.stage,c.signal,f.next).then(p=>[f,p])));}catch{/* The button says Try again. */}finally{clearTimeout(timeout);}
-    if(paging!==c||shownStage?.[3]!==changes)return;
-    paging=null;changes.busy=false;changes.failed=!pages;
-    if(pages){
-      const from=shownChanges(changes).length,held=document.activeElement===changes.more;
-      for(const [f,p] of pages){f.items.push(...p.items);f.next=p.next;}
-      const rows=shownChanges(changes).slice(from).map(r=>changeRow(r,changes.station));changes.list.append(...rows);
-      if(!changes.feeds.some(f=>f.next)){changes.more.remove();changes.more=null;if(held)(rows.map(r=>r.children[0]).find(a=>a.getAttribute('href'))||recordTitle).focus({preventScroll:true});}
+    // After a failure the press asks again, also when the rows of a station that answered wait in the place.
+    const ask=changes.failed||shownChanges(changes).length<changes.shown+10?changes.feeds.filter(f=>f.next):[];let ok=true;
+    if(ask.length){
+      const c=new AbortController();paging=c;changes.busy=true;changes.failed=false;sayChanges(changes);
+      try{await Promise.all(ask.map(async f=>{const j=f.from;if(j.value.items.length<=f.items.length)await journalMore(f.stage,c.signal,j);f.items.push(...j.value.items.slice(f.items.length));f.next=j.value.next;}));}catch{ok=false;/* The button says Try again. */}
+      if(paging!==c||shownStage?.[3]!==changes)return;
+      paging=null;changes.busy=false;
+    }
+    changes.failed=!ok;
+    if(ok){
+      const all=shownChanges(changes),held=document.activeElement===changes.more,rows=all.slice(changes.shown,changes.shown+10).map(r=>changeRow(r,changes.station));
+      changes.list.append(...rows);changes.shown+=rows.length;
+      if(all.length===changes.shown&&!changes.feeds.some(f=>f.next)){changes.more.remove();changes.more=null;if(held)(rows.map(r=>r.querySelector('a.row[href]')).find(Boolean)||recordTitle).focus({preventScroll:true});}
     }
     sayChanges(changes);
   }
@@ -1150,12 +1178,13 @@
       for(const item of top){const li=node('li'),row=node('a','row'),text=node('span','row-text');if(entityID('plex_'+item.id))row.href='#explore/plex_'+item.id;text.append(node('span','row-name',item.title),node('span','row-line',item.artist));row.append(text,node('span','row-fact',number(item.plays)+'×'));li.append(row);list.append(li);}
       played.append(h,list);grid.append(played);
     }
-    // Added and removed: the newest changes, and Show earlier changes while there are more. No change, no region.
+    // Added and removed: the newest ten changes, or as many as the place showed before it was drawn again, and Show
+    // earlier changes while there are more. No change, no region.
     const changed=changes?shownChanges(changes):[];
     if(changed.length){
-      const section=node('section','region changes'),h=node('h4','',word('changesTitle')),list=node('ol');h.id='r-changes';section.setAttribute('aria-labelledby',h.id);
-      list.append(...changed.map(c=>changeRow(c,Boolean(station))));section.append(h,list);grid.append(section);
-      Object.assign(changes,{station:Boolean(station),list,more:changes.feeds.some(f=>f.next)?action('',()=>earlierChanges(changes),'text-button'):null});
+      const section=node('section','region changes'),h=node('h4','',word('changesTitle')),list=node('ol'),shown=changed.slice(0,changes.shown||10);h.id='r-changes';section.setAttribute('aria-labelledby',h.id);
+      list.append(...shown.map(c=>changeRow(c,Boolean(station))));section.append(h,list);grid.append(section);
+      Object.assign(changes,{station:Boolean(station),list,shown:shown.length,more:changed.length>shown.length||changes.feeds.some(f=>f.next)?action('',()=>earlierChanges(changes),'text-button'):null});
       if(changes.more){section.append(changes.more);sayChanges(changes);}
     }
     content.append(grid);
@@ -1525,13 +1554,14 @@
       }else{
         // A station's plays and its changes come with its numbers, All stations' changes from every station, and the labels
         // document with both; any of them that fails leaves the numbers to show. The labels document and the changes hold
-        // the place 2 s past its numbers at most: one that is later is left out of this place, and the document still
-        // comes for the next one.
+        // the place 2 s past its numbers at most: one that is later is left out of this place, and the document and the
+        // journal still come for the next one. The place shows its own copy of each journal, which journal() has kept by
+        // the time the copy is asked for.
         const station=radio.stations.some(s=>s.id===scope);
         const numbers=[readJSON('/api/library/statistics?scope='+scope,controller.signal),station?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null];
         let grace=null;
         const late=Promise.all(numbers).then(()=>new Promise(done=>{grace=setTimeout(()=>done(null),2000);}),()=>null),soon=extra=>Promise.race([extra.catch(()=>null),late]);
-        const [data,music,labels,...feeds]=await Promise.all([...numbers,soon(namesOf('labels',controller.signal)),...(station?[scope]:radio.stations.map(s=>s.id)).map(id=>soon(changesOf(id,controller.signal)))]);
+        const [data,music,labels,...feeds]=await Promise.all([...numbers,soon(namesOf('labels',controller.signal)),...(station?[scope]:radio.stations.map(s=>s.id)).map(id=>soon(journal(id).then(feedOf(journals.get(id)))))]);
         clearTimeout(grace);
         if(musicRequest!==controller)return;
         const answered=feeds.filter(Boolean);

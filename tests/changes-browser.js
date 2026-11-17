@@ -6,14 +6,15 @@ async page => {
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  const origin=new URL(page.url()).origin;
  await page.route('**/stream/**',route=>route.abort());
- // 23 changes over 3 syncs on Fontanna (9, 9 and 5 records, a day apart, the newest today), and 12 of one sync on
- // Essentials. Merged, Essentials has one more page, and Fontanna 3 changes a day apart, the newest tying with it.
+ // 213 changes on Fontanna over syncs of 9 records, a day apart, the newest today: pages of 100, 100 and 13. 12 of one sync
+ // on Essentials. Merged, Essentials has 110 of one sync, one page more, and Fontanna 3 changes a day apart, the newest
+ // tying with it. Every page is asked 100 at a time, as the server answers it.
  const now=Date.now(),at=day=>new Date(now-60000-day*86400000).toISOString().replace(/\.\d+Z$/,'Z');
  const feed=(stage,n,per)=>Array.from({length:n},(_,i)=>({sequence:String(n-i),kind:i%3===2?'removed':'added',id:String(700000+n-i),title:stage+' change '+(n-i),artist:'Test artist '+(n-i),album:'Test album',observedAt:at(Math.floor(i/per))}));
- const sets={records:{fontanna:feed('fontanna',23,9),essentials:feed('essentials',12,12)},merge:{fontanna:feed('fontanna',3,1),essentials:feed('essentials',12,12)}},feeds=sets.records;
- let mode='records',held=null,hold=false;const asked=[],numbers=[];
+ const sets={records:{fontanna:feed('fontanna',213,9),essentials:feed('essentials',12,12)},merge:{fontanna:feed('fontanna',3,1),essentials:feed('essentials',110,110)}},feeds=sets.records;
+ let mode='records',held=null,hold=false;const asked=[],numbers=[],limits=new Set();
  await page.route('**/api/radio/*/changes?**',async route=>{
-  const url=new URL(route.request().url()),stage=url.pathname.split('/')[3],limit=Number(url.searchParams.get('limit')),before=Number(url.searchParams.get('before')||Infinity);asked.push(stage+(url.searchParams.get('before')?' before '+url.searchParams.get('before'):''));
+  const url=new URL(route.request().url()),stage=url.pathname.split('/')[3],limit=Number(url.searchParams.get('limit')),before=Number(url.searchParams.get('before')||Infinity);asked.push(stage+(url.searchParams.get('before')?' before '+url.searchParams.get('before'):''));limits.add(url.searchParams.get('limit'));
   if(hold){hold=false;await new Promise(resolve=>{held=resolve;});}
   if(mode==='error')return route.fulfill({status:503,body:'changes unavailable'}).catch(()=>{});
   const rest=(sets[mode]?.[stage]||[]).filter(r=>Number(r.sequence)<before),out=rest.slice(0,limit);
@@ -25,19 +26,30 @@ async page => {
  const region='#music-content section[aria-labelledby=r-changes]',rows=region+' li > a.row',more=region+' > button';
  const drawn=()=>page.waitForFunction(()=>document.querySelector('#music-content .entity-heading')&&!document.getElementById('music-content').hasAttribute('aria-busy'));
  const visit=async stage=>{await page.locator(`#stage-row a[href="#statistics/${stage}"]`).click();await drawn();};
- await page.goto(origin+'/?station=palac-feel');
- await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
- await page.locator('#language [value=en]').dispatchEvent('click');
- await page.evaluate(()=>{history.pushState({explorer:true},'','#statistics/fontanna');dispatchEvent(new PopStateEvent('popstate'));});
- await drawn();
+ // A page load reads every journal again: the page keeps them 5 minutes, for every place.
+ const fresh=async stage=>{
+  await page.goto(origin+'/?station=palac-feel');
+  await page.waitForFunction(()=>window.Pavoia?.stations?.length===9);
+  await page.locator('#language [value=en]').dispatchEvent('click');
+  await page.evaluate(h=>{history.pushState({explorer:true},'',h);dispatchEvent(new PopStateEvent('popstate'));},'#statistics/'+stage);
+  await drawn();
+ };
+ // A press shows ten more held in memory, and asks for nothing.
+ const fromMemory=async()=>{const n=await page.locator(rows).count(),sent=asked.length;await page.locator(more).click();await page.waitForFunction(([r,n])=>document.querySelectorAll(r).length===n,[rows,n+10]);assert(asked.length===sent,'A press with ten rows in memory asked: '+asked.slice(sent));};
+ await fresh('fontanna');
  assert(await page.locator(rows).count()===10,'The first page is not ten changes');
+ assert(JSON.stringify(asked)==='["fontanna"]','The place did not ask once for its first page: '+asked);
  assert(await page.locator(region+' h4').textContent()==='Added and removed','Missing heading');
  assert(await page.locator('#music-content .regions > section').last().getAttribute('aria-labelledby')==='r-changes','The region is not last, after Most played');
  const first=await page.locator(rows).first().evaluate(a=>[a.getAttribute('href'),a.querySelector('time').dateTime,a.querySelector('.row-name').textContent,a.querySelector('.row-line').textContent,a.querySelector('.row-fact').textContent]);
- assert(JSON.stringify(first)===JSON.stringify(['#explore/plex_700023',feeds.fontanna[0].observedAt,'fontanna change 23','Test artist 23','added']),'First row: '+JSON.stringify(first));
+ assert(JSON.stringify(first)===JSON.stringify(['#explore/plex_700213',feeds.fontanna[0].observedAt,'fontanna change 213','Test artist 213','added']),'First row: '+JSON.stringify(first));
  assert(await page.locator(rows).nth(2).locator('.row-fact').textContent()==='removed','A removal does not say so');
  const times=await page.locator(rows+' time').allTextContents();
  assert(times[0]===new Date(feeds.fontanna[0].observedAt).toLocaleTimeString('en',{timeStyle:'short'})&&times[9]===new Date(feeds.fontanna[9].observedAt).toLocaleDateString('en',{day:'numeric',month:'short'}),'Time today, day before: '+times.join(','));
+ // The first page holds 100: ten more at a press, with no request, under the rows shown.
+ await page.locator(rows).first().evaluate(a=>{a.dataset.ten='';});await fromMemory();
+ assert(await page.locator(rows).first().getAttribute('data-ten')===''&&await page.locator(more).textContent()==='Show earlier changes','The rows held in memory drew the list again');
+ for(let n=30;n<=100;n+=10)await fromMemory();
  // Paging: busy in place, focus kept, then appended under the rows shown.
  held=null;hold=true;await page.locator(more).focus();await page.keyboard.press('Enter');
  for(let i=0;!held&&i<100;i++)await page.waitForTimeout(20);
@@ -47,16 +59,19 @@ async page => {
  const sent=asked.length;await page.keyboard.press('Enter');await page.waitForTimeout(200);
  assert(asked.length===sent,'A second press while it loads asked again');
  const top=await page.locator(rows).first().evaluate(a=>a.dataset.mark='first');
- held();await page.waitForFunction(r=>document.querySelectorAll(r).length===20,rows);
+ held();await page.waitForFunction(r=>document.querySelectorAll(r).length===110,rows);
  assert(await page.locator(rows).first().getAttribute('data-mark')==='first','The first rows were drawn again');
- assert(asked.at(-1)==='fontanna before 14','Paging did not ask from the oldest change shown: '+asked.at(-1));
+ assert(asked.at(-1)==='fontanna before 114','Paging did not ask from the oldest change shown: '+asked.at(-1));
+ for(let n=120;n<=200;n+=10)await fromMemory();
  mode='error';await page.locator(more).click();
  await page.waitForFunction(b=>document.querySelector(b)?.textContent==='Try again',more);
- assert(await page.locator(rows).count()===20,'A failed page dropped rows');
+ assert(await page.locator(rows).count()===200,'A failed page dropped rows');
  mode='records';await page.locator(more).focus();await page.keyboard.press('Enter');
- await page.waitForFunction(r=>document.querySelectorAll(r).length===23,rows);
+ await page.waitForFunction(r=>document.querySelectorAll(r).length===210,rows);
+ assert(asked.at(-1)==='fontanna before 14','Try again did not ask for the same page: '+asked.at(-1));
+ await page.keyboard.press('Enter');await page.waitForFunction(r=>document.querySelectorAll(r).length===213,rows);
  assert(await page.locator(more).count()===0,'The last page left the button');
- assert(await page.evaluate(r=>document.activeElement===document.querySelectorAll(r)[20],rows),'Focus did not move to the first change of the last page');
+ assert(await page.evaluate(r=>document.activeElement===document.querySelectorAll(r)[210],rows),'Focus did not move to the first change of the last page');
  assert((await page.locator('#music-content .stage-notes').textContent()).includes('Changes are recorded since Oct 7.'),'Missing the date changes are recorded since');
  for(const width of [320,360,390,760,1100,1440]){
   await page.setViewportSize({width,height:900});await page.waitForTimeout(100);
@@ -72,13 +87,13 @@ async page => {
  await page.locator('#language [value=en]').dispatchEvent('click');await drawn();
  // All stations: the nine first pages, merged by time, ties in the order on screen; only Essentials pages again.
  await page.setViewportSize({width:1440,height:900});
- mode='merge';asked.length=0;await visit('radio');
+ mode='merge';asked.length=0;await fresh('radio');
  assert(asked.length===9&&asked.every(a=>!a.includes('before')),'All stations did not ask each station once: '+asked.join(','));
  const merged=await page.locator(rows).evaluateAll(n=>n.map(a=>[a.querySelector('time').dateTime,a.querySelector('.row-line').textContent.split(' · ')[0]]));
  const order=await page.evaluate(()=>window.Pavoia.stations.map(s=>s.name));
  assert(merged.every(r=>order.includes(r[1])),'A row does not name its station: '+JSON.stringify(merged[0]));
  assert(merged.every((r,i)=>!i||r[0]<merged[i-1][0]||r[0]===merged[i-1][0]&&order.indexOf(r[1])>=order.indexOf(merged[i-1][1])),'Not newest first with ties in screen order');
- const cut=sets.merge.essentials[9].observedAt;
+ const cut=sets.merge.essentials[99].observedAt;
  assert(merged.length>0&&merged.every(r=>r[0]>=cut),'A change older than the oldest loaded of a station with more is shown');
  // The region reads across the columns before the last one, as Release years does, which keeps its width: from 761px
  // they share one edge and one width, and Release years is no taller than its strip.
@@ -88,13 +103,14 @@ async page => {
   assert(years[0]===changes[0]&&years[1]===changes[1]&&years[2]<400,`At ${width} Release years ${years} and the changes ${changes} do not share their columns`);
  }
  await page.setViewportSize({width:1440,height:900});
- asked.length=0;await page.locator(more).click();await page.waitForFunction(()=>!document.querySelector('section[aria-labelledby=r-changes] > button'));
- assert(JSON.stringify(asked)==='["essentials before 3"]','Paging asked other stations: '+asked.join(','));
- assert(await page.locator(rows).count()===15&&merged.length===11,'Merged rows: '+merged.length+' then '+await page.locator(rows).count());
+ asked.length=0;await fromMemory();
+ for(let i=0;i<20&&await page.locator(more).count();i++){const n=await page.locator(rows).count();await page.locator(more).click();await page.waitForFunction(([r,b,n])=>document.querySelectorAll(r).length>n||!document.querySelector(b),[rows,more,n]);}
+ assert(JSON.stringify(asked)==='["essentials before 11"]','Paging asked other stations: '+asked.join(','));
+ assert(await page.locator(rows).count()===113&&merged.length===10,'Merged rows: '+merged.length+' then '+await page.locator(rows).count());
  await page.locator(region).scrollIntoViewIfNeeded();
  await page.screenshot({path:'changes-fixture-desktop.png'});
  // No change yet: no region, and the date. Not watched yet: nothing. A feed that fails: no region, the rest draws.
- mode='baseline';await visit('etage-zero');
+ mode='baseline';await fresh('etage-zero');
  assert(await page.locator(region).count()===0,'An empty feed shows a region');
  assert((await page.locator('#music-content .stage-notes').textContent()).includes('Changes are recorded since'),'An empty feed lost its date');
  mode='pending';await visit('closing');
@@ -103,7 +119,7 @@ async page => {
  assert(await page.locator(region).count()===0,'A failing feed shows a region');
  assert(await page.locator('#music-content .release-years').count()===1&&await page.locator('#music-status').textContent()==='','A failing feed broke the place');
  // A page still loading when the listener leaves never lands in the next place.
- mode='records';await visit('fontanna');held=null;hold=true;await page.locator(more).click();
+ mode='records';await visit('fontanna');for(let n=20;n<=100;n+=10)await fromMemory();held=null;hold=true;await page.locator(more).click();
  for(let i=0;!held&&i<100;i++)await page.waitForTimeout(20);
  await visit('essentials');held();await page.waitForTimeout(200);
  assert(await page.locator(rows).count()===10&&(await page.locator(rows).first().textContent()).includes('essentials'),'A page of the station left landed in the next one');
@@ -126,7 +142,8 @@ async page => {
   assert(asked.length===sent[0]&&numbers.length===sent[1],`At ${width} Back asked again: ${asked.slice(sent[0])} ${numbers.slice(sent[1])}`);
   kept.push({width,rows:back[0],scrollTop:[left[1],back[1]],requests:asked.length-sent[0]+numbers.length-sent[1]});
  }
+ assert(JSON.stringify([...limits])==='["100"]','A page was not asked 100 at a time: '+[...limits]);
  assert(await page.locator('#audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Statistics started audio');
  assert(errors.length===0,errors.join('; '));
- return {checks:'rows, time or day, paging busy/append/Try again/last page focus, since date, EN/DE, widths, All stations merge and paging, empty, not watched, 503, race, Back keeps the place, paused audio',widths:[320,360,390,760,1100,1440],kept,pageErrors:errors};
+ return {checks:'rows, time or day, pages of 100, ten more from memory, paging busy/append/Try again/last page focus, since date, EN/DE, widths, All stations merge and paging, empty, not watched, 503, race, Back keeps the place, paused audio',widths:[320,360,390,760,1100,1440],kept,pageErrors:errors};
 }
