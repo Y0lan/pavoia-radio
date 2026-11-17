@@ -1026,16 +1026,17 @@ test('each way groups its stations under its words, in one radio group',async()=
 });
 
 test('the hero names the station\'s stage over its title, and hides it on the Bus',async()=>{
- const e=setup();await flush();const fact=e.elements['mood-stage'];
+ const e=setup();await flush();const fact=e.elements['mood-fact'],eyebrow=e.elements['mood-stage'];
  const facts=()=>Object.fromEntries(['01','03','06','07','08','09','05'].map(id=>{e.change(id);return [id,fact.textContent];}));
  const expected={'01':'Bermuda stage','03':'Pałac stage','06':'Etage 0 stage','07':'Fontanna stage','08':'Ambiance stage','09':'Selected by Gaende','05':'Selected by Gaende'};
  assert.deepEqual({...facts()},expected,'by stage');
  press(e,'feeling');assert.deepEqual({...facts()},expected,'and the same facts by feeling');
  e.setLanguage('de');e.change('03');assert.equal(fact.textContent,'Bühne Pałac');e.change('05');assert.equal(fact.textContent,'Ausgewählt von Gaende');
- assert.equal(fact.hidden,false);
- e.location.hash='#bus';e.window.emit('hashchange');assert.equal(fact.hidden,true,'the Bus hides it, since its title is its stage');
- e.location.hash='';e.window.emit('popstate');assert.equal(fact.hidden,false,'leaving the Bus shows it again');
- assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage">Pałac stage<\/p>\s*<h1 id="mood-name">/,'over the title from the first paint');
+ assert.equal(eyebrow.hidden,false);
+ e.location.hash='#bus';e.window.emit('hashchange');assert.equal(eyebrow.hidden,true,'the Bus hides it, since its title is its stage');
+ e.location.hash='';e.window.emit('popstate');assert.equal(eyebrow.hidden,false,'leaving the Bus shows it again');
+ assert.equal(eyebrow.textContent,'','the fact is written into its span, so the eyebrow keeps its child');
+ assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage"><span id="mood-fact">Pałac stage<\/span><\/p>\s*<h1 id="mood-name">/,'over the title from the first paint');
 });
 
 test('the spoken position says the stage once',async()=>{
@@ -1691,6 +1692,127 @@ test('the explorer frame stops above the player bar and its controls read in Int
 // Explore plan step 7: with no map, On the radio comes first, before what is close to it.
 const byClass=(root,name)=>root.descendants().filter(n=>(n.className||n.attrs?.class||'').split(' ').includes(name));
 const inspector=e=>e.elements['entity-inspector'];
+
+// The radio heard and the station shown come apart in the next step; until then a test sets them apart by hand.
+const showApart=(e,stage)=>e.run(`currentMood=moodOf('${stage}')`);
+const counting=(e,name,value)=>{const calls=[];e.window.Pavoia[name]=()=>{calls.push(name);return value;};return calls;};
+
+test('the radio is on while its sound is wanted, or while a preview holds it to give it back',async()=>{
+ const e=setup();await flush();
+ assert.equal(e.run('radioOn()'),false,'paused, with no preview');
+ e.window.Pavoia.previewResume=()=>true;assert.equal(e.run('radioOn()'),true,'a preview that paused a playing radio');
+ e.window.Pavoia.previewResume=()=>false;assert.equal(e.run('radioOn()'),false,'a preview over a paused radio');
+ e.click();assert.equal(e.run('radioOn()'),true,'playing');
+ const x=setup({journey:true});await flush();x.elements['preview-audio'].play=async()=>{};
+ x.discovery=()=>({entity:{id:'trk_0123456789ab',type:'track',title:'T',previewUrl:'/api/discovery/preview/trk_0123456789ab',connections:[]},included:[]});
+ for(const on of [true,false]){
+  if(on){x.click();x.playing();}
+  x.visit('#explore/trk_0123456789ab');await flush();
+  assert.equal(x.window.Pavoia.previewResume(),false,'no preview yet');
+  byClass(inspector(x),'preview-toggle')[0].emit('click');await flush();
+  assert.deepEqual([x.window.Pavoia.getState().wanted,x.window.Pavoia.previewResume(),x.run('radioOn()')],[false,on,on],on?'a preview over the playing radio gives it back':'a preview over a paused radio gives nothing back');
+  byClass(inspector(x),'preview-toggle')[0].emit('click');await flush();
+  assert.equal(x.window.Pavoia.previewResume(),false,'its end gives the radio back, and holds nothing more');
+  x.elements['explorer-close'].emit('click');await flush();if(on)x.window.Pavoia.pause();
+ }
+});
+
+test('playShown() plays the station shown: on the station heard it plays or ends a preview, apart it cuts to the station shown',async()=>{
+ const {saved,storage}=remembered();const e=setup({storage});await flush();
+ const stopped=counting(e,'stopPreview',false);
+ e.location.hash='#bus';e.window.emit('hashchange');e.run('playShown()');
+ assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.src],[false,undefined],'the Bus has nothing to play');
+ e.location.hash='';e.window.emit('popstate');
+ e.run('playShown()');
+ assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.src,stopped.length],[true,'/stream/palac-feel.mp3',0],'paused on the station heard, it plays');
+ e.playing();const calls=e.audio.calls.length;e.run('playShown()');
+ assert.deepEqual([e.audio.calls.length,stopped.length],[calls,1],'playing the station heard, it only ends a preview: no new connection');
+ // The stream drops and waits to try again; then the listener plays the station shown.
+ e.error();assert.equal(e.elements['playback-status'].textContent,'Reconnecting…');
+ const cancelled=counting(e,'cancelPreview',undefined);showApart(e,'fontanna');
+ const asked=e.requests.length;e.run('playShown()');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.window.Pavoia.getState().wanted,e.audio.src,saved['pavoia-station']],['fontanna',false,true,'/stream/fontanna.mp3','fontanna'],'apart, the bar takes the station shown, plays it and remembers it');
+ assert.deepEqual([cancelled.length,stopped.length],[1,1],'a preview is cancelled, not ended into the old station');
+ assert.equal(e.elements['playback-status'].textContent,'Connecting…','a new station connects; the old one\'s reconnect is over');
+ assert.ok(![...e.timers.values()].some(t=>t.delay===1000),'its retry is cleared');
+ assert.deepEqual([e.elements['player-title'].textContent,e.elements['player-stage'].children[0]],['Loading track…','Fontanna'],'the bar names the station at once, and waits for its track');
+ assert.deepEqual(e.requests.slice(asked).map(r=>r.url),['/api/radio/fontanna'],'and asks what it has on air');
+ assert.equal(e.run('air.has("palac-feel")'),false,'the station left is followed no more');
+ e.error();assert.ok([...e.timers.values()].some(t=>t.delay===1000),'a loss on the new station starts the ladder from its first step');
+ const paused=setup();await flush();showApart(paused,'closing');paused.run('playShown()');
+ assert.deepEqual([paused.window.Pavoia.getState().stage,paused.window.Pavoia.getState().wanted,paused.audio.src],['closing',true,'/stream/closing.mp3'],'apart and paused, it plays the station shown');
+});
+
+test('tuneShown() gives the bar the station shown and starts nothing',async()=>{
+ const {saved,storage}=remembered();const e=setup({storage});await flush();
+ showApart(e,'fontanna');e.run('lost=true;retries=3;retryTimer=setTimeout(connect,1000)');e.run('tuneShown()');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.window.Pavoia.getState().wanted,e.audio.src,saved['pavoia-station']],['fontanna',false,false,undefined,'fontanna']);
+ assert.deepEqual([e.run('lost'),e.run('retries'),[...e.timers.values()].some(t=>t.delay===1000)],[false,0,false],'no trace of the old station\'s reconnect');
+ assert.deepEqual([e.elements['player-title'].textContent,e.elements['player-stage'].children[0]],['Loading track…','Fontanna'],'the bar names it at once');
+ assert.equal(e.run('air.has("palac-feel")'),false,'the station left is followed no more');
+ e.click();assert.equal(e.audio.src,'/stream/fontanna.mp3','the bar\'s play then starts it');
+});
+
+test('Switch to this station moves the music by itself, with a station change that only shows',async()=>{
+ // selectMood() still cuts; here it only shows, as it will, so tune() alone moves the music or the bar.
+ const only=e=>e.run('selectMood=id=>{currentMood=moods.find(mood=>mood.id===id);}');
+ const e=setup();await flush();e.click();e.playing();only(e);e.window.Pavoia.tune('closing');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.window.Pavoia.getState().apart,e.audio.src],['closing',false,'/stream/closing.mp3'],'while the radio is on, the music moves to it');
+ const {saved,storage}=remembered();const x=setup({storage});await flush();only(x);x.window.Pavoia.tune('closing');
+ assert.deepEqual([x.window.Pavoia.getState().stage,x.window.Pavoia.getState().apart,x.audio.src,saved['pavoia-station']],['closing',false,undefined,'closing'],'while it is off, the bar takes it and nothing plays');
+});
+
+test('Switch to this station, the media keys and the keys in the explorer go through playShown() while the radio is on',async()=>{
+ const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage;const stopped=counting(e,'stopPreview',false);
+ e.window.Pavoia.tune('fontanna');e.actions.nexttrack();e.elements.explorer.open=true;e.key('2');e.key('ArrowRight');
+ assert.deepEqual([stage(),e.audio.src,stopped.length],['palac-dance',undefined,0],'paused, each one only changes the station');
+ e.elements.explorer.open=false;e.click();e.playing();
+ for(const [what,act,expected] of [['tune',()=>e.window.Pavoia.tune('closing'),'closing'],['nexttrack',()=>e.actions.nexttrack(),'essentials'],['previoustrack',()=>e.actions.previoustrack(),'closing'],
+  ['2, explorer closed',()=>e.key('2'),'bermuda-evening'],['ArrowRight, explorer closed',()=>e.key('ArrowRight'),'palac-dance']]){
+  const before=stopped.length;act();
+  assert.deepEqual([stage(),e.audio.src,stopped.length-before],[expected,'/stream/'+expected+'.mp3',/explorer closed/.test(what)?0:1],what);
+ }
+ e.elements.explorer.open=true;
+ for(const [what,act,expected] of [['4 in the explorer',()=>e.key('4'),'palac-feel'],['ArrowLeft in the explorer',()=>e.key('ArrowLeft'),'palac-dance']]){
+  const before=stopped.length;act();assert.deepEqual([stage(),e.audio.src,stopped.length-before],[expected,'/stream/'+expected+'.mp3',1],what);
+ }
+ e.window.Pavoia.pause();e.window.Pavoia.previewResume=()=>true;const cancelled=counting(e,'cancelPreview',undefined);
+ e.key('3');assert.deepEqual([stage(),e.audio.src,cancelled.length,stopped.length],['palac-dance',undefined,0,5],'in the explorer, the key of the station already shown and heard leaves a preview playing');
+ e.key('4');assert.deepEqual([stage(),e.audio.src,cancelled.length],['palac-feel','/stream/palac-feel.mp3',2],'another key ends it and plays the station picked');
+});
+
+test('the media keys step from the station heard, and a key in the explorer plays the station shown',async()=>{
+ const e=setup();await flush();const stage=()=>e.window.Pavoia.getState().stage;
+ e.click();e.playing();showApart(e,'fontanna');e.actions.nexttrack();
+ assert.deepEqual([stage(),e.window.Pavoia.getState().viewing,e.audio.src],['etage-zero','etage-zero','/stream/etage-zero.mp3'],'next after Lost in Feelings, the station heard, not after Fontanna, the station shown');
+ showApart(e,'fontanna');e.actions.previoustrack();assert.equal(stage(),'palac-feel','previous too');
+ showApart(e,'fontanna');e.elements.explorer.open=true;e.key('6');
+ assert.deepEqual([stage(),e.window.Pavoia.getState().apart,e.audio.src],['fontanna',false,'/stream/fontanna.mp3'],'the key of the station shown moves the music to it');
+});
+test('a preview that holds the radio counts as the radio on, and the arrows in the explorer step from the station shown',async()=>{
+ // selectMood() still cuts, so it still ends a preview and sets the two stations together; here it only shows, as it will.
+ const only=e=>e.run('selectMood=id=>{currentMood=moods.find(mood=>mood.id===id);}');
+ const held=async()=>{const e=setup();await flush();only(e);e.window.Pavoia.previewResume=()=>true;return {e,cancelled:counting(e,'cancelPreview',undefined)};};
+ const state=e=>[e.window.Pavoia.getState().stage,e.window.Pavoia.getState().wanted,e.audio.src];
+ const next=await held();next.e.actions.nexttrack();
+ assert.deepEqual([...state(next.e),next.cancelled.length],['etage-zero',true,'/stream/etage-zero.mp3',1],'the lock screen\'s next ends the preview and plays the next station');
+ const tuned=await held();tuned.e.window.Pavoia.tune('closing');
+ assert.deepEqual([...state(tuned.e),tuned.cancelled.length],['closing',true,'/stream/closing.mp3',1],'Switch to this station too');
+ const e=setup();await flush();e.click();e.playing();only(e);showApart(e,'fontanna');e.elements.explorer.open=true;e.key('ArrowRight');
+ assert.deepEqual(state(e),['ambiance',true,'/stream/ambiance.mp3'],'after Fontanna, the station shown, not after Lost in Feelings, the station heard');
+ showApart(e,'fontanna');e.key('ArrowLeft');assert.equal(e.window.Pavoia.getState().stage,'etage-zero','and before it');
+ showApart(e,'fontanna');e.window.Pavoia.tune('fontanna');
+ assert.deepEqual(state(e),['fontanna',true,'/stream/fontanna.mp3'],'Switch to this station on the station shown, while another plays, moves the music to it');
+});
+
+test('Switch to this station leaves a preview playing on the station already shown and heard',async()=>{
+ const e=setup();await flush();e.window.Pavoia.previewResume=()=>true;
+ const cancelled=counting(e,'cancelPreview',undefined),stopped=counting(e,'stopPreview',false);
+ e.window.Pavoia.tune('palac-feel');
+ assert.deepEqual([e.window.Pavoia.getState().wanted,e.audio.src,cancelled.length,stopped.length],[false,undefined,0,0]);
+ e.window.Pavoia.tune('closing');
+ assert.deepEqual([e.window.Pavoia.getState().stage,e.audio.src],['closing','/stream/closing.mp3'],'another station ends it and plays');
+});
 const cls=n=>n.className||n.attrs?.class;
 const links=(over={})=>[{kind:'wikidata',url:'https://www.wikidata.org/wiki/Q1'},{kind:'other',url:'https://www.after.life/'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},
  {kind:'musicbrainz',url:'https://musicbrainz.org/artist/1'},{kind:'twitter',url:'https://twitter.com/a'},{kind:'discogs',url:'https://www.discogs.com/artist/1'},{kind:'juno',url:'https://www.junodownload.com/artists/A'},

@@ -766,6 +766,8 @@
   }
   function finishPreview() {const resume=preview?.resume;cancelPreview();if(resume)radio.play();else renderPlayer();}
   radio.cancelPreview=cancelPreview;
+  // A preview holds the radio paused: it was on before, and the end of the preview turns it on again.
+  radio.previewResume=()=>Boolean(preview?.resume);
   radio.stopPreview=()=>{if(!preview)return false;finishPreview();return true;};
   $('preview-audio').addEventListener('ended',finishPreview);
   $('preview-audio').addEventListener('error',()=>{if(preview){$('discovery-status').textContent=word('previewError');finishPreview();}});

@@ -420,9 +420,16 @@ $('stations-sheet').addEventListener('click', event => {
 $('stations-sheet').addEventListener('close', () => $('open-stations').setAttribute('aria-expanded', 'false'));
 $('bus-link').addEventListener('click', closeStations);
 mobileLayout.addEventListener('change', arrangeStations);
-// The arrows, the swipes and the media keys walk the stations in the order on screen.
+// The arrows and the swipes walk the stations in the order on screen.
+const beside = (mood, dir) => shown[(shown.indexOf(mood) + dir + shown.length) % shown.length];
 function step(dir) {
-  selectMood(shown[(shown.indexOf(currentMood) + dir + shown.length) % shown.length].id);
+  selectMood(beside(currentMood, dir).id);
+}
+// The lock screen and the media keys have no page to press play on: they step from the station heard and, while the
+// radio is on, move the music there.
+function stepMusic(dir) {
+  selectMood(beside(tunedMood, dir).id);
+  if (radioOn()) playShown();
 }
 let swipe = null;
 $('poster').addEventListener('pointerdown', event => {
@@ -494,7 +501,7 @@ function renderScene() {
   }
   // The hero names the station's stage over its title, in both ways; the Bus's title is its stage.
   $('mood-stage').hidden = bus;
-  $('mood-stage').textContent = stageFact(currentMood);
+  $('mood-fact').textContent = stageFact(currentMood);
   const index=shown.indexOf(currentMood);
   $('mood-place').textContent = bus ? text('busPlace') : words[language].places[Number(currentMood.id)-1];
   $('station-text').textContent = `${index+1} / ${shown.length}`;
@@ -707,6 +714,39 @@ function play() {
   rememberStation();
   connect();
 }
+// The radio is on while its sound is wanted, and while a preview holds it paused to give it back at its end.
+const radioOn = () => wanted || Boolean(window.Pavoia?.previewResume?.());
+// The one way a control moves the music to the station shown. Where it is the station heard, the radio plays, or a
+// preview gives it back; apart, the bar takes the station shown and its stream replaces the old one in one cut. The Bus
+// has no stream to play.
+function playShown() {
+  if (location.hash === '#bus' || !currentMood.stage) return;
+  if (!apart()) {
+    if (!wanted) play();
+    else window.Pavoia?.stopPreview?.();
+    return;
+  }
+  window.Pavoia?.cancelPreview?.();
+  tunedMood = currentMood;
+  prunePolls();
+  wanted = true;
+  lost = false;
+  retries = 0;
+  rememberStation();
+  renderBar();
+  connect();
+  poll(tunedMood);
+}
+// The bar takes the station shown while the radio is off, and starts nothing: its play then starts that station.
+function tuneShown() {
+  tunedMood = currentMood;
+  clearTimeout(retryTimer);
+  retries = 0;
+  lost = false;
+  rememberStation();
+  prunePolls();
+  renderBar();
+}
 
 // The network comes back, the page is shown again, or play is pressed on the lock screen: a lost stream tries again
 // at once instead of waiting out its delay. Back online, a stall in the middle of a track tries again too, since the
@@ -742,7 +782,9 @@ document.addEventListener('keydown', event => {
     event.preventDefault();
     if (!event.repeat && !window.Pavoia.stopPreview?.()) toggle();
   } else if (!event.repeat && (event.key === 'ArrowLeft' || event.key === 'ArrowRight') && !document.querySelector('dialog:modal') && !target.matches('[type=radio], [type=range]')) {
-    step(event.key === 'ArrowLeft' ? -1 : 1);
+    const dir = event.key === 'ArrowLeft' ? -1 : 1;
+    if ($('explorer').open) pick(beside(currentMood, dir).id);
+    else step(dir);
   }
 });
 // The other page keys listen on the window, after every handler of the document, so a key the Index or Escape took
@@ -751,10 +793,17 @@ document.addEventListener('keydown', event => {
 // ? opens or closes the shortcuts under the roots, which the open explorer covers.
 window.addEventListener('keydown', event => {
   if (event.defaultPrevented || event.repeat || event.ctrlKey || event.metaKey || event.altKey || event.isComposing || event.target.matches?.(typing) || document.querySelector('dialog:modal')) return;
-  if (/^[1-9]$/.test(event.key)) selectMood(shown[event.key - 1].id);
+  if (/^[1-9]$/.test(event.key)) pick(shown[event.key - 1].id);
   else if (event.key === 'm' || event.key === 'M') window.Pavoia.toggleMute?.();
   else if (event.key === '?' && !$('explorer').open) toggleKeys();
 });
+// A key picks a station as the rail does. The open explorer covers the hero, so there a pick moves the music too while
+// the radio is on; a key for the station already shown and heard changes nothing, and a preview goes on.
+function pick(id) {
+  const before = currentMood;
+  selectMood(id);
+  if ($('explorer').open && radioOn() && (apart() || currentMood !== before)) playShown();
+}
 function toggleKeys() {
   const keys = $('keys'), summary = keys.querySelector('summary');
   keys.open = !keys.open;
@@ -764,7 +813,7 @@ function toggleKeys() {
   if (keys.open) keys.scrollIntoView({ block: 'nearest', behavior: reducedMotion.matches ? 'auto' : 'smooth' });
 }
 if ('mediaSession' in navigator) {
-  for (const [action, handler] of Object.entries({ play, pause, stop: pause, previoustrack: () => step(-1), nexttrack: () => step(1) })) {
+  for (const [action, handler] of Object.entries({ play, pause, stop: pause, previoustrack: () => stepMusic(-1), nexttrack: () => stepMusic(1) })) {
     try { navigator.mediaSession.setActionHandler(action, handler); } catch { /* Unsupported action. */ }
   }
 }
@@ -924,10 +973,15 @@ $('language').addEventListener('click',event=>{
   localise();
 });
 
-// The explorer tunes the radio to a stage that plays a record; the player bar shows the switch.
+// The explorer tunes the radio to a stage that plays a record; the player bar shows the switch. While the radio is on,
+// the music moves there; while it is off, the bar's play starts it. The station already shown and heard changes
+// nothing, and a preview goes on.
 function tune(stage) {
-  const mood = moods.find(m => m.stage === stage);
-  if (mood) selectMood(mood.id);
+  const mood = moods.find(m => m.stage === stage), before = currentMood;
+  if (!mood) return;
+  selectMood(mood.id);
+  if (radioOn() && (apart() || currentMood !== before)) playShown();
+  else if (apart()) tuneShown();
 }
 
 function announceRadio() {
