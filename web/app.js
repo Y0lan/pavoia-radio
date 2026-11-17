@@ -107,6 +107,10 @@ Object.assign(words.de, {orderStations:'Sender ordnen', byFeeling:'Nach Stimmung
 // The shortcuts under the roots: each key's name where it has one, and what it does.
 Object.assign(words.en, {keysTitle:'Keyboard shortcuts', keySpace:'Play or pause', keyArrowsName:'Left and right arrows', keyArrows:'Previous or next station',
   keyNumbers:'The station at that place in the list', keyMute:'Sound off, and on again', keyFilter:'In the Index: filter the names', keyClose:'Back to listening', keyHelp:'Show or hide these shortcuts'});
+// Away from the station heard (on the Bus), the bar's label is a door back to it; the radio heard says so. The German
+// word is no longer than the English one, so the waveform keeps its room in the one-row bar.
+Object.assign(words.en, {tunedTo:'Tuned to {station}', backTo:'Back to {station}', hearing:'You hear this station'});
+Object.assign(words.de, {tunedTo:'Sender: {station}', backTo:'Zurück zu {station}', hearing:'Diesen Sender hörst du'});
 Object.assign(words.de, {keysTitle:'Tastenkürzel', keySpace:'Abspielen oder pausieren', keyArrowsName:'Pfeiltasten links und rechts', keyArrows:'Vorheriger oder nächster Sender',
   keyNumbers:'Der Sender an dieser Stelle der Liste', keyMute:'Ton aus und wieder an', keyFilter:'Im Index: Namen filtern', keyClose:'Zurück zum Radio', keyHelp:'Diese Kürzel zeigen oder verbergen'});
 let language = 'en';
@@ -166,6 +170,8 @@ let currentMood = moodOf(new URLSearchParams(location.search).get('station')) ||
 // player bar holds: the one that plays, or that the bar's play starts. For now a station change moves both at once.
 let tunedMood = currentMood;
 const apart = () => tunedMood !== currentMood;
+// The page is away from the station heard: on the Bus, or on another station.
+const away = () => location.hash === '#bus' || apart();
 // A change of station or a play remembers the station in the bar for the next visit.
 function rememberStation() {
   try { localStorage.setItem('pavoia-station', tunedMood.stage); } catch { /* Storage is optional. */ }
@@ -288,6 +294,19 @@ for (const mood of moods) {
   labels.set(mood.stage, label);
   facts.set(mood, fact);
 }
+// The station heard carries the red dot on the rail and in the sheet, wherever the page is. While its sound is wanted,
+// its radio is also described as the one you hear, after its line (and its stage, by feeling).
+const hearingNote = Object.assign(document.createElement('span'), { id: 'hearing-note', hidden: true });
+$('station-selector').append(hearingNote);
+function markHearing() {
+  hearingNote.textContent = text('hearing');
+  for (const [stage, label] of labels) {
+    const input = label.querySelector('input'), hearing = stage === tunedMood.stage;
+    const ids = (input.getAttribute('aria-describedby') || '').split(' ').filter(id => id && id !== 'hearing-note');
+    label.toggleAttribute('data-hearing', hearing);
+    input.setAttribute('aria-describedby', [...ids, ...hearing && wanted ? ['hearing-note'] : []].join(' '));
+  }
+}
 
 // A group of a way is its word over its stations, and for a stage its phrase. Screen readers hear the word and the
 // phrase once, as the group's name and description, so the visible copies are hidden from them. Each group is built
@@ -331,6 +350,7 @@ function arrangeWay() {
   for (const choice of $('ways').children) choice.setAttribute('aria-pressed', choice.value === way);
   for (const mood of moods) labels.get(mood.stage).querySelector('input').setAttribute('aria-describedby', way === 'feeling' ? `line-${mood.id} stage-${mood.id}` : `line-${mood.id}`);
   balanceRail();
+  markHearing();
 }
 // Both ways take as many rows on the rail, so a press never moves the title, nor the switch from under the pointer.
 // The rail wraps whole groups, each as wide as its word or its stations; the other way's words are measured for a
@@ -341,15 +361,15 @@ function balanceRail() {
   for (const { node } of groups.values()) node.removeAttribute('data-break');
   rail.removeAttribute('data-wraps');
   if (mobileLayout.matches) return;
-  const other = ways[way === 'stage' ? 'feeling' : 'stage'], away = other.filter(group => !ways[way].includes(group)).map(group => groupNode(group).node);
-  rail.append(...away);
+  const other = ways[way === 'stage' ? 'feeling' : 'stage'], aside = other.filter(group => !ways[way].includes(group)).map(group => groupNode(group).node);
+  rail.append(...aside);
   const width = node => node.getBoundingClientRect().width, gap = node => parseFloat(getComputedStyle(node).columnGap) || 0;
   const wide = group => {
     const { name, list } = groupNode(group), items = group.bus ? [$('bus-link')] : group.ids.map(id => labels.get(id));
     return Math.max(width(name), items.reduce((sum, item) => sum + width(item), gap(list) * (items.length - 1)));
   };
   const [mine, theirs] = [ways[way], other].map(order => [width($('ways')), ...order.map(wide)]);
-  for (const node of away) node.remove();
+  for (const node of aside) node.remove();
   const room = width(rail) + .01, between = gap(rail);
   const rows = widths => widths.reduce(([count, x], w) => x && x + between + w > room ? [count + 1, w] : [count, x ? x + between + w : w], [1, 0])[0];
   const balanced = rows(theirs) > rows(mine) && rows(mine.slice(0, -1)) + 1 === rows(theirs);
@@ -480,6 +500,7 @@ function renderScene() {
   $('station-text').textContent = `${index+1} / ${shown.length}`;
   $('station-label').textContent = `${text('stationPosition')} ${index+1} ${text('of')} ${shown.length}, ${spoken(currentMood)}`;
   $('station-position').hidden = bus;
+  renderAway();
 }
 // The tab names the record while it plays, and otherwise the station the listener wants to hear, or the one shown.
 function tabTitle() {
@@ -513,15 +534,50 @@ function render() {
   changePhoto();
   renderStatus();
   document.querySelector(`input[value="${currentMood.id}"]`).checked = true;
+  markHearing();
 }
 // The bar: the station it holds, and what that station has on air.
 function renderBar() {
   button.disabled = !tunedMood.stage;
-  // The bar names the stage after a station named otherwise; where its column is narrow, the stylesheet hides it.
-  const suffix = stageSuffix(tunedMood);
-  $('player-stage').replaceChildren(plain(tunedMood), ...suffix ? [Object.assign(document.createElement('span'), { className: 'player-stage-of', textContent: ` · ${suffix}` })] : []);
+  renderAway();
   syncBar();
+  markHearing();
 }
+// Away from the station heard, the page says so, and the bar's label leads back to it.
+function renderAway() {
+  document.body.toggleAttribute('data-away', away());
+  paintStage();
+}
+// The bar's label, its only writer. It names the station held, and the stage after a station named otherwise; where its
+// column is narrow, the stylesheet hides the stage. Away, it is a door back: "Tuned to …", the same playing or paused,
+// so a pause never changes its width. It is drawn again only when it changes, so a focused door keeps its focus; when
+// the door goes, its focus goes to the play button.
+let paintedStage = '';
+function paintStage() {
+  const key = [away(), tunedMood.id, language].join(':');
+  if (key === paintedStage) return;
+  paintedStage = key;
+  const label = $('player-stage'), focused = label.contains(document.activeElement), name = plain(tunedMood);
+  if (away()) {
+    // "Tuned to" has its own span: where the column is narrow, the stylesheet keeps it for screen readers alone.
+    const [to, after] = text('tunedTo').split('{station}');
+    const door = Object.assign(document.createElement('button'), { type: 'button', className: 'stage-door', title: text('backTo').replace('{station}', name) });
+    door.append(Object.assign(document.createElement('span'), { className: 'stage-door-to', textContent: to }), name + after);
+    door.addEventListener('click', showPlaying);
+    label.replaceChildren(door);
+    if (focused) door.focus({ preventScroll: true });
+    return;
+  }
+  const suffix = stageSuffix(tunedMood);
+  label.replaceChildren(name, ...suffix ? [Object.assign(document.createElement('span'), { className: 'player-stage-of', textContent: ` · ${suffix}` })] : []);
+  if (focused) $('play').focus({ preventScroll: true });
+}
+// The door and the bar's cover show the station heard. On the Bus, selectMood() leaves it with one entry and touches
+// no audio.
+function showPlaying() {
+  if (away()) selectMood(tunedMood.id);
+}
+document.querySelector('.dock-artwork').addEventListener('click', showPlaying);
 // The bar's track is the one its station answered last: Loading track… until the first answer, and after a failed
 // answer the last track known, or the station's name when none is. A failed answer clears the lock screen.
 function syncBar() {
@@ -550,6 +606,10 @@ function state(value, status) {
   button.title = `${label} (${text('space')})`;
   $('playback-status').textContent = text(status);
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = wanted ? 'playing' : 'paused';
+  paintStage();
+  // A transient state hides the bar's label: a door that had focus gives it to the play button.
+  if (status !== 'paused' && status !== 'playing' && $('player-stage').contains(document.activeElement)) $('play').focus({ preventScroll: true });
+  markHearing();
   tabTitle();
   announceRadio();
 }
@@ -853,6 +913,7 @@ function localise() {
   renderArtworkToggle();
   renderScene();
   syncBar();
+  markHearing();
   renderStatus();
   state(playbackState,playbackText);
 }

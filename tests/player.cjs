@@ -482,6 +482,13 @@ test('Bus navigation and metadata updates keep the playing station and source',a
  e.location.hash='#bus';e.window.emit('popstate');
  e.elements.moods.emit('click',{target:{name:'mood',value:'03'}});
  assert.equal(e.location.hash,'');assert.equal(e.elements.photo.src,photo);assert.equal(e.audio.calls.length,calls);
+ for(const target of [()=>e.elements['player-stage'].children[0],()=>e.elements['dock-artwork']]){
+  e.location.hash='#bus';e.window.emit('hashchange');
+  target().emit('click');
+  assert.deepEqual([e.location.hash,e.audio.src,e.audio.calls.length,e.audio.paused,e.window.Pavoia.getState().stage,e.elements.photo.src],['',source,calls,false,'palac-dance',photo],'the door and the cover leave the Bus; the source, the play calls and the station stay');
+ }
+ const entries=e.urls().length;e.elements['dock-artwork'].emit('click');
+ assert.deepEqual([e.urls().length,e.audio.src,e.audio.calls.length],[entries,source,calls],'on the station heard, the cover leads nowhere');
  e.location.hash='#bus';e.window.emit('hashchange');e.change('01');await flush();
  assert.equal(e.location.hash,'');assert.equal(e.audio.src,'/stream/bermuda-day.mp3');
 });
@@ -592,11 +599,23 @@ test('the bar names the stage, the tab names the record and Play names its key',
  assert.equal(e.elements.play.title,'Play (Space)');assert.equal(e.elements.play.getAttribute('aria-pressed'),null);
  e.click();assert.equal(e.elements.play.title,'Pause (Space)');assert.equal(e.document.title,'Lost in Feelings · Pavoia Radio','connecting is not playing yet');
  e.playing();assert.equal(e.document.title,'▶ First · Artist First · Pavoia Radio');assert.equal(e.elements['player-artist'].textContent,'Artist First');
+ e.location.hash='#bus';e.window.emit('hashchange');
+ const bar=e.elements['player-stage'],door=bar.children[0];
+ assert.deepEqual([bar.children.length,door.localName,door.type,door.className,textOf(door),door.getAttribute('aria-label'),door.title,e.document.body.getAttribute('data-away')],[1,'button','button','stage-door','Tuned to Lost in Feelings',null,'Back to Lost in Feelings',''],'on the Bus while playing, the page is away, and the bar reads Tuned to, named by its words, described by its title');
+ assert.deepEqual([door.children.length,door.children[0].localName,door.children[0].className,door.children[0].textContent,door.children[1]],[2,'span','stage-door-to','Tuned to ','Lost in Feelings'],'"Tuned to" has its own span, then the name');
+ const english=door.children[0].textContent.length;
+ e.click();assert.deepEqual([bar.children[0]===door,textOf(bar),door.title],[true,'Tuned to Lost in Feelings','Back to Lost in Feelings'],'paused on the Bus, it reads the same and is not drawn again');
+ e.click();e.playing();e.location.hash='';e.window.emit('hashchange');
+ assert.deepEqual([textOf(bar),e.document.body.getAttribute('data-away')],['Lost in Feelings · Pałac',null],'back on the station, the label is plain text again');
  e.response=new Error('Offline');e.change('03');await flush();
  assert.equal(textOf(e.elements['player-stage']),'Night in Motion · Pałac');assert.equal(e.elements['player-title'].textContent,'Night in Motion','a failed metadata call names the station');
  assert.equal(e.elements['player-artist'].textContent,'','the artist line does not repeat it');
  e.setLanguage('de');assert.equal(e.elements.play.title,'Pause (Leertaste)');
  e.click();assert.equal(e.elements.play.title,'Abspielen (Leertaste)');assert.equal(e.document.title,'Night in Motion · Pavoia Radio');
+ e.location.hash='#bus';e.window.emit('hashchange');
+ assert.deepEqual([textOf(e.elements['player-stage']),e.elements['player-stage'].children[0].title],['Sender: Night in Motion','Zurück zu Night in Motion'],'in German');
+ assert.deepEqual([e.elements['player-stage'].children[0].children[0].className,e.elements['player-stage'].children[0].children[0].textContent],['stage-door-to','Sender: '],'its own span in German too');
+ assert.ok(e.elements['player-stage'].children[0].children[0].textContent.length<=english,'the German word is no longer than the English one, so the waveform keeps its room in the one-row bar');
 });
 
 test('the record title opens its roots, and the stage photo stands in for a missing cover',async()=>{
@@ -813,8 +832,19 @@ test('the Bus scene shows one current mark, and the red dot marks the stage you 
  assert.match(rules.get('body[data-bus] .mood:has(input:checked):not(:hover)'),/color:var\(--soft\)/,'the stage that keeps playing goes back to rest');
  assert.match(rules.get('body[data-bus] .mood:has(input:checked) span::after'),/transform:scaleX\(0\)/,'and loses its underline');
  assert.match(phone.get('body:not([data-bus]) #stations-sheet .mood:has(input:checked), #stations-sheet .bus-link[aria-current]'),/^\s*background:rgb\(240 237 229 \/ \.06\);\s*$/,'a checked row gets only the background, and only the Bus row in its scene');
- assert.match(phone.get('body[data-playing]:not([data-bus]) #stations-sheet .mood:has(input:checked)::after'),/width:6px; height:6px; border-radius:50%; background:var\(--red\)/,'the dot shows only while the stage plays, in red');
- assert.ok(!phone.has('#stations-sheet .mood:has(input:checked)::after'),'no dot at rest');
+ assert.match(phone.get('body[data-wanted] #stations-sheet .mood[data-hearing]::after'),/content:""; grid-area:1 \/ 3 \/ 3; align-self:center; width:6px; height:6px; border-radius:50%; background:var\(--red\)/,'the sheet dot marks the station heard while its sound is wanted, in red, in its own grid area');
+ assert.ok(![...phone.keys()].some(selector=>selector.includes('#stations-sheet .mood')&&selector.endsWith('::after')&&selector.includes(':not([data-bus])')),'and shows on the Bus too');
+ assert.ok(!phone.has('#stations-sheet .mood[data-hearing]::after')&&!phone.has('#stations-sheet .mood:has(input:checked)::after'),'no dot at rest');
+ assert.match(rules.get('.poster .mood > span::before'),/content:""; position:absolute; top:50%; right:calc\(-1 \* var\(--s1\) - 6px\); width:6px; height:6px; margin-top:-2px; border-radius:50%; background:var\(--red\); opacity:0;/,'the rail dot waits unseen in the gap after the name, nearer to its own name than to the next, out of the flow, so no name moves');
+ assert.match(rules.get('.poster .mood:has(input:focus-visible) > span::before'),/^\s*right:calc\(-1 \* var\(--s2\) - 6px\);\s*$/,'under the keyboard the dot steps clear of the ring');
+ assert.match(rules.get('body[data-wanted] .poster .mood[data-hearing] > span::before'),/^\s*opacity:1;\s*$/,'and shows on the station heard while its sound is wanted, on the Bus too');
+ assert.ok(![...rules.keys()].some(selector=>selector.includes('span::before')&&selector.includes('data-bus')),'no Bus exception for the rail dot');
+ assert.match(rules.get('#player-stage:has(.stage-door)'),/^\s*overflow:visible;\s*$/,'the bar\'s label lets the door\'s focus ring out');
+ assert.match(rules.get('.stage-door'),/padding:0 0 var\(--s1\); margin-bottom:calc\(-1 \* var\(--s1\)\);/,'the door keeps 4px under its words for its underline, and gives them back, so the label stays 14px high');
+ assert.match(cssRules('(min-width:761px) and (max-width:1100px)').get('.player .stage-door-to'),/^\s*position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset\(50%\);\s*$/,'where the bar\'s column would cut the name, the door shows the name alone, and keeps "Tuned to" for screen readers');
+ assert.match(rules.get('.stage-door'),/display:block; max-width:100%;.*color:var\(--soft\); font:inherit; letter-spacing:inherit; text-transform:inherit;.*overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer;/,'the door keeps the label\'s letters, a step brighter, and cuts its own words');
+ assert.match(rules.get('.stage-door:is(:hover, :focus-visible)'),/color:var\(--cream\); text-decoration:underline; text-underline-offset:3px;/,'cream and underlined under a pointer or the keyboard');
+ assert.match(rules.get('body[data-away] .player .dock-artwork'),/^\s*cursor:pointer;\s*$/,'away, the cover leads back too');
  for(const [selector,body] of phone)if(selector.includes('#stations-sheet'))assert.doesNotMatch(body,/margin-left/,'no margin hack: '+selector);
 });
 
@@ -1197,6 +1227,68 @@ test('leaving the Bus adds one entry, and Back shows the current station with no
  e.history.back();await flush();
  assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.audio.calls.length,e.audio.paused],['/?station=closing','closing',calls,false],'Back again: the current station, never the old one');
  e.history.go(2);await flush();assert.deepEqual([e.url(),e.window.Pavoia.getState().stage,e.urls().length],['/?station=closing','closing',3],'Forward the same');
+ e.location.hash='#bus';e.window.emit('hashchange');await flush();
+ e.elements['player-stage'].children[0].emit('click');await flush();
+ assert.deepEqual([e.urls(),e.position(),e.document.body.getAttribute('data-bus'),e.audio.calls.length,e.audio.src,e.audio.paused],[['/?station=closing','/?station=closing#bus','/?station=closing','/?station=closing#bus','/?station=closing'],4,null,calls,src,false],'the door leaves the Bus with exactly one entry, and the music goes on untouched');
+});
+
+test('the station heard carries data-hearing and a description only while the sound is wanted',async()=>{
+ const e=setup();await flush();
+ const labelOf=id=>e.document.querySelectorAll('.mood').find(label=>label.querySelector('input').value===id);
+ const marked=()=>e.document.querySelectorAll('.mood').filter(label=>'data-hearing' in label.attrs).map(label=>label.querySelector('input').value);
+ const described=id=>labelOf(id).querySelector('input').getAttribute('aria-describedby');
+ const note=e.elements['station-selector'].children.find(child=>child.id==='hearing-note');
+ assert.deepEqual([marked(),described('04'),described('03'),note.hidden,note.textContent],[['04'],'line-04','line-03',true,'You hear this station'],'paused: the mark is on the station tuned alone, and no radio is described as heard');
+ e.click();
+ assert.deepEqual([marked(),described('04'),described('03')],[['04'],'line-04 hearing-note','line-03'],'wanted, even while it connects: the radio heard is described as such, after its line');
+ e.location.hash='#bus';e.window.emit('hashchange');
+ assert.deepEqual([marked(),described('04')],[['04'],'line-04 hearing-note'],'on the Bus too');
+ e.elements.ways.children[0].emit('click');
+ assert.deepEqual([marked(),described('04'),described('03')],[['04'],'line-04 stage-04 hearing-note','line-03 stage-03'],'a way switch while playing keeps the note, after the line and the stage');
+ e.setLanguage('de');
+ assert.deepEqual([marked(),described('04'),note.textContent],[['04'],'line-04 stage-04 hearing-note','Diesen Sender hörst du'],'in German');
+ e.elements.ways.children[1].emit('click');
+ assert.deepEqual([described('04'),described('03')],['line-04 hearing-note','line-03'],'and back by stage, in German');
+ e.change('03');
+ assert.deepEqual([marked(),described('04'),described('03')],[['03'],'line-04','line-03 hearing-note'],'the mark and the note follow the station heard');
+ e.click();
+ assert.deepEqual([marked(),described('03'),note.textContent],[['03'],'line-03','Diesen Sender hörst du'],'a pause keeps the mark, which the stylesheet hides, and takes the note away');
+ e.setLanguage('en');assert.equal(note.textContent,'You hear this station');
+ e.click();e.error();
+ assert.deepEqual([e.document.querySelector('.player').dataset.status,described('03')],['retrying','line-03 hearing-note'],'reconnecting: the sound is still wanted, so the note stays');
+});
+
+test('the door gives focus to the play button when it goes: on a press, on Back and on a transient state',async()=>{
+ const e=setup();await flush();e.click();e.playing();
+ const play=e.elements.play,link=e.elements['bus-link'];
+ const door=()=>e.elements['player-stage'].children.find(child=>child.className==='stage-door');
+ const toBus=()=>{if(e.location.hash!=='#bus'){e.location.hash='#bus';e.window.emit('hashchange');}};
+ const focusDoor=()=>{toBus();door().focus();play.focusOptions=undefined;assert.equal(e.document.activeElement,door());};
+ const onPlay=()=>[e.document.activeElement===play,play.focusOptions?.preventScroll,e.document.querySelector('.player').dataset.status];
+ link.focus();toBus();
+ assert.deepEqual([e.document.activeElement===link,Boolean(door())],[true,true],'the Bus link pressed keeps its focus: a door that had none takes none');
+ e.setLanguage('de');assert.equal(e.document.activeElement,link,'nor a door drawn again in another language');
+ e.setLanguage('en');
+ focusDoor();door().emit('click');
+ assert.deepEqual([...onPlay(),e.location.hash,door()],[true,true,'playing','',undefined],'a press: the door goes, and its focus goes to Play, with no scroll');
+ toBus();assert.deepEqual([e.document.activeElement===play,Boolean(door())],[true,true],'back on the Bus with the focus on Play, it stays there');
+ focusDoor();e.setLanguage('de');
+ assert.deepEqual([e.document.activeElement===door(),door().focusOptions?.preventScroll,textOf(door())],[true,true,'Sender: Lost in Feelings'],'a language switch draws the door again and keeps its focus, with no scroll');
+ e.setLanguage('en');
+ focusDoor();e.history.back();
+ assert.deepEqual([...onPlay(),e.location.hash,door()],[true,true,'playing','',undefined],'Back: the same');
+ // A transient state hides the label, and its door with it: the door keeps its place, and its focus goes to Play.
+ focusDoor();e.audio.readyState=2;e.audio.emit('waiting');
+ assert.deepEqual([...onPlay(),Boolean(door())],[true,true,'buffering',true],'buffering');
+ e.playing();focusDoor();e.error();
+ assert.deepEqual([...onPlay(),Boolean(door())],[true,true,'retrying',true],'reconnecting');
+ e.fire(1000);e.playing();e.actions.pause();
+ focusDoor();e.actions.play();
+ assert.deepEqual([...onPlay(),Boolean(door())],[true,true,'connecting',true],'a play from the lock screen connects');
+ e.audio.calls.at(-1).reject(Object.assign(new Error(),{name:'NotAllowedError'}));await flush();
+ assert.deepEqual([...onPlay(),e.window.Pavoia.getState().wanted,Boolean(door())],[true,true,'blocked',false,true],'a start the browser refuses keeps the focus on Play');
+ assert.notEqual(e.document.activeElement,e.document.body,'focus never falls to the page');
+ assert.equal(e.timers.size,0,'no timer left');
 });
 
 test('closing the explorer, owned or shared, lands on ?station=<current> with an empty hash',async()=>{
