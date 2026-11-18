@@ -82,6 +82,7 @@
     sessionNew1:'1 new track',sessionNew:'{n} new tracks',sessionGone1:'1 removed',sessionGone:'{n} removed',earlierThatDay:'Earlier that day',
     atOnce:'{n} tracks added at once',atOnceGone:'{n} tracks removed at once',atOnceAtLeast:'At least {n} tracks added at once',
     changesLate:'A change shows the time the radio saw it. The radio looks at the playlists every 5 minutes.',
+    joinedOn:'Added to {names} on {date}',joinedWith:'Came to {stage} on {date} with {n}\u00a0other\u00a0tracks',
     airNow:'On air now',airTotal:'{n} listening on all stations',airLoading:'Loading track…',airNoTrack:'No track announced',airError:'What plays now could not load.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
     indexTab:'Index',toHistory:'to History',toStatistics:'to Statistics',toIndexTab:'to the Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
@@ -97,6 +98,7 @@
     sessionNew1:'1 neuer Track',sessionNew:'{n} neue Tracks',sessionGone1:'1 entfernt',sessionGone:'{n} entfernt',earlierThatDay:'Früher am selben Tag',
     atOnce:'{n} neue Tracks auf einmal',atOnceGone:'{n} Tracks auf einmal entfernt',atOnceAtLeast:'Mindestens {n} neue Tracks',
     changesLate:'Eine Änderung zeigt die Zeit, zu der das Radio sie bemerkt hat. Das Radio schaut alle 5 Minuten in die Playlists.',
+    joinedOn:'Am {date} zu {names} hinzugefügt',joinedWith:'Kam am {date} mit {n}\u00a0weiteren\u00a0Tracks zu {stage}',
     airNow:'Gerade läuft',airTotal:'{n} hören auf allen Sendern',airLoading:'Titel wird geladen…',airNoTrack:'Kein Titel gemeldet',airError:'Was gerade läuft, konnte nicht geladen werden.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
     indexTab:'Index',toHistory:'zum Verlauf',toStatistics:'zur Statistik',toIndexTab:'zum Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
@@ -476,9 +478,17 @@
       // and focus in it stays on the title.
       if(!place&&selected&&e.previewUrl&&!selected.previewUrl&&!bodyShown){const held=$('entity-inspector').contains(document.activeElement);renderEntity(e);if(held)recordTitle.focus({preventScroll:true});}
       if(selected)selected=e;else header(e);
+      // A track reads the journals of its stations, or of every station for one that names none, beside its credited
+      // artists and under the same deadline: page 1, then the next ones, 3 in all at most, while its own Plex file is not
+      // in them or its look is cut there (see joinsOf()). A journal that fails or comes late leaves its station out. A
+      // record that leaves stops waiting and reads on no further, and the page it waits for still fills the journal, for
+      // the place that needs it next. Back and Forward draw the line from memory, at once, as it was when left.
+      const plex=e.type==='track'&&/^\d+$/.test(e.plexId||'')?e.plexId:'';
+      const more=(stage,v)=>{const c=v.items.find(c=>c.id===plex&&!c.again);return hop===controller&&(!c||cut(c,v))&&v.next&&v.pages<3?journalMore(stage).then(w=>more(stage,w)):v;};
+      const joins=plex&&!place&&Promise.all((stagesOf(e).length?stagesOf(e):radio.stations).map(s=>journal(s.id).then(v=>more(s.id,v)).catch(()=>null)));
       const ours=[data,...(await Promise.all(near.credited(e).map(a=>fetched(a).catch(()=>null)))).filter(Boolean)];
       const pool=new Map(ours.flatMap(p=>[p.entity,...p.included]).map(r=>[r.id,r]));
-      await Promise.all(near.namingPlan(near.regions(e,records),pool,payloads,navigator.connection?.saveData===true).map(a=>fetched(a).catch(()=>null)));
+      await Promise.all([...near.namingPlan(near.regions(e,records),pool,payloads,navigator.connection?.saveData===true).map(a=>fetched(a).catch(()=>null)),joins]);
     })();
     // An answer that fails after the body painted changes nothing. The 10 s limit holds until every request of the hop
     // settles, the naming ones still out when the deadline painted the body too.
@@ -540,6 +550,31 @@
     // at hand, names its artist and release.
     const parts=[...e.type==='track'&&!near.credited(e).some(id=>records.has(id))?[e.artist,e.album]:[],['artist','label'].includes(e.type)&&e.country&&region(e.country),e.type==='release'&&year,stages.length&&[word(e.type==='track'?'playsOn':'onStage')+' ',...stages],e.type==='track'&&e.durationMs&&time(e.durationMs/1000)];
     parts.filter(Boolean).forEach((part,i)=>{if(i)line.append(' · ');line.append(...[part].flat());});
+    return line;
+  }
+  // The header's last line, a track's only: the day it was added to each station, the stations of one day in one
+  // sentence, each one named, and the station it came to with the others of a bulk look, newest first (see joinsOf()). A
+  // station the line of facts does not name links to its place; a name stays whole on its row, and so does a count with
+  // its noun. With no day known there is no line. On the map the header stands in the
+  // map's box, over its caption: there the oldest parts give way until the line ends inside the box, and the newest
+  // always shows. The list shows every part.
+  function joinedLine(e,into,box) {
+    const plex=e.type==='track'&&/^\d+$/.test(e.plexId||'')?e.plexId:'';if(!plex)return null;
+    const own=new Set(stagesOf(e).map(s=>s.id)),parts=[],days=new Map();
+    const place=id=>{if(own.has(id))return node('span','',stationName(id));const a=node('a','',stationName(id));a.href='#statistics/'+id;return a;};
+    for(const j of joinsOf(plex).sort((a,b)=>Date.parse(b.at)-Date.parse(a.at))){
+      if(j.with){parts.push(sentence(word('joinedWith').replace('{n}',()=>number(j.with)),{stage:place(j.stage),date:dayOf(j.at)}));continue;}
+      const day=new Date(j.at).toDateString();
+      if(!days.has(day)){days.set(day,{at:j.at,stages:[]});parts.push(days.get(day));}
+      days.get(day).stages.push(j.stage);
+    }
+    if(!parts.length)return null;
+    const line=node('p','entity-line'),said=({at,stages})=>sentence(word('joinedOn').replace('{names}',()=>new Intl.ListFormat(radio.getState().language,{type:'conjunction'}).format(stages.map((_,i)=>'{s'+i+'}'))),{...Object.fromEntries(stages.map((id,i)=>['s'+i,place(id)])),date:dayOf(at)});
+    into.append(line);
+    for(let n=parts.length;n;n--){
+      line.replaceChildren();parts.slice(0,n).forEach((part,i)=>{if(i)line.append(' · ');line.append(...Array.isArray(part)?part:said(part));});
+      if(n===1||!box?.clientWidth||line.getBoundingClientRect().bottom<=box.getBoundingClientRect().bottom)break;
+    }
     return line;
   }
   // The header: the line to the places before and after, the picture, the type, the title and its line.
@@ -608,6 +643,9 @@
       const empty=e.type==='label'&&r.key==='releases'?'noLabelReleases':empties[r.key];
       if(r.items.length||(empty&&!r.total))(map||grid).append(regionSection(r.key,r.items.map(i=>({...i,line:say(i.reason),fact:fact(i)})),empty,'r',Boolean(map),undefined,null,open.includes(r.key)));
     }
+    // A track's day on each station closes the header, under its notes, with the body: nothing over it moves, and on the
+    // map the names are laid out around it.
+    joinedLine(e,recordTitle.parentNode,map);
     const about=node('section','record-about'),title=node('h4','',word('about').replace('{title}',e.title)),shown=sites(e.links||[]);
     title.id='r-about';about.setAttribute('aria-labelledby',title.id);about.append(title);
     let text=null,more=null,fit=null;
@@ -1125,7 +1163,16 @@
   // A removal is known only once its look is read whole. A sync writes its additions before its removals, so a page that
   // cuts a look holds its removals before the additions that could make them files found again: while its station has
   // more of that look to read, a removal of it is not known yet, and shows nowhere.
-  const unsure = (c,j) => c.kind==='removed'&&Boolean(j?.next)&&Date.parse(c.observedAt)===Date.parse(j.items.at(-1).observedAt);
+  const cut = (c,j) => Boolean(j?.next)&&Date.parse(c.observedAt)===Date.parse(j.items.at(-1).observedAt);
+  const unsure = (c,j) => c.kind==='removed'&&cut(c,j);
+  // When a track joined each station, from every journal in memory: the newest record of its own Plex file there that is
+  // no file found again. An addition dates the station, and one of a bulk look comes with the others of its look. A
+  // removal says nothing, and so does a record whose look the pages read cut, since the rest of its look could still
+  // make it a file found again or part of a bulk; no record says nothing either. It sends no request and writes nothing.
+  const joinsOf = plexId => [...journals.values()].map(j=>j.value).filter(Boolean).flatMap(v=>{
+    const c=v.items.find(c=>c.id===plexId&&!c.again);
+    return c?.kind==='added'&&!cut(c,v)?[{stage:v.stage,at:c.observedAt,with:c.bulk?c.sync-1:0}]:[];
+  });
   // The changes shown as sessions, newest first, from the flags of the journal, writing nothing on a record. A file found
   // again does not show, nor a removal not known yet. In one look of one station the additions come first, so that its
   // removals, once known, come under them. The bulk records of one station, one look and one kind fold into one row,

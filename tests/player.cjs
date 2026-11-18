@@ -5871,3 +5871,193 @@ test('Back to a track drawn from an included copy paints its header and its body
  assert.deepEqual(seen.map(s=>s.title+(s.regions?' whole':'')),['Track 2','Track 1 whole'],'the last header stays until Track 1 paints whole, never its header alone');
  release();await flush();
 });
+
+// Step D4: a track's record says when it was added to each station, from the stations' journals.
+// A track with its own Plex file and its stations, each named as the playlists name it, with the playlist's own id; a
+// change of one Plex file at a local time.
+const trackOn=(n,plexId,stations=[],more={})=>({entity:rec(id('trk',n),'Track '+n,[],{plexId,durationMs:300000,playlists:stations.map(station=>({code:'X',station,plexId:'147167'})),...more}),included:[]});
+const change=(seq,plex,[y,mo,d,h,mi],kind='added',title='Track '+plex,artist='Artist')=>({sequence:String(seq),kind,id:String(plex),title,artist,album:'',observedAt:new Date(y,mo,d,h,mi).toISOString()});
+// The header's last line when it is the line of days: a second p.entity-line, last in the title's column.
+const joinedOf=e=>{const about=byClass(inspector(e),'entity-heading')[0]?.children.at(-1),lines=about?byClass(about,'entity-line'):[];return lines.length>1&&about.children.at(-1)===lines.at(-1)?lines.at(-1):null;};
+// A record's body has painted: its regions, or the sentence that nothing is linked to it. A hop through 3 pages of
+// changes takes more turns than one flush.
+const bodyIn=e=>byClass(inspector(e),'region').length>0||byClass(inspector(e),'collection-note').some(n=>textOf(n).startsWith('Nothing in the collection'));
+const settled=async(e,title)=>{for(let i=0;i<8&&!(titleShown(e)===title&&bodyIn(e));i++)await flush();};
+const linksIn=p=>p.descendants().filter(n=>n.localName==='a').map(a=>[a.textContent,a.getAttribute('href')]);
+const asksOf=(e,stage)=>e.changesRequests.filter(r=>r.url.split('/')[3]===stage).map(r=>new URL(r.url,'http://radio').searchParams.get('before')||'first');
+
+test('a track\'s header ends on the day it was added to each station the changes name, at the body paint, and says nothing for a track from before tracking, one removed last, or one past the pages read',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);const A=id('art',1);let credited=null;
+ const tracks={[id('trk',1)]:{entity:rec(id('trk',1),'Track 1',[[A,'primary']],{plexId:'501',durationMs:300000,playlists:['Etage 0','Fontanna','Essentials'].map(station=>({station}))}),included:[]},
+  [id('trk',2)]:trackOn(2,'502',['Essentials']),[id('trk',3)]:trackOn(3,'503',['Essentials']),[id('trk',4)]:trackOn(4,'600',['Ambiance']),[id('trk',5)]:trackOn(5,'9020',['Closing'])};
+ const feeds={essentials:[change(3,501,[2026,10,16,12,51]),change(2,502,[2026,10,10,9,0],'removed'),change(1,502,[2026,10,2,9,0])],fontanna:[change(1,501,[2026,10,16,9,10])],'etage-zero':[change(1,501,[2026,10,12,22,0])],
+  ambiance:changeFeed(350,9,e.clock.now),closing:changeFeed(150,9,e.clock.now)};
+ e.changes=url=>changePage(feeds[url.split('/')[3]]||[])(url);
+ e.discovery=url=>{const key=url.split('/').pop();return key===A?new Promise(resolve=>{credited=()=>resolve(entity(A));}):tracks[key]||entity(key,'track');};
+ routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual([titleShown(e),byClass(inspector(e),'region').length,joinedOf(e)],['Track 1',0,null],'the header paints before the body, with no line of days');
+ assert.deepEqual(['etage-zero','fontanna','essentials'].map(s=>asksOf(e,s)),[['first'],['first'],['first']],'its three stations are asked, beside its credited artist');
+ credited();await flush();
+ const line=joinedOf(e);
+ assert.deepEqual([byClass(inspector(e),'region').length>0,line?.localName,textOf(line),linksIn(line)],[true,'p','Added to Essentials and Fontanna on Nov 16 · Added to Etage 0 on Nov 12',[]],'at the body paint the header ends on its days, newest first, the stations of one day together, plain text where the line of facts names them');
+ for(const [n,why] of [[2,'one removed last'],[3,'one from before tracking']]){routeTo(e,'#explore/'+id('trk',n));await settled(e,'Track '+n);assert.deepEqual([titleShown(e),bodyIn(e),joinedOf(e),byClass(byClass(inspector(e),'entity-heading')[0],'entity-line').length],['Track '+n,true,null,1],why+': no line');}
+ routeTo(e,'#explore/'+id('trk',4));await settled(e,'Track 4');
+ assert.deepEqual([bodyIn(e),joinedOf(e),asksOf(e,'ambiance')],[true,null,['first','251','151']],'one past the pages read: 3 pages at most, then no line');
+ routeTo(e,'#explore/'+id('trk',5));await settled(e,'Track 5');
+ assert.deepEqual([textOf(joinedOf(e)),asksOf(e,'closing')],['Added to Closing on Nov 3',['first','51']],'one on the second page: the record reads on until it finds it');
+ e.setLanguage('de');await flush();assert.equal(textOf(joinedOf(e)),'Am 3. Nov. zu Closing hinzugefügt');
+});
+
+test('a basic record gets its station from the changes of all nine stations, as a link, and a track of a bulk sync says it came with the others',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);
+ const look=[2026,9,15,6,48],feeds={'etage-zero':Array.from({length:7},(_,i)=>change(7-i,143466-i,look)),fontanna:Array.from({length:86},(_,i)=>change(86-i,1000+i,look))};
+ e.changes=url=>changePage(feeds[url.split('/')[3]]||[])(url);
+ const basic={entity:{id:'plex_143466',type:'track',title:'Synthetic Dreams (Anetha remix)',artist:'X-Coast',album:'Synthetic Dreams EP',basicDetails:true,plexId:'143466',connections:[]},included:[]};
+ e.discovery=url=>{const key=url.split('/').pop();return key==='plex_143466'?basic:key===id('trk',1)?trackOn(1,'1000',['Fontanna']):entity(key,'track');};
+ routeTo(e,'#explore/plex_143466');await flush();
+ const asked=[...e.window.Pavoia.stations].map(s=>asksOf(e,s.id).length),line=joinedOf(e),about=line.parent;
+ assert.deepEqual([asked,e.changesRequests.length],[[1,1,1,1,1,1,1,1,1],9],'no station named: every station is asked once');
+ assert.deepEqual([textOf(line),linksIn(line)],['Came to Etage 0 on Oct 15 with 6\u00a0other\u00a0tracks',[['Etage 0','#statistics/etage-zero']]],'it came with the six others of its look, and its station is a link');
+ assert.deepEqual(about.children.slice(-2).map(n=>n.className),['collection-note','entity-line'],'under the note that it has no profiles yet');
+ e.setLanguage('de');await flush();
+ assert.equal(textOf(joinedOf(e)),'Kam am 15. Okt. mit 6\u00a0weiteren\u00a0Tracks zu Etage 0');
+ e.setLanguage('en');routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual([textOf(joinedOf(e)),linksIn(joinedOf(e))],['Came to Fontanna on Oct 15 with 85\u00a0other\u00a0tracks',[]],'a track of a playlist that came whole, on its own station: plain text');
+});
+
+test('the line joins a track by its own plexId, never by a playlist\'s, and never dates a file found again, also when no Statistics place was drawn',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);
+ // Essentials names the playlist's own id. Fontanna found one file again: a removal and an addition of one title and
+ // artist in one look, and the old file's addition before. Etage 0 and Ambiance answer 2 records a page, Closing 1:
+ // their first page cuts a look that holds a removal, so the record reads on, 3 pages at most. Night in Motion answers 1
+ // record a page, of one look of 4 additions: three pages still cut it.
+ const X=[2026,10,14,10,0],Y=[2026,10,15,10,0];
+ const feeds={essentials:[change(1,147167,[2026,10,16,12,51])],fontanna:[change(3,801,X,'removed','Again','Same'),change(2,802,X,'added','Again','Same'),change(1,801,[2026,10,4,8,30],'added','Again','Same')],
+  'etage-zero':[change(6,950,Y),change(5,901,X,'removed','Gone','Same'),change(4,902,X,'added','Gone','Same'),change(3,901,[2026,10,5,7,0],'added','Gone','Same')],
+  ambiance:[change(3,960,Y),change(2,961,X,'removed','Left'),change(1,962,X,'added','Other')],
+  closing:[970,971,972,973].map((plex,i)=>change(4-i,plex,X,i<3?'removed':'added','Closing '+i)),'palac-dance':[984,983,982,981].map((plex,i)=>change(4-i,plex,X))};
+ const most={'etage-zero':2,ambiance:2,closing:1,'palac-dance':1};
+ e.changes=url=>{const stage=url.split('/')[3];return changePage(feeds[stage]||[],undefined,most[stage])(url);};
+ const tracks={[id('trk',1)]:trackOn(1,'700',['Essentials']),[id('trk',2)]:trackOn(2,'802',['Fontanna']),[id('trk',3)]:trackOn(3,'801',['Fontanna']),[id('trk',4)]:trackOn(4,'901',['Etage 0']),[id('trk',5)]:trackOn(5,'961',['Ambiance']),[id('trk',6)]:trackOn(6,'970',['Closing']),[id('trk',7)]:trackOn(7,'984',['Night in Motion'])};
+ e.discovery=url=>tracks[url.split('/').pop()]||entity(url.split('/').pop(),'track');
+ const open=async n=>{routeTo(e,'#explore/'+id('trk',n));await settled(e,'Track '+n);assert.deepEqual([titleShown(e),bodyIn(e)],['Track '+n,true]);return joinedOf(e)&&textOf(joinedOf(e));};
+ assert.equal(await open(1),null,'the playlist\'s plexId is in the changes, the track\'s is not: no line');
+ assert.equal(await open(2),null,'the file found again is never dated');
+ assert.equal(await open(3),'Added to Fontanna on Nov 4','the old file, which the roots still name, keeps the day it was added');
+ assert.deepEqual([await open(4),asksOf(e,'etage-zero')],['Added to Etage 0 on Nov 5',['first','5']],'a removal its page cuts from its look is not known yet: the next page makes it a file found again, and the addition before it dates the track');
+ assert.deepEqual([await open(5),asksOf(e,'ambiance')],[null,['first','2']],'the next page makes it a removal: no line');
+ assert.deepEqual([await open(6),asksOf(e,'closing')],[null,['first','4','3']],'three pages do not settle it: no line, and no fourth page');
+ assert.deepEqual([await open(7),asksOf(e,'palac-dance')],[null,['first','4','3']],'an addition whose look three pages cut could still be one of a bulk: no line');
+ assert.equal(e.requests.filter(r=>r.url.includes('/statistics')).length,0,'no Statistics place was drawn');
+});
+
+test('a journal later than the body deadline leaves the line out, and Back and a language switch draw it from memory',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);const A=id('art',1);let release=null;
+ const feeds={essentials:[change(1,501,[2026,10,16,12,51])]};
+ e.changes=url=>new Promise(resolve=>{release=()=>resolve(changePage(feeds.essentials)(url));});
+ e.discovery=url=>{const key=url.split('/').pop();return key===id('trk',1)?{entity:rec(id('trk',1),'Track 1',[[A,'primary']],{plexId:'501',playlists:[{station:'Essentials'}]}),included:[]}:entity(key);};
+ routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual([titleShown(e),byClass(inspector(e),'region').length],['Track 1',0],'the body waits for the journal');
+ e.fire(2500);await flush();
+ assert.deepEqual([byClass(inspector(e),'region').length>0,joinedOf(e)],[true,null],'the deadline paints the body without the line');
+ release();await flush();
+ assert.equal(joinedOf(e),null,'the journal that comes later adds no line: nothing moves');
+ const asked=e.changesRequests.length;
+ e.setLanguage('de');await flush();
+ assert.equal(textOf(joinedOf(e)),'Am 16. Nov. zu Essentials hinzugefügt','a language switch draws the line from memory');
+ e.setLanguage('en');routeTo(e,'#explore/'+A);await flush();
+ e.history.back();await flush();
+ assert.deepEqual([titleShown(e),textOf(joinedOf(e)),e.changesRequests.length-asked],['Track 1','Added to Essentials on Nov 16',0],'Back draws it from memory, with no request');
+});
+
+test('a track\'s record also reads the changes of every station already in memory, with no request, and the record on air at the Roots landing gets the line',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);
+ const feeds={fontanna:[change(1,501,[2026,10,12,21,46])],essentials:[change(1,777,[2026,10,16,12,51])]};
+ e.changes=url=>changePage(feeds[url.split('/')[3]]||[])(url);
+ e.discovery=url=>url.endsWith('/'+id('trk',1))?trackOn(1,'501',['Essentials']):url.includes('/search?')?{items:[]}:entity(url.split('/').pop());
+ await radioPlace(e);const asked=e.changesRequests.length;
+ assert.equal(asked,9,'All stations read every journal');
+ routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual([textOf(joinedOf(e)),linksIn(joinedOf(e)),e.changesRequests.length-asked],['Added to Fontanna on Nov 12',[['Fontanna','#statistics/fontanna']],0],'Fontanna, in memory and not named by its playlists, dates it as a link; Essentials is read from memory too');
+ // The Roots landing: the record on air, as the roots name it.
+ const r=setup({journey:true});await flush();sessionsAt(r);r.changes=e.changes;
+ r.discovery=url=>url.includes('/track/')?{entity:rec(id('trk',9),'On air',[],{plexId:'777',playlists:[{station:'Essentials'}]}),included:[]}:entity(url.split('/').pop());
+ await r.poll();await flush();
+ const land=async()=>{routeTo(r,'#explore');await flush();return [r.location.hash,joinedOf(r)&&textOf(joinedOf(r)),asksOf(r,'essentials').length];};
+ assert.deepEqual(await land(),['#explore/'+id('trk',9),'Added to Essentials on Nov 16',1],'the landing record ends on its day, for one journal');
+ r.elements['explorer-close'].emit('click');await flush();
+ assert.deepEqual(await land(),['#explore/'+id('trk',9),'Added to Essentials on Nov 16',1],'a second landing within 5 minutes asks nothing');
+ r.elements['explorer-close'].emit('click');r.clock.now+=300000;await flush();
+ assert.deepEqual((await land()).slice(1),['Added to Essentials on Nov 16',2],'5 minutes later it reads the journal again');
+});
+
+test('a station place keeps its own copy of a journal that a track record grows: Back shows the rows it showed, and the next press shows the journal\'s rows with no request',async()=>{
+ const e=setup({journey:true});await flush();
+ // 250 changes on Under the Sun, one session of 100 a day: the page shows page 1 whole, and the button asks for more.
+ const records=changeFeed(250,100,clock.now);e.changes=changePage(records);
+ e.discovery=url=>url.endsWith('/'+id('trk',1))?trackOn(1,'9100',['Under the Sun']):url.includes('/search?')?{items:[]}:entity(url.split('/').pop(),'track');
+ const content=await stagePlace(e,'#statistics/bermuda-day'),shown=[...content.children],rows=changeRows(e),asked=placeAsks(e);
+ assert.deepEqual([rows.length,asksOf(e,'bermuda-day')],[100,['first']],'page 1 shows whole');
+ routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual([asksOf(e,'bermuda-day'),Boolean(joinedOf(e))],[['first','151'],true],'the record reads page 2 into the journal, where its own file is');
+ e.history.back();await flush();
+ assert.deepEqual([e.location.hash,sameRows(content.children,shown),sameRows(changeRows(e),rows),changeRows(e).length],['#statistics/bermuda-day',true,true,100],'Back: the rows it showed, not more');
+ const sent=e.changesRequests.length;changeRegion(e).children.at(-1).emit('click');await flush();
+ assert.deepEqual([changeRows(e).length,e.changesRequests.length-sent,placeAsks(e)-asked],[200,0,1],'the press shows page 2 from the journal, with no request');
+});
+
+test('Back to a track more than 5 minutes after it was left paints it at once with the line it showed, and asks no journal; a new hop to it asks again',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);const A=id('art',1);let hold=false,release=null;
+ const feeds={essentials:[change(1,501,[2026,10,16,12,51])]};
+ e.changes=url=>hold?new Promise(resolve=>{release=()=>resolve(changePage(feeds.essentials)(url));}):changePage(feeds.essentials)(url);
+ e.discovery=url=>{const key=url.split('/').pop();return key===id('trk',1)?{entity:rec(id('trk',1),'Track 1',[[A,'primary']],{plexId:'501',playlists:[{station:'Essentials'}]}),included:[]}:entity(key);};
+ routeTo(e,'#explore/'+id('trk',1));await settled(e,'Track 1');
+ assert.equal(textOf(joinedOf(e)),'Added to Essentials on Nov 16');
+ routeTo(e,'#explore/'+A);await flush();
+ // The journal is older than 5 minutes now, and a new read of it would answer late.
+ e.clock.now+=300001;hold=true;const asked=e.changesRequests.length;
+ e.history.back();await flush();
+ assert.deepEqual([titleShown(e),bodyIn(e),joinedOf(e)&&textOf(joinedOf(e)),e.changesRequests.length-asked],['Track 1',true,'Added to Essentials on Nov 16',0],'Back paints the record whole at once, with its line, and no journal is asked');
+ assert.ok(![...e.timers.values()].some(t=>t.delay===2500),'the body deadline is over');
+ routeTo(e,'#explore/'+A);await flush();routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual([titleShown(e),e.changesRequests.length-asked],['Track 1',1],'a new hop to it reads the old journal again');
+ release();await settled(e,'Track 1');
+ assert.equal(textOf(joinedOf(e)),'Added to Essentials on Nov 16');
+});
+
+test('a track record left while the next page of a journal is out leaves that page to the station place that needs it next, and reads on no further',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);
+ // Closing answers 1 record a page. Page 1 is a removal of a look it cuts, so the place reads on, and so does a record
+ // whose file is not on it. Page 2 answers only once the listener is on the station's place.
+ const X=[2026,10,14,10,0],feeds=[change(3,970,X,'removed','A'),change(2,971,X,'added','B'),change(1,972,[2026,10,10,10,0],'added','C')];
+ let answer=null;
+ e.changes=(url,signal)=>new URL(url,'http://radio').searchParams.get('before')==='3'?new Promise((resolve,reject)=>{answer=()=>resolve(changePage(feeds,undefined,1)(url));signal?.addEventListener('abort',()=>reject(new Error('aborted')));}):changePage(feeds,undefined,1)(url);
+ e.discovery=url=>{const key=url.split('/').pop();return key===id('trk',1)?trackOn(1,'972',['Closing']):url.includes('/search?')?{items:[]}:entity(key,'track');};
+ routeTo(e,'#explore/'+id('trk',1));await flush();
+ assert.deepEqual(asksOf(e,'closing'),['first','3'],'the record reads on to page 2');
+ const content=stagePlace(e,'#statistics/closing');await flush();
+ answer();await content;await flush();await flush();
+ const rows=changeRows(e).map(textOf);
+ assert.deepEqual([asksOf(e,'closing'),rows.length>0,textOf(changeRegion(e)).includes('could not load')],[['first','3'],true,false],'the place shows the rows of the page the record asked for, with no second request, and the record asks for no page 3');
+});
+
+test('a journal that fails leaves only its station out of a track\'s line; a day of another year says its year, a day is the listener\'s own, and every station of a day is named, each one whole on its row',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);
+ // Track 1 came to Essentials at 23:30 and to Fontanna one hour later, the next day, and to Etage 0 one year before;
+ // the journal of Closing fails. Track 2 came to four stations in one day.
+ const feeds={essentials:[change(2,702,[2026,10,16,12,0]),change(1,701,[2026,10,14,23,30])],fontanna:[change(2,702,[2026,10,16,11,0]),change(1,701,[2026,10,15,0,30])],
+  'etage-zero':[change(2,702,[2026,10,16,10,0]),change(1,701,[2025,10,16,12,0])],ambiance:[change(1,702,[2026,10,16,9,0])]};
+ let late=null;
+ e.changes=url=>{const s=url.split('/')[3],page=changePage(feeds[s]||[])(url);return s==='closing'?null:s==='essentials'&&!late?new Promise(resolve=>{late=()=>resolve(page);}):page;};
+ const tracks={[id('trk',1)]:trackOn(1,'701',['Essentials','Fontanna','Etage 0','Closing']),[id('trk',2)]:trackOn(2,'702',['Essentials','Fontanna','Etage 0','Ambiance'])};
+ e.discovery=url=>{const key=url.split('/').pop();return tracks[key]||entity(key,'track');};
+ routeTo(e,'#explore/'+id('trk',1));await flush();await flush();
+ assert.deepEqual([titleShown(e),bodyIn(e)],['Track 1',false],'the journal that failed does not paint the body before the one still out');
+ late();await settled(e,'Track 1');
+ assert.deepEqual([bodyIn(e),asksOf(e,'closing'),textOf(joinedOf(e))],[true,['first'],'Added to Fontanna on Nov 15 · Added to Essentials on Nov 14 · Added to Etage 0 on Nov 16, 2025'],'the body paints, and the three stations whose journal came are dated: two days one hour apart, and a year where it is not this one');
+ routeTo(e,'#explore/'+id('trk',2));await settled(e,'Track 2');
+ const line=joinedOf(e),whole=p=>p.descendants().filter(n=>n.localName==='span').map(n=>n.textContent);
+ assert.deepEqual([textOf(line),whole(line),linksIn(line)],['Added to Essentials, Fontanna, Etage 0, and Ambiance on Nov 16',['Essentials','Fontanna','Etage 0','Ambiance'],[]],'four stations of one day: each is named, and each plain name is one piece that stays on its row');
+ e.setLanguage('de');await flush();
+ assert.equal(textOf(joinedOf(e)),'Am 16. Nov. zu Essentials, Fontanna, Etage 0 und Ambiance hinzugefügt');
+});
