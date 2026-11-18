@@ -88,7 +88,8 @@ play to retry." On dev it keeps trying, and the music comes back without a touch
 | --- | --- | --- |
 | The player keeps reconnecting while the listener wants to play (item A) | Built, on dev, waits for the owner's push to prod | It tries at +1, +3, +7, +15 and +30 s, then every 15 s, and at once when the network comes back or the page shows again. It says "Reconnecting…" or "Offline. Waiting for the network…". A pause stays a pause. |
 | Open a station by its own address, and come back to the last station, with no autoplay (item B) | Built, on dev, waits for the owner's push to prod | `/?station=<id>`, for example `/?station=fontanna`. The address always names the station on screen. The browser keeps the last station chosen or played (`pavoia-station` in localStorage). A link wins over the remembered station. With empty storage and no link, the radio opens on Lost in Feelings. |
-| Keys `1` to `9`, `M` and `?` (item I) | Built, on dev, waits for the owner's push to prod | `1` to `9` go to the station at that place in the order on screen, as the rail does, and never start playback. `M` turns the sound off and on again. `?` opens the Keyboard shortcuts list under "See the roots it's built on", while the explorer is closed. No key acts while typing, with a modifier key or while a modal dialog is open. |
+| Look at another station without losing the music | Built, on dev, waits for the owner's push to prod | While the radio plays, the rail, the phone sheet, a swipe, the arrow keys and `1` to `9` only show a station, and ask for no stream. The music moves when the listener presses play on the station shown: a play ring after the stage name in the hero, with what that station plays now. A red dot marks the station heard, and the bar's "Tuned to {station}" leads back to it. With the radio off, a station change is the station to play, as before. |
+| Keys `1` to `9`, `M` and `?` (item I) | Built, on dev, waits for the owner's push to prod | `1` to `9` show the station at that place in the order on screen, as the rail does, and start nothing while the radio is paused. With the explorer open and the radio on, they move the music. `M` turns the sound off and on again. `?` opens the Keyboard shortcuts list under "See the roots it's built on", while the explorer is closed. No key acts while typing, with a modifier key or while a modal dialog is open. |
 | Mute | Built, on dev, waits for the owner's push to prod | The `M` key sets the volume slider to 0 and back. There is no dedicated button. The key acts only where the slider shows, and the radio does not store it. |
 | Installable home-screen icon; no offline interface, no service worker (item G) | Built, on dev, waits for the owner's push to prod | [web/manifest.webmanifest](../web/manifest.webmanifest) and four icons in `web/assets/`, made from the Gaende mark. The installed app opens full screen at `/`, named "Pavoia". Live audio needs a connection. |
 | A shared link shows a preview (item J) | Built, on dev, waits for the owner's push to prod | Description and Open Graph tags in `web/index.html` give "Pavoia Radio", "So it never ends. A personal selection by Gaende." and the photo `photos/hero-night.jpg`. One preview serves every link, also a station link. |
@@ -108,12 +109,17 @@ only that a first visit stores nothing and names `/?station=palac-feel` in the
 address. No browser test opens a link to another station or comes back to a
 remembered one.
 The keys and mute have
-`1 to 9 go to the station at that place on screen, as the rail does, and never start playback`,
+`1 to 9 show the station at that place on screen; with the explorer open and the radio on, they move the music`,
 `M turns the sound off and back on where the volume shows, stores nothing, and does nothing where the device sets the level`,
 `? opens the shortcuts under the roots button, in both languages, only while the explorer is closed`,
 `the page keys wait while typing, with a modifier, with the stations sheet open, and when an earlier handler took the key`,
 [tests/keyboard-browser.js](../tests/keyboard-browser.js) and
 [tests/keys-play-browser.js](../tests/keys-play-browser.js).
+Looking at another station has
+`while the radio plays, the rail, the sheet, the swipe, the arrows and 1 to 9 show a station and ask for no stream`,
+`one press on the hero's play is one cut to the station shown`,
+[tests/apart-browser.js](../tests/apart-browser.js) and
+[tests/stations-browser.js](../tests/stations-browser.js).
 The install icon and the link preview have
 `the head names the manifest, the icons and one share preview; the manifest uses the page's ink`.
 
@@ -133,6 +139,9 @@ playback and its short gap when the station changes.
 | Extend artist recommendations inside and outside the collection, with a clear basis for each connection | Partial, approved | |
 | Grow the existing diagram into the agreed connected Explore experience, with shared context and usable mobile navigation | Partial, approved | |
 | The Index rail from A to Z, type-ahead, and the letter in the address (item C) | Built, on dev, waits for the owner's push to prod | The rail in the right gutter jumps to a letter, or to a band of track counts in Most tracks. Typing in the list goes to the first name with those letters. `/` goes to the filter. The address keeps the letter, for example `#index/artists?at=M`. |
+| An artist's and a release's tracks on the radio, each with its stations | Built, on dev, waits for the owner's push to prod | "On the radio" on an artist's or a release's record lists its tracks that play, by release, the newest first. Each row names the stations that play the track, in the order on screen. On a phone the region comes first. |
+| Since when a track plays on a station | Built, on dev, waits for the owner's push to prod | A row of On the radio reads "Essentials since Nov 16" where the station's changes date the track. A track's own record ends its header on "Added to Essentials on Nov 16", or on "Came to Etage 0 on Oct 15 with 6 other tracks" for a track that came with a playlist. A track from before the radio recorded changes says nothing. |
+| Back and Forward walk through the explorer | Built, on dev, waits for the owner's push to prod | Each record and each tab move is one entry of the browser's history, and every place has one address. A line over a record's title names the place before and the place after, and steps to them. History, Statistics and the Index come back as they were left, with their rows, scroll and focus. |
 | Cover grids | Candidate | |
 | Advanced library filters, sortable tables and saved/shared views | Out | |
 | Graph zoom/pan, clusters, and artist/label/release/remix/genre/stage modes | Out | It is the Music Universe workspace. |
@@ -143,6 +152,15 @@ The Index rail has
 `/ focuses the filter`,
 `at= is written after scrolling stops, read back on a reload, and never part of the kept place`
 and [tests/index-browser.js](../tests/index-browser.js).
+On the radio and its dates have
+`On the radio says since when a track plays on each station the changes date, in the rail's order, each name and its date whole`,
+`an artist's row and its track's record give one answer, whichever opens first, also when the addition is past page 1`,
+`a track's header ends on the day it was added to each station the changes name, at the body paint, and says nothing for a track from before tracking, one removed last, or one past the pages read`,
+[tests/radio-tracks-browser.js](../tests/radio-tracks-browser.js) and
+[tests/digging-browser.js](../tests/digging-browser.js).
+Back and Forward have
+`each record and each tab move is one entry, and Back and Forward walk them`
+and [tests/steps-browser.js](../tests/steps-browser.js).
 
 Basic profiles, entity search and connections are available. The full Music
 Universe is not, and it is out. A shared label or remix credit is a factual
@@ -171,7 +189,7 @@ wanted. Full-track on-demand playback is outside the agreed preview model.
 | --- | --- | --- |
 | Public recent-play history with station and period navigation | Delivered at `#history` | |
 | What all nine stations play now (item E) | Built, on dev, waits for the owner's push to prod | History, All stations, at `#history/radio`, under "On air now". One row per station, in the order on screen, gives the track over "artist · station", with the station name always whole. The station you hear reads Now. The total of audio connections shows only when all nine stations answered, and never as 0. |
-| What was added to and removed from each playlist (item F1) | Built, on dev, waits for the owner's push to prod | "Added and removed" in each station's Statistics place (`#statistics/<id>`) shows the newest ten changes, with "Show earlier changes". All stations merges the nine feeds by time, and its rows read "station · artist". |
+| What was added to and removed from each playlist (item F1) | Built, on dev, waits for the owner's push to prod | "Added and removed" comes first in each station's Statistics place (`#statistics/<id>`). The changes read as digging sessions: a line such as "Monday, November 16 · 1 new track" heads the changes of one session, and a session starts after 4 hours or more without a change. Five additions or more in one look at a playlist read as one row, "86 tracks added at once". "Show earlier changes" adds whole sessions. A place with no change or with no record yet says so, and a failed answer has "Try again". All stations merges the nine feeds by time, and its rows read "station · artist". |
 | Public playlist-addition calendar with a yearly heatmap and day details | Out | The digging calendar is rejected for this site. |
 | Calendar playlist filters, counting rules and timezone | Out | They belong to the calendar. |
 | Session views for first listens, revisits, acceptance and rejection | Out | |
@@ -182,7 +200,9 @@ On air now has
 `each station refreshes after its track ends, between 20 s and 2 min, and nothing is asked while hidden`
 and [tests/history-browser.js](../tests/history-browser.js).
 Added and removed has
-`Added and removed lists the newest ten changes, pages in place, and hides when empty or failing`,
+`Added and removed comes first when it has rows, and says at the end when it is empty, not recorded yet or failing, with Try again`,
+`a session starts after 4 hours or more without a change, on all stations together, and a second session of a day reads Earlier that day`,
+`five additions or more in one look at one station read as one row with no link, n tracks added at once, that never joins a session`,
 `All stations merges the nine feeds by time, and pages only the stations that have more`
 and [tests/changes-browser.js](../tests/changes-browser.js).
 
@@ -321,6 +341,8 @@ Each item names what it waits for and who acts.
 7. **Other backend changes.** Each one needs the owner to run commands on the host:
    - a lower-bandwidth stream per station (Icecast and the controller);
    - an "up next" route for the next tracks of each station;
+   - a route for the plays of one track or of one artist, so that a record can
+     say when it last played;
    - a preview per station link, from a page per station on the server. The
      owner decides first whether one preview for the whole site is enough.
 8. **Production.** The whole build waits for the owner's look at dev and his
