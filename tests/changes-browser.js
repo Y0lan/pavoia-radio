@@ -1,18 +1,22 @@
 // Playwright CLI callback. Added and removed, in a station's Statistics place and merged under All stations, and the place
-// kept on Back from a record. With rows it is the first region; with none it is the last and says why, with Try again
-// when the changes did not load. Every changes record, statistics document and plays document here is browser-only test
-// data; the stream is never asked for.
+// kept on Back from a record. With rows it is the first region, in sessions, each under its line; with none it is the
+// last and says why, with Try again when the changes did not load. Every changes record, statistics document and plays
+// document here is browser-only test data; the stream is never asked for.
 async page => {
  const assert=(ok,message)=>{if(!ok)throw new Error(message);};
  const errors=[];page.on('pageerror',error=>errors.push(error.message));
  const origin=new URL(page.url()).origin;
  await page.route('**/stream/**',route=>route.abort());
- // 213 changes on Fontanna over syncs of 9 records, a day apart, the newest today: pages of 100, 100 and 13. 12 of one sync
- // on Essentials. Merged, Essentials has 110 of one sync, one page more, and Fontanna 3 changes a day apart, the newest
- // tying with it. Every page is asked 100 at a time, as the server answers it.
- const now=Date.now(),at=day=>new Date(now-60000-day*86400000).toISOString().replace(/\.\d+Z$/,'Z');
- const feed=(stage,n,per)=>Array.from({length:n},(_,i)=>({sequence:String(n-i),kind:i%3===2?'removed':'added',id:String(700000+n-i),title:stage+' change '+(n-i),artist:'Test artist '+(n-i),album:'Test album',observedAt:at(Math.floor(i/per))}));
- const sets={records:{fontanna:feed('fontanna',213,9),essentials:feed('essentials',12,12)},merge:{fontanna:feed('fontanna',3,1),essentials:feed('essentials',110,110)}},feeds=sets.records;
+ // 213 changes on Fontanna in sessions of 9, a day apart, the newest today, one change a look a minute apart: pages of
+ // 100, 100 and 13. One session of 12 on Essentials. Merged, Essentials has one session of 110, one page more, and
+ // Fontanna 3 changes a day apart, the newest tying with it. Bulk: 86 tracks added to Fontanna in one look, and one to
+ // Essentials. Year: one session of 12 additions and 3 removals on 12 November 2025, at noon. Every page is asked 100
+ // at a time, as the server answers it.
+ const now=Date.now(),at=(day,minute=0)=>new Date(now-60000-day*86400000-minute*60000).toISOString().replace(/\.\d+Z$/,'Z');
+ const feed=(stage,n,per)=>Array.from({length:n},(_,i)=>({sequence:String(n-i),kind:i%3===2?'removed':'added',id:String(700000+n-i),title:stage+' change '+(n-i),artist:'Test artist '+(n-i),album:'Test album',observedAt:at(Math.floor(i/per),i%per)}));
+ const look=new Date(now-3*86400000).toISOString().replace(/\.\d+Z$/,'Z'),bulk=Array.from({length:86},(_,i)=>({sequence:String(86-i),kind:'added',id:String(800086-i),title:'Bulk track '+(86-i),artist:'Bulk artist',album:'Test album',observedAt:look}));
+ const year=Array.from({length:15},(_,i)=>({sequence:String(15-i),kind:i%5===4?'removed':'added',id:String(900015-i),title:'Year track '+(15-i),artist:'Year artist',album:'Test album',observedAt:new Date(2025,10,12,12,30-i).toISOString()}));
+ const sets={records:{fontanna:feed('fontanna',213,9),essentials:feed('essentials',12,12)},merge:{fontanna:feed('fontanna',3,1),essentials:feed('essentials',110,110)},bulk:{fontanna:bulk,essentials:feed('essentials',1,1)},year:{essentials:year}},feeds=sets.records;
  let mode='records',held=null,hold=false;const asked=[],numbers=[],limits=new Set();
  await page.route('**/api/radio/*/changes?**',async route=>{
   const url=new URL(route.request().url()),stage=url.pathname.split('/')[3],limit=Number(url.searchParams.get('limit')),before=Number(url.searchParams.get('before')||Infinity);asked.push(stage+(url.searchParams.get('before')?' before '+url.searchParams.get('before'):''));limits.add(url.searchParams.get('limit'));
@@ -24,7 +28,7 @@ async page => {
  await page.route('**/api/library/statistics?**',route=>{const scope=new URL(route.request().url()).searchParams.get('scope');numbers.push('statistics '+scope);
   route.fulfill({json:{scope,updatedAt:new Date(now).toISOString(),tracks:400,artists:300,releases:200,durationMs:90000000,coverage:{artists:400,labels:400,years:400,releases:400,genres:0},topArtists:[{name:'Test artist',count:9}],labels:[{name:'Test label',count:8}],years:[{name:'2020',count:300},{name:'2024',count:100}],genres:[],stages:[]}});});
  await page.route('**/api/radio/*/music',route=>{numbers.push('music');return route.fulfill({json:{from:new Date(now-30*86400000).toISOString(),until:new Date(now).toISOString(),earliest:'2026-10-06T23:27:25Z',tracks:400,plays:900,distinctPlayed:400,unplayed:0,top:[]}});});
- const region='#music-content section[aria-labelledby=r-changes]',rows=region+' li > a.row',more=region+' > button';
+ const region='#music-content section[aria-labelledby=r-changes]',rows=region+' li > a.row',more=region+' > button',lines=region+' li > .release-line';
  const drawn=()=>page.waitForFunction(()=>document.querySelector('#music-content .entity-heading')&&!document.getElementById('music-content').hasAttribute('aria-busy'));
  const visit=async stage=>{await page.locator(`#stage-row a[href="#statistics/${stage}"]`).click();await drawn();};
  // A page load reads every journal again: the page keeps them 5 minutes, for every place.
@@ -35,10 +39,16 @@ async page => {
   await page.evaluate(h=>{history.pushState({explorer:true},'',h);dispatchEvent(new PopStateEvent('popstate'));},'#statistics/'+stage);
   await drawn();
  };
- // A press shows ten more held in memory, and asks for nothing.
- const fromMemory=async()=>{const n=await page.locator(rows).count(),sent=asked.length;await page.locator(more).click();await page.waitForFunction(([r,n])=>document.querySelectorAll(r).length===n,[rows,n+10]);assert(asked.length===sent,'A press with ten rows in memory asked: '+asked.slice(sent));};
+ // A press shows the next session of nine held in memory, and asks for nothing.
+ const fromMemory=async()=>{const n=await page.locator(rows).count(),sent=asked.length;await page.locator(more).click();await page.waitForFunction(([r,n])=>document.querySelectorAll(r).length===n,[rows,n+9]);assert(asked.length===sent,'A press with a session in memory asked: '+asked.slice(sent));};
+ // Each line stands first in the item of its session's first row; a line and a row line show, not hidden to 1 px.
+ const read=()=>page.locator(region+' ol > li').evaluateAll(items=>items.map(li=>[...li.children].map(n=>n.localName==='p'?'LINE '+n.textContent:(n.hasAttribute('href')?'ROW ':'BULK ')+n.querySelector('.row-name').textContent).join(' / ')));
+ // A row line may end on an ellipsis, as every row line does when it is long; a session line shows whole.
+ const shown=(selector,whole=false)=>page.locator(selector).evaluateAll((n,whole)=>n.map(e=>{const b=e.getBoundingClientRect();return b.width>1&&b.height>1&&(!whole||e.scrollWidth<=e.clientWidth);}),whole);
  await fresh('fontanna');
- assert(await page.locator(rows).count()===10,'The first page is not ten changes');
+ assert(await page.locator(rows).count()===9,'The first batch is not one session of nine');
+ const today=await page.locator(lines).allTextContents();
+ assert(JSON.stringify(today)==='["Today · 6 new tracks · 3 removed"]'&&(await read())[0]==='LINE Today · 6 new tracks · 3 removed / ROW fontanna change 213','The first line is not over the first row: '+JSON.stringify(today));
  assert(JSON.stringify(asked)==='["fontanna"]','The place did not ask once for its first page: '+asked);
  assert(await page.locator(region+' h4').textContent()==='Added and removed','Missing heading');
  assert(await page.locator('#music-content .regions > section').first().getAttribute('aria-labelledby')==='r-changes','The region with rows is not the first of the regions');
@@ -46,12 +56,14 @@ async page => {
  const first=await page.locator(rows).first().evaluate(a=>[a.getAttribute('href'),a.querySelector('time').dateTime,a.querySelector('.row-name').textContent,a.querySelector('.row-line').textContent,a.querySelector('.row-fact').textContent]);
  assert(JSON.stringify(first)===JSON.stringify(['#explore/plex_700213',feeds.fontanna[0].observedAt,'fontanna change 213','Test artist 213','added']),'First row: '+JSON.stringify(first));
  assert(await page.locator(rows).nth(2).locator('.row-fact').textContent()==='removed','A removal does not say so');
- const times=await page.locator(rows+' time').allTextContents();
- assert(times[0]===new Date(feeds.fontanna[0].observedAt).toLocaleTimeString('en',{timeStyle:'short'})&&times[9]===new Date(feeds.fontanna[9].observedAt).toLocaleDateString('en',{day:'numeric',month:'short'}),'Time today, day before: '+times.join(','));
- // The first page holds 100: ten more at a press, with no request, under the rows shown.
+ const times=await page.locator(rows+' time').allTextContents(),clock=c=>new Date(c.observedAt).toLocaleTimeString('en',{timeStyle:'short'});
+ assert(times[0]===clock(feeds.fontanna[0])&&times[8]===clock(feeds.fontanna[8]),'A row does not read its time: '+times.join(','));
+ assert((await shown(rows+' .row-line')).every(Boolean)&&(await shown(lines,true)).every(Boolean),'A row line or a session line is cut');
+ // The first page holds 100: a session more at a press, with no request, under the rows shown.
  await page.locator(rows).first().evaluate(a=>{a.dataset.ten='';});await fromMemory();
  assert(await page.locator(rows).first().getAttribute('data-ten')===''&&await page.locator(more).textContent()==='Show earlier changes','The rows held in memory drew the list again');
- for(let n=30;n<=100;n+=10)await fromMemory();
+ assert(JSON.stringify(await page.locator(lines).allTextContents())==='["Today · 6 new tracks · 3 removed","Yesterday · 6 new tracks · 3 removed"]','The second session has no line of its own');
+ for(let n=27;n<=90;n+=9)await fromMemory();
  // Paging: busy in place, focus kept, then appended under the rows shown.
  held=null;hold=true;await page.locator(more).focus();await page.keyboard.press('Enter');
  for(let i=0;!held&&i<100;i++)await page.waitForTimeout(20);
@@ -61,19 +73,21 @@ async page => {
  const sent=asked.length;await page.keyboard.press('Enter');await page.waitForTimeout(200);
  assert(asked.length===sent,'A second press while it loads asked again');
  const top=await page.locator(rows).first().evaluate(a=>a.dataset.mark='first');
- held();await page.waitForFunction(r=>document.querySelectorAll(r).length===110,rows);
+ // The last session of the page waits, with one row so far, and could join the batch: the press asks for the next page.
+ held();await page.waitForFunction(r=>document.querySelectorAll(r).length===99,rows);
  assert(await page.locator(rows).first().getAttribute('data-mark')==='first','The first rows were drawn again');
- assert(asked.at(-1)==='fontanna before 114','Paging did not ask from the oldest change shown: '+asked.at(-1));
- for(let n=120;n<=200;n+=10)await fromMemory();
+ assert(asked.at(-1)==='fontanna before 114','Paging did not ask from the oldest change read: '+asked.at(-1));
+ for(let n=108;n<=189;n+=9)await fromMemory();
  mode='error';await page.locator(more).click();
  await page.waitForFunction(b=>document.querySelector(b)?.textContent==='Try again',more);
- assert(await page.locator(rows).count()===200,'A failed page dropped rows');
+ assert(await page.locator(rows).count()===189,'A failed page dropped rows');
  mode='records';await page.locator(more).focus();await page.keyboard.press('Enter');
- await page.waitForFunction(r=>document.querySelectorAll(r).length===210,rows);
+ await page.waitForFunction(r=>document.querySelectorAll(r).length===198,rows);
  assert(asked.at(-1)==='fontanna before 14','Try again did not ask for the same page: '+asked.at(-1));
+ await page.keyboard.press('Enter');await page.waitForFunction(r=>document.querySelectorAll(r).length===207,rows);
  await page.keyboard.press('Enter');await page.waitForFunction(r=>document.querySelectorAll(r).length===213,rows);
- assert(await page.locator(more).count()===0,'The last page left the button');
- assert(await page.evaluate(r=>document.activeElement===document.querySelectorAll(r)[210],rows),'Focus did not move to the first change of the last page');
+ assert(await page.locator(more).count()===0,'The last session left the button');
+ assert(await page.evaluate(r=>document.activeElement===document.querySelectorAll(r)[207],rows),'Focus did not move to the first change of the last session');
  assert((await page.locator('#music-content .stage-notes').textContent()).includes('Changes are recorded since Oct 7.'),'Missing the date changes are recorded since');
  for(const width of [320,360,390,760,1100,1440]){
   await page.setViewportSize({width,height:900});await page.waitForTimeout(100);
@@ -84,6 +98,12 @@ async page => {
  assert(await page.locator(region+' h4').textContent()==='Hinzugefügt und entfernt','Heading not translated');
  assert(JSON.stringify(await page.locator(rows+' .row-fact').evaluateAll(n=>n.slice(0,3).map(f=>f.textContent)))==='["hinzugefügt","hinzugefügt","entfernt"]','Facts not translated');
  assert(await page.locator(more).textContent()==='Frühere Änderungen anzeigen','Button not translated');
+ for(const width of [390,360]){
+  await page.setViewportSize({width,height:844});await page.waitForTimeout(100);
+  assert(JSON.stringify(await page.locator(lines).allTextContents())==='["Heute · 6 neue Tracks · 3 entfernt"]'&&(await shown(lines,true)).every(Boolean)&&(await shown(rows+' .row-line')).every(Boolean),`The German line at ${width}: `+await page.locator(lines).allTextContents());
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.getElementById('explorer').scrollWidth<=document.getElementById('explorer').clientWidth),`Overflow at ${width} in German`);
+ }
+ await page.setViewportSize({width:390,height:844});
  await page.locator(region).scrollIntoViewIfNeeded();
  await page.screenshot({path:'changes-fixture-mobile-de.png'});
  await page.locator('#language [value=en]').dispatchEvent('click');await drawn();
@@ -97,6 +117,8 @@ async page => {
  assert(merged.every((r,i)=>!i||r[0]<merged[i-1][0]||r[0]===merged[i-1][0]&&order.indexOf(r[1])>=order.indexOf(merged[i-1][1])),'Not newest first with ties in screen order');
  const cut=sets.merge.essentials[99].observedAt;
  assert(merged.length>0&&merged.every(r=>r[0]>=cut),'A change older than the oldest loaded of a station with more is shown');
+ const two=(await read()).slice(0,2);
+ assert(JSON.stringify(two)==='["LINE '+two[0].slice(5).split(' · ')[0]+' · 68 new tracks · 33 removed / ROW fontanna change 3","ROW essentials change 110"]','The session of two stations does not count its rows: '+JSON.stringify(two));
  // The region reads across the columns before the last one, as Release years does, which keeps its width: from 761px
  // they share one edge and one width, and Release years is no taller than its strip.
  for(const width of [1440,1100,900]){
@@ -111,10 +133,12 @@ async page => {
  await page.locator('#music-content .neighbourhood-caption button').click();await page.waitForFunction(()=>!document.querySelector('#music-content .neighbourhood'));tops.list=await headingTop();
  assert(await page.locator('#music-content .regions > section').first().getAttribute('aria-labelledby')==='r-changes','In the list the region is not first');
  await page.locator('#music-content .neighbourhood-caption button').click();await page.waitForFunction(()=>document.querySelector('#music-content .neighbourhood'));
- asked.length=0;await fromMemory();
+ // The first session never waits, though Essentials has more: it shows whole, and grows with the next page.
+ asked.length=0;
  for(let i=0;i<20&&await page.locator(more).count();i++){const n=await page.locator(rows).count();await page.locator(more).click();await page.waitForFunction(([r,b,n])=>document.querySelectorAll(r).length>n||!document.querySelector(b),[rows,more,n]);}
  assert(JSON.stringify(asked)==='["essentials before 11"]','Paging asked other stations: '+asked.join(','));
- assert(await page.locator(rows).count()===113&&merged.length===10,'Merged rows: '+merged.length+' then '+await page.locator(rows).count());
+ assert(await page.locator(rows).count()===113&&merged.length===101,'Merged rows: '+merged.length+' then '+await page.locator(rows).count());
+ assert(JSON.stringify(await page.locator(lines).evaluateAll(n=>n.map(p=>p.textContent.split(' · ').slice(1))))==='[["75 new tracks","36 removed"],["1 new track"],["1 removed"]]','The session that grew does not count its rows');
  await page.locator(region).scrollIntoViewIfNeeded();
  await page.screenshot({path:'changes-fixture-desktop.png'});
  // No row: the region is the last one, its heading and one sentence. No change yet: nothing added or removed since the
@@ -142,18 +166,46 @@ async page => {
  assert(asked.slice(tried).join()==='ambiance'&&JSON.stringify(await said())==='["p Seit 7. Okt. nichts hinzugefügt oder entfernt."]','Try again did not ask again: '+asked.slice(tried)+' '+JSON.stringify(await said()));
  empty.de=await said();
  await page.locator('#language [value=en]').dispatchEvent('click');await drawn();await page.setViewportSize({width:1440,height:900});
+ // A bulk look is one row that opens nothing, on All stations and on its station's place: no link, no fact, no focus,
+ // no pointer, and its lines show whole. Its session says its day only.
+ for(const [width,height] of [[1440,900],[390,844]]){
+  await page.setViewportSize({width,height});mode='bulk';await fresh('radio');
+  const all=await read(),row=page.locator(region+' li > a.row:not([href])');
+  assert(all.length===2&&all[1].startsWith('LINE ')&&!all[1].split(' / ')[0].includes(' · ')&&all[1].endsWith('BULK 86 tracks added at once'),`At ${width} the bulk session: `+JSON.stringify(all));
+  const seen=await row.evaluate(a=>{a.focus();return [a.querySelector('.row-line').textContent,a.querySelectorAll('.row-fact').length,document.activeElement===a,getComputedStyle(a).cursor,getComputedStyle(a.querySelector('.row-name')).textDecorationLine];});
+  assert(JSON.stringify(seen)==='["Fontanna · Bulk track 86, Bulk track 85 and 84 more",0,false,"auto","none"]',`At ${width} the bulk row: `+JSON.stringify(seen));
+  await row.hover();assert(await row.evaluate(a=>getComputedStyle(a.querySelector('.row-name')).textDecorationLine)==='none',`At ${width} the bulk row underlines on hover`);
+  assert((await shown(rows+' .row-line')).every(Boolean)&&(await shown(region+' li > a.row:not([href]) .row-line')).every(Boolean),`At ${width} a row line is hidden`);
+  await visit('fontanna');
+  assert(JSON.stringify(await read())==='["LINE '+all[1].split(' / ')[0].slice(5)+' / BULK 86 tracks added at once"]'&&await page.locator(region+' li > a.row:not([href]) .row-line').textContent()==='Bulk track 86, Bulk track 85 and 84 more',`At ${width} the bulk row on its station: `+JSON.stringify(await read()));
+  await page.mouse.move(2,2);
+ }
+ // The longest line, a day of another year in German with both counts, shows whole at 320 and 360 px, laid out as on a
+ // phone, whose scrollbar takes no width: Chromium's mobile emulation while it measures. (A desktop window keeps 15 px
+ // for its scrollbar, html's scrollbar-gutter, and cuts the line at 320 px with an ellipsis.)
+ mode='year';await fresh('essentials');await page.locator('#language [value=de]').dispatchEvent('click');await drawn();
+ const longest={},cdp=await page.context().newCDPSession(page);
+ for(const width of [320,360]){
+  await page.setViewportSize({width,height:740});await cdp.send('Emulation.setDeviceMetricsOverride',{width,height:740,deviceScaleFactor:1,mobile:true});
+  await page.waitForFunction(w=>document.body.clientWidth===w&&document.querySelector('#music-content .release-line'),width,{timeout:30000});
+  longest[width]=await page.locator(lines).evaluate(p=>[p.textContent,p.scrollWidth,p.clientWidth]);
+  assert(longest[width][0]==='12. November 2025 · 12 neue Tracks · 3 entfernt'&&longest[width][1]<=longest[width][2],`The line with a year at ${width}: `+JSON.stringify(longest[width]));
+  assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth&&document.getElementById('explorer').scrollWidth<=document.getElementById('explorer').clientWidth),`Overflow at ${width} with the year line`);
+ }
+ await cdp.send('Emulation.clearDeviceMetricsOverride');await cdp.detach();
+ await page.locator('#language [value=en]').dispatchEvent('click');await drawn();await page.setViewportSize({width:1440,height:900});
  // A page still loading when the listener leaves never lands in the next place.
- mode='records';await visit('fontanna');for(let n=20;n<=100;n+=10)await fromMemory();held=null;hold=true;await page.locator(more).click();
+ mode='records';await fresh('fontanna');for(let n=18;n<=90;n+=9)await fromMemory();held=null;hold=true;await page.locator(more).click();
  for(let i=0;!held&&i<100;i++)await page.waitForTimeout(20);
  await visit('essentials');held();await page.waitForTimeout(200);
- assert(await page.locator(rows).count()===10&&(await page.locator(rows).first().textContent()).includes('essentials'),'A page of the station left landed in the next one');
+ assert(await page.locator(rows).count()===12&&(await page.locator(rows).first().textContent()).includes('essentials'),'A page of the station left landed in the next one');
  // Back from a record opened from the place: the same rows, the same scroll, focus on the row opened, and no request for
  // the numbers, the plays or the changes. The record itself does not matter here: it may fail to load.
  const kept=[];
  for(const [width,height] of [[1440,900],[390,844]]){
   await page.setViewportSize({width,height});await visit('essentials');await visit('fontanna');
   await page.evaluate(()=>{document.getElementById('explorer').scrollTop=600;});await page.locator(more).click();
-  await page.waitForFunction(r=>document.querySelectorAll(r).length===20,rows);
+  await page.waitForFunction(r=>document.querySelectorAll(r).length===18,rows);
   await page.locator(rows).nth(4).evaluate(a=>{a.dataset.opened='';a.scrollIntoView({block:'center'});});await page.waitForTimeout(100);
   const left=await page.evaluate(r=>[document.querySelectorAll(r).length,document.getElementById('explorer').scrollTop],rows),sent=[asked.length,numbers.length],href=await page.locator(rows).nth(4).getAttribute('href');
   await page.locator(rows).nth(4).click();
@@ -169,5 +221,5 @@ async page => {
  assert(JSON.stringify([...limits])==='["100"]','A page was not asked 100 at a time: '+[...limits]);
  assert(await page.locator('#audio').evaluate(a=>a.paused&&!a.getAttribute('src')),'Statistics started audio');
  assert(errors.length===0,errors.join('; '));
- return {checks:'first region with rows, rows, time or day, pages of 100, ten more from memory, paging busy/append/Try again/last page focus, since date, EN/DE, widths, All stations merge and paging, heading top at 1440x900, last region with the empty, not watched and 503 sentences, Try again, race, Back keeps the place, paused audio',widths:[320,360,390,760,1100,1440],headingTop1440x900:tops,emptyDe:empty.de,kept,pageErrors:errors};
+ return {checks:'first region with rows, session lines over their rows, row times, pages of 100, a session more from memory, paging busy/append/Try again/last session focus, since date, EN/DE at 390 and 360, widths, All stations merge and paging with a first session that grows, bulk rows with no link, fact, focus or pointer, the line with a year at 320 and 360, heading top at 1440x900, last region with the empty, not watched and 503 sentences, Try again, race, Back keeps the place, paused audio',widths:[320,360,390,760,1100,1440],headingTop1440x900:tops,longest,emptyDe:empty.de,kept,pageErrors:errors};
 }

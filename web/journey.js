@@ -79,6 +79,8 @@
     statLineAll:'{tracks} tracks by {artists} on {labels}, {hours} hours of music',artistsLink:'{n} artists',labelsLink:'{n} labels',allArtists:'All {n} artists',allLabels:'All {n} labels',
     changesTitle:'Added and removed',changeAdded:'added',changeRemoved:'removed',changesMore:'Show earlier changes',changesSince:'Changes are recorded since {date}.',
     changesNone:'Nothing added or removed since {date}.',changesNotYet:'No changes are recorded yet.',changesError:'The changes could not load.',changesPartial:'Not all changes could load.',
+    sessionNew1:'1 new track',sessionNew:'{n} new tracks',sessionGone1:'1 removed',sessionGone:'{n} removed',earlierThatDay:'Earlier that day',
+    atOnce:'{n} tracks added at once',atOnceGone:'{n} tracks removed at once',atOnceAtLeast:'At least {n} tracks added at once',
     changesLate:'A change shows the time the radio saw it. The radio looks at the playlists every 5 minutes.',
     airNow:'On air now',airTotal:'{n} listening on all stations',airLoading:'Loading track…',airNoTrack:'No track announced',airError:'What plays now could not load.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
@@ -92,6 +94,8 @@
     statLineAll:'{tracks} Tracks von {artists} auf {labels}, {hours} Stunden Musik',artistsLink:'{n} Künstlern',labelsLink:'{n} Labels',allArtists:'Alle {n} Künstler',allLabels:'Alle {n} Labels',
     changesTitle:'Hinzugefügt und entfernt',changeAdded:'hinzugefügt',changeRemoved:'entfernt',changesMore:'Frühere Änderungen anzeigen',changesSince:'Änderungen werden seit {date} erfasst.',
     changesNone:'Seit {date} nichts hinzugefügt oder entfernt.',changesNotYet:'Noch keine Änderungen erfasst.',changesError:'Die Änderungen konnten nicht geladen werden.',changesPartial:'Nicht alle Änderungen konnten geladen werden.',
+    sessionNew1:'1 neuer Track',sessionNew:'{n} neue Tracks',sessionGone1:'1 entfernt',sessionGone:'{n} entfernt',earlierThatDay:'Früher am selben Tag',
+    atOnce:'{n} neue Tracks auf einmal',atOnceGone:'{n} Tracks auf einmal entfernt',atOnceAtLeast:'Mindestens {n} neue Tracks',
     changesLate:'Eine Änderung zeigt die Zeit, zu der das Radio sie bemerkt hat. Das Radio schaut alle 5 Minuten in die Playlists.',
     airNow:'Gerade läuft',airTotal:'{n} hören auf allen Sendern',airLoading:'Titel wird geladen…',airNoTrack:'Kein Titel gemeldet',airError:'Was gerade läuft, konnte nicht geladen werden.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
@@ -172,11 +176,14 @@
     if(items.length>6){const more=all||action(word(typeof count==='string'?'showListed':'showAll').replace('{n}',number(items.length)),()=>{const rest=rows(items.slice(6));list.append(...rest);more.remove();section.setAttribute('data-open','');rest[0].querySelector('.row').focus();},'text-button');section.append(more);}
     return section;
   }
-  // {names}: "A", "A and B", or "A, B and 3 more", in the listener's language.
-  function names(ids) {
-    const titles=ids.map(id=>records.get(id)?.title).filter(Boolean),list=new Intl.ListFormat(radio.getState().language,{type:'conjunction'});
-    return titles.length>2?titles[0]+', '+list.format([titles[1],word('moreNames').replace('{n}',number(titles.length-2))]):list.format(titles);
+  // {names}: "A", "A and B", or "A, B and 3 more", in the listener's language; `total` counts names not given as more.
+  function listOf(titles,total=titles.length) {
+    const list=new Intl.ListFormat(radio.getState().language,{type:'conjunction'}),more=n=>word('moreNames').replace('{n}',number(n));
+    if(total>2&&titles.length>=2)return titles[0]+', '+list.format([titles[1],more(total-2)]);
+    return list.format(total>titles.length?[...titles,more(total-titles.length)]:titles);
   }
+  // The names of records by their ids, as listOf() says them.
+  const names = ids => listOf(ids.map(id=>records.get(id)?.title).filter(Boolean));
   // A reason from closeness.js in words: each part states its evidence, and parts read apart by a middle dot.
   const say=reason=>reason.map(({kind,names:list})=>kind==='relation'?[...new Set(list.map(word))].join(' · '):kind==='text'?list.join(', '):kind==='title'?names(list):
     kind==='inCommon'&&list.length===1?word('inCommon1'):word(kind).replace('{names}',names(list)).replace('{n}',number(list.length))).filter(Boolean).join(' · ');
@@ -925,9 +932,11 @@
   };
   // A tab's route alone names it: Roots carries the last search (#explore?q=…), History and Statistics their last place.
   const tab = link => link.getAttribute('href').split(/[/?]/)[0].slice(1);
+  // How many local days a moment is before today.
+  const daysAgo = at => {const midnight=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate());return Math.round((midnight(new Date(Date.now()))-midnight(at))/86400000);};
   // Today and yesterday by name, older days by weekday and date.
   function dayName(at) {
-    const lang=radio.getState().language,midnight=d=>new Date(d.getFullYear(),d.getMonth(),d.getDate()),days=Math.round((midnight(new Date(Date.now()))-midnight(at))/86400000);
+    const lang=radio.getState().language,days=daysAgo(at);
     if(days>1)return at.toLocaleDateString(lang,{weekday:'long',day:'numeric',month:'long'});
     const name=new Intl.RelativeTimeFormat(lang,{numeric:'auto'}).format(-days,'day');return name[0].toUpperCase()+name.slice(1);
   }
@@ -1056,12 +1065,25 @@
   // Each station's journal of changes, read 100 at a time and kept 5 minutes for every place of the visit: page 1 at once,
   // the next pages only when a place asks. A place that leaves stops waiting, and the read still fills the journal; a read
   // that fails or takes 12 s is not kept, so the next place asks again. Only journal(), journalMore() and forget() change a
-  // journal.
+  // journal, and they alone write the flags of its records (markJournal()).
   const journals=new Map();
+  // The flags of a journal's records, set again over all of them each time the journal grows. In one look of the radio, a
+  // removal and an addition of the same title and artist are one file found again: both are `again`. Each other record
+  // counts the additions, or the removals, of its look (`sync`), and a look of 5 or more is `bulk`, never a session.
+  const markJournal = value => {
+    const looks=new Map(),same=(a,b)=>a.title===b.title&&a.artist===b.artist;
+    for(const c of value.items){const t=Date.parse(c.observedAt);if(!looks.has(t))looks.set(t,[]);looks.get(t).push(c);c.again=false;}
+    for(const look of looks.values()){
+      for(const r of look)if(r.kind==='removed'){const a=look.find(c=>c.kind==='added'&&!c.again&&same(c,r));if(a)r.again=a.again=true;}
+      const count={added:0,removed:0};for(const c of look)if(!c.again)count[c.kind]++;
+      for(const c of look){c.sync=count[c.kind];c.bulk=!c.again&&c.sync>=5;}
+    }
+    return value;
+  };
   const journal = stage => {
     const kept=journals.get(stage),age=kept&&Date.now()-kept.at;if(kept&&age>=0&&age<300000)return kept.promise;
     const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000),entry={at:Date.now(),value:null,more:null,stop:()=>c.abort()};
-    entry.promise=changesOf(stage,c.signal).then(page=>entry.value={...page,pages:1},error=>{if(journals.get(stage)===entry)journals.delete(stage);throw error;}).finally(()=>clearTimeout(timeout));
+    entry.promise=changesOf(stage,c.signal).then(page=>entry.value=markJournal({...page,pages:1}),error=>{if(journals.get(stage)===entry)journals.delete(stage);throw error;}).finally(()=>clearTimeout(timeout));
     journals.set(stage,entry);return entry.promise;
   };
   // A journal still reading is dropped, so that the next place asks again; one that has answered stays.
@@ -1073,13 +1095,21 @@
     const value=entry?.value;if(!value?.next)return Promise.resolve(value);
     if(entry.more)return entry.more;
     const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000),drop=()=>c.abort();signal?.addEventListener('abort',drop);
-    entry.more=changesOf(stage,c.signal,value.next).then(page=>{const read=new Set(value.items.map(i=>i.sequence));value.items.push(...page.items.filter(i=>!read.has(i.sequence)));value.next=page.next;value.pages++;return value;})
+    entry.more=changesOf(stage,c.signal,value.next).then(page=>{const read=new Set(value.items.map(i=>i.sequence));value.items.push(...page.items.filter(i=>!read.has(i.sequence)));value.next=page.next;value.pages++;return markJournal(value);})
       .finally(()=>{clearTimeout(timeout);signal?.removeEventListener('abort',drop);entry.more=null;});
     return entry.more;
   };
   // A place's own copy of a station's journal, so that what it shows stays its own; it keeps the journal it came from,
   // which only grows, also once a newer read of the station has taken its place.
   const feedOf = from => () => {const {stage,items,next,since}=from.value;return {stage,items:[...items],next,since,from};};
+  // A station's journal as a place first shows it: page 1, and its next pages, 3 in all at most, while they hold no change
+  // known yet (only files found again, or removals of a look the page cuts), so that the place does not open on a region
+  // with no row. A place that leaves drops the page it waits for.
+  const placeJournal = (stage,signal) => {
+    const read=journal(stage),entry=journals.get(stage),known=v=>v.items.some(c=>!c.again&&!unsure(c,v));
+    const on=v=>v.next&&v.pages<3&&!known(v)?journalMore(stage,signal,entry).then(on):v;
+    return read.then(on).then(feedOf(entry));
+  };
   // The changes shown: the stations' feeds, each in its own order, merged newest first, ties in the order on screen. A
   // change shows only once no station with earlier pages could still add one before it, so a page that comes appends.
   const shownChanges = ({feeds}) => {
@@ -1092,27 +1122,99 @@
       out.push(c);heads[best]++;
     }
   };
-  // A change reads the time of the sync that saw it, or its day before today, the track over its artist, on All stations
-  // after its station, which a short line keeps whole, and whether it came or went. It opens its track.
-  const changeRow = (c,station) => {
-    const li=node('li'),a=node('a','row'),when=node('time','',timeOrDay(c.observedAt)),text=node('span','row-text');when.dateTime=c.observedAt;
+  // A removal is known only once its look is read whole. A sync writes its additions before its removals, so a page that
+  // cuts a look holds its removals before the additions that could make them files found again: while its station has
+  // more of that look to read, a removal of it is not known yet, and shows nowhere.
+  const unsure = (c,j) => c.kind==='removed'&&Boolean(j?.next)&&Date.parse(c.observedAt)===Date.parse(j.items.at(-1).observedAt);
+  // The changes shown as sessions, newest first, from the flags of the journal, writing nothing on a record. A file found
+  // again does not show, nor a removal not known yet. In one look of one station the additions come first, so that its
+  // removals, once known, come under them. The bulk records of one station, one look and one kind fold into one row,
+  // which counts its whole look, at least, while its station has more of that look to read. A session ends after 4 hours
+  // with no change, on all stations together, or where bulk rows begin or end. While a station has more, the last session
+  // waits, since it could go on, unless it is the first: a place never shows a heading and a button with no row.
+  const sessionsOf = (rows,feeds) => {
+    const at=c=>Date.parse(c.observedAt),journalOf=stage=>feeds.find(f=>f.stage===stage)?.from?.value,looks=[],folds=new Map(),list=[],groups=[];
+    for(const c of rows){const l=looks.at(-1);if(l&&l[0].stage===c.stage&&at(l[0])===at(c))l.push(c);else looks.push([c]);}
+    for(const c of looks.flatMap(l=>[...l.filter(r=>r.kind==='added'),...l.filter(r=>r.kind!=='added')])){
+      if(c.again||unsure(c,journalOf(c.stage)))continue;
+      if(!c.bulk){list.push(c);continue;}
+      const key=c.stage+' '+c.kind+' '+at(c);
+      if(!folds.has(key)){const j=journalOf(c.stage),last=j?.items.at(-1);folds.set(key,{key,bulk:true,stage:c.stage,kind:c.kind,observedAt:c.observedAt,records:[],count:c.sync,cut:Boolean(j?.next&&last&&at(last)===at(c))});list.push(folds.get(key));}
+      folds.get(key).records.push(c);
+    }
+    for(const r of list){const g=groups.at(-1);if(g&&g.bulk===Boolean(r.bulk)&&at(g.rows.at(-1))-at(r)<14400000){g.rows.push(r);g.newest=Math.max(g.newest,at(r));}else groups.push({rows:[r],bulk:Boolean(r.bulk),newest:at(r)});}
+    if(groups.length>1&&feeds.some(f=>f.next))groups.waiting=groups.pop();
+    return groups;
+  };
+  // How many sessions hold the rows shown, one at least; and how many more a batch adds: whole sessions while it holds 12
+  // rows at most, and one always. A batch is whole when the session after it, shown or waiting, could not join it: a
+  // session that waits only grows.
+  const sessionsIn = (groups,rows) => {let k=0,n=0;while(k<groups.length&&n+groups[k].rows.length<=rows)n+=groups[k++].rows.length;return Math.max(k,1);};
+  const batchOf = (groups,from) => {
+    let n=0,rows=0;while(from+n<groups.length&&(!n||rows+groups[from+n].rows.length<=12))rows+=groups[from+(n++)].rows.length;
+    const after=groups[from+n]||groups.waiting;return {n,whole:n>0&&(rows>=12||Boolean(after)&&rows+after.rows.length>12)};
+  };
+  // A session's day: the local day of its newest change, never after today, even when the browser's clock is behind.
+  const sessionDay = g => new Date(Math.min(g.newest,Date.now()));
+  // A session's line, over its first row: its day by name, the date with its year and no weekday in another year, or
+  // Earlier that day under a session of the same day; then the tracks it added and removed, each when there is one. A
+  // bulk session says its day only.
+  function sessionLine(g,newer) {
+    const day=sessionDay(g),lang=radio.getState().language,count=kind=>g.rows.filter(r=>r.kind===kind).length;
+    const when=newer&&sessionDay(newer).toDateString()===day.toDateString()?word('earlierThatDay'):daysAgo(day)>1&&day.getFullYear()!==new Date(Date.now()).getFullYear()?day.toLocaleDateString(lang,{day:'numeric',month:'long',year:'numeric'}):dayName(day);
+    const counts=g.bulk?[]:[['added','sessionNew'],['removed','sessionGone']].map(([kind,key])=>[count(kind),key]).filter(([n])=>n).map(([n,key])=>word(n===1?key+'1':key).replace('{n}',number(n)));
+    return node('p','release-line',[when,...counts].join(' · '));
+  }
+  // A row's time is the time of the look that saw it; a row of another day than its session's line reads its day.
+  const rowTime = (value,day) => {const t=node('time','',new Date(Math.min(Date.parse(value),Date.now())).toDateString()===day.toDateString()?shortTime(value):dayOf(value));t.dateTime=value;return t;};
+  // A change reads its time, the track over its artist, on All stations after its station, which a short line keeps
+  // whole, and whether it came or went. It opens its track.
+  const changeRow = (c,station,day) => {
+    const li=node('li'),a=node('a','row'),text=node('span','row-text');
     if(entityID('plex_'+c.id))a.href='#explore/plex_'+c.id;
     text.append(node('span','row-name',c.title),node('span','row-line',(station?[c.artist]:[stationName(c.stage),c.artist]).filter(Boolean).join(' · ')));
-    a.append(when,text,node('span','row-fact',word(c.kind==='added'?'changeAdded':'changeRemoved')));li.append(a);return li;
+    a.append(rowTime(c.observedAt,day),text,node('span','row-fact',word(c.kind==='added'?'changeAdded':'changeRemoved')));li.append(a);return li;
+  };
+  // A bulk look reads as one row that opens nothing, on every place: its time, how many tracks came or went at once, and
+  // the first two of them, on All stations after its station. sayBulk() writes its count again when more of it comes.
+  const sayBulk = (li,r,station) => {
+    li.querySelector('.row-name').textContent=word(r.kind==='added'?r.cut?'atOnceAtLeast':'atOnce':'atOnceGone').replace('{n}',number(r.count));
+    li.querySelector('.row-line').textContent=(station?[]:[stationName(r.stage)]).concat(listOf(r.records.slice(0,2).map(c=>c.title),Math.max(r.count,r.records.length))).join(' · ');
+  };
+  const bulkRow = (r,station,day) => {
+    const li=node('li'),a=node('a','row'),text=node('span','row-text');
+    text.append(node('span','row-name'),node('span','row-line'));a.append(rowTime(r.observedAt,day),text);li.append(a);sayBulk(li,r,station);return li;
+  };
+  // The sessions shown, each line in the first item of its session. A row shown stays the same node, kept by its key: a
+  // session that grows gets its new rows under it and its line says its new numbers, as a bulk row says its new count.
+  const showSessions = (changes,groups) => {
+    const items=[];
+    groups.forEach((g,k)=>{const day=sessionDay(g);g.rows.forEach((r,i)=>{
+      const key=r.bulk?r.key:r.stage+' '+r.sequence;let li=changes.rows.get(key);
+      if(!li){li=r.bulk?bulkRow(r,changes.station,day):changeRow(r,changes.station,day);changes.rows.set(key,li);}else if(r.bulk)sayBulk(li,r,changes.station);
+      const line=li.children[0].className==='release-line'?li.children[0]:null;
+      if(!i){const said=sessionLine(g,groups[k-1]);if(line)line.textContent=said.textContent;else li.prepend(said);}else line?.remove();
+      items.push(li);
+    });});
+    const have=[...changes.list.children];
+    if(have.every((li,i)=>items[i]===li))changes.list.append(...items.slice(have.length));else changes.list.replaceChildren(...items);
+    changes.shown=items.length;
   };
   // Show earlier changes says what it does next, and that it is disabled while its pages load: aria-disabled keeps focus on it.
   // After a failure it says Try again, unless a station is missing: then the region's sentence says that not all changes
   // could load, with the region's one Try again, and the button keeps its name and asks for the same pages.
   const sayChanges = changes => {const b=changes.more;if(!b)return;b.textContent=word(changes.busy?'loadingMore':changes.failed&&!changes.missing?'retry':'changesMore');
     if(changes.busy){b.setAttribute('aria-disabled','true');b.setAttribute('aria-busy','true');}else{b.removeAttribute('aria-disabled');b.removeAttribute('aria-busy');}};
-  // Ten more changes under the rows shown: from the rows the place holds, or else with the next page of every station that
-  // has one, which its journal may hold already. A failure keeps the rows and says Try again on the button (see
-  // sayChanges()), which asks for the same pages. The button goes with the last row, its focus to the first row it showed that opens a track, or to the
-  // place's name. Leaving the place drops the request.
+  // A batch of whole sessions under the ones shown (see batchOf()): from the rows the place holds, or else, when they make
+  // no whole batch, with the next page of every station that has one, which its journal may hold already. A failure keeps
+  // the rows and says Try again on the button (see sayChanges()), which asks for the same pages. The button goes with the
+  // last session, its focus to the first row of the batch that opens a track, or to the place's name. Leaving the place
+  // drops the request.
   async function earlierChanges(changes) {
     if(changes.busy)return;
     // After a failure the press asks again, also when the rows of a station that answered wait in the place.
-    const ask=changes.failed||shownChanges(changes).length<changes.shown+10?changes.feeds.filter(f=>f.next):[];let ok=true;
+    const before=sessionsOf(shownChanges(changes),changes.feeds),k=changes.shown&&sessionsIn(before,changes.shown);
+    const ask=changes.failed||!batchOf(before,k).whole?changes.feeds.filter(f=>f.next):[];let ok=true;
     if(ask.length){
       const c=new AbortController();paging=c;changes.busy=true;changes.failed=false;sayChanges(changes);
       try{await Promise.all(ask.map(async f=>{const j=f.from;if(j.value.items.length<=f.items.length)await journalMore(f.stage,c.signal,j);f.items.push(...j.value.items.slice(f.items.length));f.next=j.value.next;}));}catch{ok=false;/* The button says Try again. */}
@@ -1121,9 +1223,12 @@
     }
     changes.failed=!ok;
     if(ok){
-      const all=shownChanges(changes),held=document.activeElement===changes.more,rows=all.slice(changes.shown,changes.shown+10).map(r=>changeRow(r,changes.station));
-      changes.list.append(...rows);changes.shown+=rows.length;
-      if(all.length===changes.shown&&!changes.feeds.some(f=>f.next)){changes.more.remove();changes.more=null;if(held)(rows.map(r=>r.querySelector('a.row[href]')).find(Boolean)||recordTitle).focus({preventScroll:true});}
+      // A batch with no whole session shows the session that waits, as far as it is read: it only grows, under the rows
+      // shown, and a bulk row cut by a page says its new count. With no session left, the place says its sentence.
+      const groups=sessionsOf(shownChanges(changes),changes.feeds),n=batchOf(groups,k).n,held=document.activeElement===changes.more,old=new Set(changes.list.children);
+      if(!groups.length){renderStage(...shownStage);if(held)(changes.more||recordTitle).focus({preventScroll:true});return;}
+      showSessions(changes,n||!groups.waiting?groups.slice(0,k+n):[...groups.slice(0,k),groups.waiting]);
+      if(k+n>=groups.length&&!changes.feeds.some(f=>f.next)){changes.more.remove();changes.more=null;if(held)([...changes.list.children].filter(li=>!old.has(li)).map(li=>li.querySelector('a.row[href]')).find(Boolean)||recordTitle).focus({preventScroll:true});}
     }
     sayChanges(changes);
   }
@@ -1199,24 +1304,29 @@
       for(const item of top){const li=node('li'),row=node('a','row'),text=node('span','row-text');if(entityID('plex_'+item.id))row.href='#explore/plex_'+item.id;text.append(node('span','row-name',item.title),node('span','row-line',item.artist));row.append(text,node('span','row-fact',number(item.plays)+'×'));li.append(row);list.append(li);}
       played.append(h,list);grid.append(played);
     }
-    // Added and removed: the newest ten changes, or as many as the place showed before it was drawn again, and Show
-    // earlier changes while there are more. With rows it is the first region; with none it stays at the end and says
-    // why: nothing changed since the radio began to watch, nothing is watched yet, or the changes did not load. Nothing
-    // changed is said only when every station asked answered; a station missing says so under the rows, with Try again.
-    const changed=shownChanges(changes),section=node('section','region changes'),h=node('h4','',word('changesTitle')),note=(say,retry)=>{
+    // Added and removed: the newest sessions, a batch of them (see batchOf()) or the ones the place showed before it was
+    // drawn again, and Show earlier changes while there are more. With a track added or removed by hand it is the first
+    // region; tracks that came or went at once, a whole playlist, are no digging and keep it at the end; with no row it
+    // stays at the end and says why: nothing changed since the radio began to watch, nothing is watched yet, or the changes did
+    // not load. Nothing changed is said only when every station asked answered; a station missing says so under the
+    // rows, with Try again.
+    const groups=sessionsOf(shownChanges(changes),changes.feeds),section=node('section','region changes'),h=node('h4','',word('changesTitle')),note=(say,retry)=>{
       // A sentence of the region; one that says a failure describes the region's one Try again, which loads the place again.
       const p=node('p','collection-note',say);if(!retry)return [p];
       const b=action(word('retry'),retryChanges,'text-button');p.id='r-changes-note';b.setAttribute('aria-describedby',p.id);return [p,b];};
     h.id='r-changes';section.setAttribute('aria-labelledby',h.id);section.append(h);
-    if(changed.length){
-      const list=node('ol'),shown=changed.slice(0,changes.shown||10);
-      list.append(...shown.map(c=>changeRow(c,Boolean(station))));section.append(list);grid.prepend(section);
-      Object.assign(changes,{station:Boolean(station),list,shown:shown.length,more:changed.length>shown.length||changes.feeds.some(f=>f.next)?action('',()=>earlierChanges(changes),'text-button'):null});
+    if(groups.length||changes.feeds.some(f=>f.next)){
+      // A place drawn again shows the sessions it showed, the one that waits too when a press showed it. Only pages that
+      // hold no change known yet leave no session: then the region stays at the end, with its button.
+      const all=groups.waiting?[...groups,groups.waiting]:groups,list=node('ol'),k=changes.shown?sessionsIn(all,changes.shown):batchOf(groups,0).n;
+      Object.assign(changes,{station:Boolean(station),list,rows:new Map()});showSessions(changes,all.slice(0,k));section.append(list);
+      if(all.some(g=>!g.bulk))grid.prepend(section);else grid.append(section);
+      changes.more=all.length>k||changes.feeds.some(f=>f.next)?action('',()=>earlierChanges(changes),'text-button'):null;
       if(changes.more){section.append(changes.more);sayChanges(changes);}
       if(changes.missing)section.append(...note(word('changesPartial'),true));
     }else{
       const say=!changes.missing?watched?word('changesNone').replace('{date}',dayOf(watched)):word('changesNotYet'):word(changes.feeds.length?'changesPartial':'changesError');
-      section.append(...note(say,changes.missing>0));grid.append(section);
+      changes.more=null;section.append(...note(say,changes.missing>0));grid.append(section);
     }
     content.append(grid);
     // The first three artists and labels that come without a record of their own get its picture and its link in place,
@@ -1587,12 +1697,12 @@
         // document with both; any of them that fails leaves the numbers to show. The labels document and the changes hold
         // the place 2 s past its numbers at most: one that is later is left out of this place, and the document and the
         // journal still come for the next one. The place shows its own copy of each journal, which journal() has kept by
-        // the time the copy is asked for.
+        // the time the copy is asked for, read further when its first page shows nothing known yet (placeJournal()).
         const station=radio.stations.some(s=>s.id===scope);
         const numbers=[readJSON('/api/library/statistics?scope='+scope,controller.signal),station?readJSON('/api/radio/'+scope+'/music',controller.signal).catch(()=>null):null];
         let grace=null;
         const late=Promise.all(numbers).then(()=>new Promise(done=>{grace=setTimeout(()=>done(null),2000);}),()=>null),soon=extra=>Promise.race([extra.catch(()=>null),late]);
-        const [data,music,labels,...feeds]=await Promise.all([...numbers,soon(namesOf('labels',controller.signal)),...(station?[scope]:radio.stations.map(s=>s.id)).map(id=>soon(journal(id).then(feedOf(journals.get(id)))))]);
+        const [data,music,labels,...feeds]=await Promise.all([...numbers,soon(namesOf('labels',controller.signal)),...(station?[scope]:radio.stations.map(s=>s.id)).map(id=>soon(placeJournal(id,controller.signal)))]);
         clearTimeout(grace);
         if(musicRequest!==controller)return;
         const answered=feeds.filter(Boolean);
