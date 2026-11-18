@@ -86,6 +86,12 @@ async page => {
   // A link of the record, never one of its line, scrolled into view and clicked as a listener does. A real click
   // only: a link that is covered or does not take the pointer fails the step.
   const follow=(p,id)=>p.locator('#entity-inspector a[href="#explore/'+id+'"]:not(.entity-trail a)').first().click({timeout:10000});
+  // A record is measured once it stands still: its fonts are in, no animation runs, and its title keeps its height for
+  // three looks 150 ms apart. A busy machine paints late, and a fixed wait then measures a record on its way.
+  const still=async p=>{
+    await p.evaluate(()=>document.fonts.ready.then(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>null)))));
+    for(let i=0,last=null,same=0;i<60&&same<3;i++){const y=await p.evaluate(()=>Math.round(document.querySelector('#entity-inspector h3')?.getBoundingClientRect().top??-1));same=y===last?same+1:0;last=y;await p.waitForTimeout(150);}
+  };
   // The player's artist opens the visit; the explorer covers the hero, so it is reached only with the explorer closed.
   const credit=async p=>{const link=p.locator('#credited-artists a.artist-credit[href="#explore/'+maceo+'"]');await link.waitFor({timeout:15000});await link.click();await record(p,'Maceo Plex');};
   const spy=p=>p.evaluate(()=>{window.__goes=[];if(history.go.__spied)return;const go=history.go.bind(history),spied=n=>{window.__goes.push(n);go(n);};spied.__spied=true;history.go=spied;});
@@ -258,10 +264,10 @@ async page => {
   const toIbiza=async p=>{
     await p.evaluate(href=>{const a=document.createElement('a');a.href=href;document.body.append(a);a.dispatchEvent(new MouseEvent('click',{bubbles:true,cancelable:true}));a.remove();},'#explore/'+morttagua);
     // The explorer slides in as it opens: Morttagua is measured once it stands still.
-    await record(p,'Morttagua');await p.evaluate(()=>Promise.all(document.getAnimations().map(a=>a.finished.catch(()=>null))));const first={...await line(p),at:await p.evaluate(()=>Math.round(document.getElementById('explorer').scrollTop))},link=p.locator('#entity-inspector a[href="#explore/'+ibiza+'"]:not(.entity-trail a)').first();
+    await record(p,'Morttagua');await still(p);const first={...await line(p),at:await p.evaluate(()=>Math.round(document.getElementById('explorer').scrollTop))},link=p.locator('#entity-inspector a[href="#explore/'+ibiza+'"]:not(.entity-trail a)').first();
     await link.scrollIntoViewIfNeeded();first.left=await link.evaluate(a=>({y:Math.round(a.getBoundingClientRect().top),top:Math.round(document.getElementById('explorer').scrollTop)}));
     await follow(p,ibiza);await record(p,'Timeless Ibiza');await follow(p,aaron);await record(p,'Aaron Suiss');
-    await p.goBack();await record(p,'Timeless Ibiza');await p.waitForTimeout(300);return first;};
+    await p.goBack();await record(p,'Timeless Ibiza');await still(p);return first;};
   walk.line={};
   for(const [size,width,height,phone,list,title] of [['1440 map',1440,900,false,false,415],['1100 map',1100,800,false,false,365],['1100 list',1100,800,false,true,172],['390',390,844,true,false,213],['360',360,740,true,false,213]])
     for(const [lang,back,ahead] of [['en','Back to Morttagua','Forward to Aaron Suiss'],['de','Zurück zu Morttagua','Weiter zu Aaron Suiss']]){
