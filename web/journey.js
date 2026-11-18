@@ -78,6 +78,8 @@
     definitions:'Each track counts once per playlist. Each artist counts once per track, featured artists and remixers included. A track can be on several stations.',playIsStart:'A play is a start on the stream, not a full listen.',checkedAt:'Playlist checked at {time}',knownArtist:'Artist known for {n} of {total} tracks',knownLabel:'Label known for {n} of {total} tracks',knownYear:'Year known for {n} of {total} tracks',
     statLineAll:'{tracks} tracks by {artists} on {labels}, {hours} hours of music',artistsLink:'{n} artists',labelsLink:'{n} labels',allArtists:'All {n} artists',allLabels:'All {n} labels',
     changesTitle:'Added and removed',changeAdded:'added',changeRemoved:'removed',changesMore:'Show earlier changes',changesSince:'Changes are recorded since {date}.',
+    changesNone:'Nothing added or removed since {date}.',changesNotYet:'No changes are recorded yet.',changesError:'The changes could not load.',changesPartial:'Not all changes could load.',
+    changesLate:'A change shows the time the radio saw it. The radio looks at the playlists every 5 minutes.',
     airNow:'On air now',airTotal:'{n} listening on all stations',airLoading:'Loading track…',airNoTrack:'No track announced',airError:'What plays now could not load.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
     indexTab:'Index',toHistory:'to History',toStatistics:'to Statistics',toIndexTab:'to the Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
@@ -89,6 +91,8 @@
     definitions:'Jeder Track zählt einmal pro Playlist. Jeder Künstler zählt einmal pro Track, Featurings und Remixer eingeschlossen. Ein Track kann auf mehreren Sendern laufen.',playIsStart:'Eine Wiedergabe ist ein Start im Stream, kein ganzes Anhören.',checkedAt:'Playlist geprüft um {time}',knownArtist:'Künstler bekannt für {n} von {total} Tracks',knownLabel:'Label bekannt für {n} von {total} Tracks',knownYear:'Jahr bekannt für {n} von {total} Tracks',
     statLineAll:'{tracks} Tracks von {artists} auf {labels}, {hours} Stunden Musik',artistsLink:'{n} Künstlern',labelsLink:'{n} Labels',allArtists:'Alle {n} Künstler',allLabels:'Alle {n} Labels',
     changesTitle:'Hinzugefügt und entfernt',changeAdded:'hinzugefügt',changeRemoved:'entfernt',changesMore:'Frühere Änderungen anzeigen',changesSince:'Änderungen werden seit {date} erfasst.',
+    changesNone:'Seit {date} nichts hinzugefügt oder entfernt.',changesNotYet:'Noch keine Änderungen erfasst.',changesError:'Die Änderungen konnten nicht geladen werden.',changesPartial:'Nicht alle Änderungen konnten geladen werden.',
+    changesLate:'Eine Änderung zeigt die Zeit, zu der das Radio sie bemerkt hat. Das Radio schaut alle 5 Minuten in die Playlists.',
     airNow:'Gerade läuft',airTotal:'{n} hören auf allen Sendern',airLoading:'Titel wird geladen…',airNoTrack:'Kein Titel gemeldet',airError:'Was gerade läuft, konnte nicht geladen werden.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
     indexTab:'Index',toHistory:'zum Verlauf',toStatistics:'zur Statistik',toIndexTab:'zum Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
@@ -425,7 +429,9 @@
       let to=null;from.style.viewTransitionName='centre';
       const move=document.startViewTransition(()=>{if(hop!==controller)return;paint();to=$('entity-inspector').querySelector('.picture');if(to)to.style.viewTransitionName='centre';});
       const done=()=>{for(const n of [from,to])if(n)n.style.viewTransitionName='';};
-      painted=move.updateCallbackDone.catch(()=>{});move.finished.then(done,done);
+      // A window resized while the picture moves makes the browser drop the move: the record still paints, and the
+      // dropped move is no error of the page.
+      painted=move.updateCallbackDone.catch(()=>{});move.ready?.catch(()=>{});move.finished.then(done,done);
     };
     if(records.has(id))header(records.get(id));
     // Without it, the last record stays in place, dimmed and out of reach, so its preview cannot start; only a
@@ -898,6 +904,8 @@
   const shortTime = value => new Date(value).toLocaleTimeString(radio.getState().language, {timeStyle:'short'});
   // A day by its month and number: Oct 7.
   const shortDay = value => new Date(value).toLocaleDateString(radio.getState().language, {day:'numeric',month:'short'});
+  // A day as shortDay() says it, with its year when that is not this year.
+  const dayOf = value => new Date(value).getFullYear()===new Date(Date.now()).getFullYear()?shortDay(value):new Date(value).toLocaleDateString(radio.getState().language,{day:'numeric',month:'short',year:'numeric'});
   // The time of a moment today, its day before.
   const timeOrDay = value => new Date(value).toDateString()===new Date(Date.now()).toDateString()?shortTime(value):shortDay(value);
   // One number format per language: the Index writes thousands of counts in one draw.
@@ -969,7 +977,7 @@
       if(view==='history')musicPlace={key:content.dataset.key,top:dialog.scrollTop,row:opened(clicked)?clicked:[...content.children].find(opened)};
       else if(view==='statistics'){
         // With no row clicked, as on Forward, the link that shows in the explorer comes before one scrolled out of view: a
-        // track of Most played is linked again from its change, far under it.
+        // track's change is linked again from Most played, far under it.
         const links=[...content.querySelectorAll('a')],frame=dialog.getBoundingClientRect(),seen=a=>{const r=a.getBoundingClientRect();return r.height>0&&r.bottom>frame.top&&r.top<frame.bottom;};
         const row=opened(clicked)?clicked:links.filter(opened).find(seen)||links.find(opened),href=row?.getAttribute('href');
         musicPlace={key:content.dataset.key,top:dialog.scrollTop,row,href,nth:links.filter(a=>a.getAttribute('href')===href).indexOf(row),y:row?row.getBoundingClientRect().top-dialog.getBoundingClientRect().top:0,map:mapOn(),phone:phone.matches};
@@ -1047,14 +1055,17 @@
   });
   // Each station's journal of changes, read 100 at a time and kept 5 minutes for every place of the visit: page 1 at once,
   // the next pages only when a place asks. A place that leaves stops waiting, and the read still fills the journal; a read
-  // that fails or takes 12 s is not kept, so the next place asks again. Only journal() and journalMore() change a journal.
+  // that fails or takes 12 s is not kept, so the next place asks again. Only journal(), journalMore() and forget() change a
+  // journal.
   const journals=new Map();
   const journal = stage => {
     const kept=journals.get(stage),age=kept&&Date.now()-kept.at;if(kept&&age>=0&&age<300000)return kept.promise;
-    const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000),entry={at:Date.now(),value:null,more:null};
+    const c=new AbortController(),timeout=setTimeout(()=>c.abort(),12000),entry={at:Date.now(),value:null,more:null,stop:()=>c.abort()};
     entry.promise=changesOf(stage,c.signal).then(page=>entry.value={...page,pages:1},error=>{if(journals.get(stage)===entry)journals.delete(stage);throw error;}).finally(()=>clearTimeout(timeout));
     journals.set(stage,entry);return entry.promise;
   };
+  // A journal still reading is dropped, so that the next place asks again; one that has answered stays.
+  const forget = stage => {const kept=journals.get(stage);if(!kept||kept.value)return;journals.delete(stage);kept.stop();};
   // The next page of a journal that has one, appended with the records not read yet. A second call while it reads waits
   // for the same page; a failure keeps the journal as it was. A place passes the journal it was given, and its signal,
   // which drops the page when the place leaves.
@@ -1090,11 +1101,13 @@
     a.append(when,text,node('span','row-fact',word(c.kind==='added'?'changeAdded':'changeRemoved')));li.append(a);return li;
   };
   // Show earlier changes says what it does next, and that it is disabled while its pages load: aria-disabled keeps focus on it.
-  const sayChanges = changes => {const b=changes.more;if(!b)return;b.textContent=word(changes.busy?'loadingMore':changes.failed?'retry':'changesMore');
+  // After a failure it says Try again, unless a station is missing: then the region's sentence says that not all changes
+  // could load, with the region's one Try again, and the button keeps its name and asks for the same pages.
+  const sayChanges = changes => {const b=changes.more;if(!b)return;b.textContent=word(changes.busy?'loadingMore':changes.failed&&!changes.missing?'retry':'changesMore');
     if(changes.busy){b.setAttribute('aria-disabled','true');b.setAttribute('aria-busy','true');}else{b.removeAttribute('aria-disabled');b.removeAttribute('aria-busy');}};
   // Ten more changes under the rows shown: from the rows the place holds, or else with the next page of every station that
-  // has one, which its journal may hold already. A failure keeps the rows and says Try again on the button, which asks for
-  // the same pages. The button goes with the last row, its focus to the first row it showed that opens a track, or to the
+  // has one, which its journal may hold already. A failure keeps the rows and says Try again on the button (see
+  // sayChanges()), which asks for the same pages. The button goes with the last row, its focus to the first row it showed that opens a track, or to the
   // place's name. Leaving the place drops the request.
   async function earlierChanges(changes) {
     if(changes.busy)return;
@@ -1114,10 +1127,17 @@
     }
     sayChanges(changes);
   }
+  // Try again drops every journal of the place still reading, so that the place asks again rather than wait on it, and
+  // loads the place again; a journal that answered after the place showed is kept, and shows.
+  function retryChanges() {
+    for(const id of radio.stations.some(s=>s.id===musicScope)?[musicScope]:radio.stations.map(s=>s.id))forget(id);
+    loadMusic();
+  }
   // A station in Statistics is a place on the map of a record: its photo, its name under its stage and its numbers in the
   // middle, the artists and labels with the most tracks on it and the stations it shares tracks with around them, each
-  // opening its own place. Under it: its release years, what it played most, what changed in its playlist, and how all
-  // of it is counted. The labels document, when it loads, counts its labels and leads its counts into the Index.
+  // opening its own place. Under it: what changed in its playlist, first when something did, its release years, what it
+  // played most, and how all of it is counted. The labels document, when it loads, counts its labels and leads its
+  // counts into the Index.
   function renderStage(data,music,labels,changes) {
     const content=$('music-content'),scope=data.scope,station=radio.stations.find(s=>s.id===scope),title=scopeName(scope),map=mapOn()?node('div','neighbourhood'):null,grid=node('div','regions');
     const heading=node('div','entity-heading'),about=node('div'),since=Date.parse(music?.earliest)>Date.parse(music?.from),every=labels!==null;
@@ -1162,11 +1182,12 @@
       top.style.left=`clamp(${clear}ch, ${(peak[0]-first+.5)/(last-first+1)*100}%, calc(100% - ${clear}ch))`;
       axis.append(node('span','',String(first)),top,node('span','',String(last)));notes.append(h,strip,axis);
     }
-    // How it is all counted, closed until asked: the only notes of the view.
+    // How it is all counted, closed until asked: the notes of the view, and a sentence in Added and removed when it has
+    // no row or misses a station.
     // Changes count from the day the radio began to watch the playlist; on All stations from the last station to begin,
     // and only when every station says.
-    const watched=changes&&(station?changes.feeds[0].since:changes.feeds.length===radio.stations.length&&changes.feeds.every(f=>f.since)&&changes.feeds.map(f=>f.since).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1));
-    details.append(node('summary','',word('howCounted')),...[word('definitions'),station&&word('playIsStart'),word('checkedAt').replace('{time}',timeOrDay(data.updatedAt)),watched&&word('changesSince').replace('{date}',shortDay(watched)),
+    const watched=station?changes.feeds[0]?.since:changes.feeds.length===radio.stations.length&&changes.feeds.every(f=>f.since)&&changes.feeds.map(f=>f.since).sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1);
+    details.append(node('summary','',word('howCounted')),...[word('definitions'),station&&word('playIsStart'),word('checkedAt').replace('{time}',timeOrDay(data.updatedAt)),watched&&word('changesSince').replace('{date}',shortDay(watched)),word('changesLate'),
       ...[['artists','knownArtist'],['labels','knownLabel'],['years','knownYear']].filter(([key])=>data.coverage?.[key]<data.tracks).map(([key,say])=>word(say).replace('{n}',number(data.coverage[key])).replace('{total}',number(data.tracks)))]
       .filter(Boolean).map(text=>node('p','collection-note',text)));
     notes.append(details);grid.append(notes);
@@ -1179,13 +1200,23 @@
       played.append(h,list);grid.append(played);
     }
     // Added and removed: the newest ten changes, or as many as the place showed before it was drawn again, and Show
-    // earlier changes while there are more. No change, no region.
-    const changed=changes?shownChanges(changes):[];
+    // earlier changes while there are more. With rows it is the first region; with none it stays at the end and says
+    // why: nothing changed since the radio began to watch, nothing is watched yet, or the changes did not load. Nothing
+    // changed is said only when every station asked answered; a station missing says so under the rows, with Try again.
+    const changed=shownChanges(changes),section=node('section','region changes'),h=node('h4','',word('changesTitle')),note=(say,retry)=>{
+      // A sentence of the region; one that says a failure describes the region's one Try again, which loads the place again.
+      const p=node('p','collection-note',say);if(!retry)return [p];
+      const b=action(word('retry'),retryChanges,'text-button');p.id='r-changes-note';b.setAttribute('aria-describedby',p.id);return [p,b];};
+    h.id='r-changes';section.setAttribute('aria-labelledby',h.id);section.append(h);
     if(changed.length){
-      const section=node('section','region changes'),h=node('h4','',word('changesTitle')),list=node('ol'),shown=changed.slice(0,changes.shown||10);h.id='r-changes';section.setAttribute('aria-labelledby',h.id);
-      list.append(...shown.map(c=>changeRow(c,Boolean(station))));section.append(h,list);grid.append(section);
+      const list=node('ol'),shown=changed.slice(0,changes.shown||10);
+      list.append(...shown.map(c=>changeRow(c,Boolean(station))));section.append(list);grid.prepend(section);
       Object.assign(changes,{station:Boolean(station),list,shown:shown.length,more:changed.length>shown.length||changes.feeds.some(f=>f.next)?action('',()=>earlierChanges(changes),'text-button'):null});
       if(changes.more){section.append(changes.more);sayChanges(changes);}
+      if(changes.missing)section.append(...note(word('changesPartial'),true));
+    }else{
+      const say=!changes.missing?watched?word('changesNone').replace('{date}',dayOf(watched)):word('changesNotYet'):word(changes.feeds.length?'changesPartial':'changesError');
+      section.append(...note(say,changes.missing>0));grid.append(section);
     }
     content.append(grid);
     // The first three artists and labels that come without a record of their own get its picture and its link in place,
@@ -1567,7 +1598,7 @@
         const answered=feeds.filter(Boolean);
         // A place starts at its top, as a record does.
         dialog.scrollTop=0;
-        renderStage(data,music,labels,answered.length?{feeds:answered}:null);content.dataset.key=key;$('music-status').textContent='';
+        renderStage(data,music,labels,{feeds:answered,missing:feeds.length-answered.length});content.dataset.key=key;$('music-status').textContent='';
         // A stage place starts at its name, as a record starts at its title, unless the listener moved focus while it loaded.
         if([dialog,document.body].includes(document.activeElement))recordTitle.focus({preventScroll:true});
       }
