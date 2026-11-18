@@ -1,8 +1,10 @@
 // Playwright CLI callback. A track's record ends its header on the day it was added to each station, from the stations'
 // changes: at the body paint, as the header's last line, with nothing in the header moving from its first paint, and on
 // the map clear of every name. A track of a playlist that came whole says it came with the others, and a track from
-// before the radio watched its playlist says nothing. Its records and changes are a minimal copy of the dev captures of
-// November 2026, held here, read in Zurich on 17 November 2026; the stream is never asked for.
+// before the radio watched its playlist says nothing. An artist's On the radio says since when each of its tracks plays
+// on each station the changes date, with nothing moving after the body paints. Its records and changes are a minimal
+// copy of the dev captures of November 2026, held here, read in Zurich on 17 November 2026; the stream is never asked
+// for.
 async page => {
  const assert=(ok,message)=>{if(!ok)throw new Error(message);};
  const origin=new URL(page.url()).origin;
@@ -17,7 +19,7 @@ async page => {
  journals['bermuda-evening']={since:'2026-10-07T00:15:13Z',rows:[['1','added',...own,'2026-11-09T22:00:00Z']]};
  journals['palac-feel']={since:'2026-10-07T00:15:13Z',rows:[['13','added',...own,'2026-10-20T10:00:00Z'],...Array.from({length:12},(_,i)=>[String(12-i),'added',String(991000+i),'Track '+i,'Artist '+i,'2026-10-20T10:00:00Z'])]};
  const changes=stage=>{const j=journals[stage];return {trackingSince:j?.since||'2026-10-07T00:15:13Z',changes:(j?.rows||[]).map(([sequence,kind,id,title,artist,observedAt])=>({sequence,kind,id,title,artist,album:'',observedAt}))};};
- const context=await page.context().browser().newContext({timezoneId:'Europe/Zurich',locale:'en-US'}),errors=[],asked=[];
+ const context=await page.context().browser().newContext({timezoneId:'Europe/Zurich',locale:'en-US'}),errors=[],asked=[];let visit=[];
  try{
   await context.route('**/stream/**',route=>route.abort());
   // Each station's changes as the server pages them, 100 at a time; every record here is under 100. They answer 300 ms
@@ -32,14 +34,15 @@ async page => {
   // and stands still: each frame from the record's first paint to 2 s after its body's, the tops of the header, the
   // title, the picture and the line of facts, and the header's last line once it has two.
   const open=async(id,{w,h,lang='en',list=false})=>{
-   await p.setViewportSize({width:w,height:h});
+   await p.setViewportSize({width:w,height:h});asked.length=0;
    await p.goto(origin+'/?station=palac-feel');
    await p.evaluate(list=>{try{localStorage.setItem('pavoia-explorer-view',list?'list':'map');}catch{}},list);
    await p.reload();await p.waitForFunction(()=>window.Pavoia?.stations?.length===9,null,{timeout:30000});
    await p.locator('#language [value='+lang+']').dispatchEvent('click');
    await p.evaluate(()=>{location.hash='#explore/art_4d5a69aef55a';});
    await p.waitForFunction(()=>location.hash==='#explore/art_4d5a69aef55a'&&document.querySelector('#entity-inspector h3')?.textContent==='Robosonic'&&document.querySelector('#entity-inspector .regions, #entity-inspector .neighbourhood-caption')&&!document.getAnimations().some(a=>a.playState==='running'),null,{timeout:30000});
-   asked.length=0;
+   // Robosonic's record reads its tracks' journals: what the next record asks comes on top of them.
+   visit=[...asked];asked.length=0;
    await p.evaluate(id=>{
     const frames=window.__frames=[];window.__done=false;let body=0;
     const top=n=>n?Math.round(n.getBoundingClientRect().top*10)/10:null;
@@ -66,8 +69,11 @@ async page => {
     const caption=n&&document.querySelector('#entity-inspector .neighbourhood + .neighbourhood-caption')?.getBoundingClientRect();
     return n&&{gap:caption?Math.round((caption.top-box.bottom)*10)/10:null,text:n.textContent,links:[...n.querySelectorAll('a')].map(a=>a.textContent+' '+a.getAttribute('href')),over,names:names.length,height:Math.round(box.height),fits:n.scrollWidth<=n.clientWidth+1};});
    const before=frames.filter(f=>!f.body);
-   return {frames:frames.length,headerFrames:before.length,moved,line,lineBeforeBody:before.some(f=>f.last),lineAtBody:frames.find(f=>f.body)?.last||'',asked:[...asked].sort(),map:await p.locator('#entity-inspector .neighbourhood').count()>0};
+   return {frames:frames.length,headerFrames:before.length,moved,line,lineBeforeBody:before.some(f=>f.last),lineAtBody:frames.find(f=>f.body)?.last||'',asked:[...asked].sort(),visit:[...visit].sort(),map:await p.locator('#entity-inspector .neighbourhood').count()>0};
   };
+  // A record's journals are read once in the visit: the ones Robosonic's record read are not asked again, and the record
+  // asks only its own stations' that are not in memory.
+  const once=(r,own)=>!r.asked.some(s=>r.visit.includes(s))&&r.asked.every(s=>own.includes(s))&&own.every(s=>r.visit.includes(s)||r.asked.includes(s));
   const out=[];
   // Drowning (club version), added to Essentials on 16 November: the line comes with the body, and nothing moves.
   for(const [w,h,lang,list,want] of [[1440,900,'en',false,'Added to Essentials on Nov 16'],[1100,800,'en',false,'Added to Essentials on Nov 16'],[1100,800,'en',true,'Added to Essentials on Nov 16'],[390,844,'en',false,'Added to Essentials on Nov 16'],[360,740,'de',false,'Am 16. Nov. zu Essentials hinzugefügt']]){
@@ -78,7 +84,7 @@ async page => {
    assert(Object.values(r.moved).every(v=>v===0),at+': nothing in the header moves from its first paint: '+JSON.stringify(r.moved));
    assert(!r.map||r.line.over===0,at+': no name on the map covers the line: '+r.line.over+' of '+r.line.names);
    assert(r.line.fits,at+': the line is not cut');
-   assert(r.asked.join()==='essentials',at+': one journal, its station\'s: '+r.asked);
+   assert(once(r,['essentials']),at+': its station\'s journal, once in the visit: '+JSON.stringify([r.visit,r.asked]));
    out.push(at+' '+r.frames+' frames, moved '+JSON.stringify(r.moved)+', line '+r.line.height+' px'+(r.map?', '+r.line.names+' names clear':''));
   }
   // Synthetic Dreams, a record with no profile and no station: every station is asked, and it came to Etage 0 with the
@@ -86,7 +92,7 @@ async page => {
   for(const [lang,want] of [['en','Came to Etage 0 on Oct 15 with 6\u00a0other\u00a0tracks'],['de','Kam am 15. Okt. mit 6\u00a0weiteren\u00a0Tracks zu Etage 0']]){
    const r=await open('plex_143466',{w:1440,h:900,lang});
    assert(r.line?.text===want&&r.line.links.join()==='Etage 0 #statistics/etage-zero','plex_143466 '+lang+': '+JSON.stringify(r.line));
-   assert(r.asked.length===9&&new Set(r.asked).size===9,'plex_143466: every station once: '+r.asked);
+   assert(once(r,[...new Set([...r.visit,...r.asked])])&&new Set([...r.visit,...r.asked]).size===9,'plex_143466: every station once in the visit: '+JSON.stringify([r.visit,r.asked]));
    assert(Object.values(r.moved).every(v=>v===0)&&r.line.over===0,'plex_143466 '+lang+': nothing moves, no name covers it: '+JSON.stringify([r.moved,r.line.over]));
    out.push('plex_143466 '+lang+' "'+r.line.text+'"');
   }
@@ -97,16 +103,66 @@ async page => {
   for(const [w,h,lang,list,whole] of [[1440,900,'en',false,true],[1100,720,'en',true,true],[1100,720,'de',true,true],[1100,720,'en',false,false],[1100,720,'de',false,false]]){
    const r=await open('trk_00000000a003',{w,h,lang,list}),at='trk_00000000a003 '+w+'x'+h+(list?' list ':' map ')+lang,parts=r.line?.text.split(' · ')||[];
    assert(parts.length>0&&parts.every((part,i)=>part===three[lang][i])&&(!whole||parts.length===3),at+': the newest parts, in order'+(whole?', all three':'')+': '+JSON.stringify(r.line));
-   assert(r.line.links.length===0&&r.asked.join()==='bermuda-evening,essentials,palac-feel',at+': its own three stations, as plain text: '+JSON.stringify([r.line.links,r.asked]));
+   assert(r.line.links.length===0&&once(r,['bermuda-evening','essentials','palac-feel']),at+': its own three stations, once in the visit, as plain text: '+JSON.stringify([r.line.links,r.visit,r.asked]));
    assert(Object.values(r.moved).every(v=>v===0),at+': nothing in the header moves from its first paint: '+JSON.stringify(r.moved));
    assert(list||r.line.over===0&&r.line.gap>=16,at+': no name covers the line, and 16 px at least free above the caption: '+JSON.stringify([r.line.over,r.line.gap]));
    out.push(at+' '+parts.length+' parts'+(list?'':', '+r.line.gap+' px above the caption'));
   }
   // Drowning (Club Version) on Under the Sun, there before the radio watched it: no line.
   const none=await open('trk_1c68b875c61c',{w:1440,h:900});
-  assert(none.line===null&&none.asked.join()==='bermuda-day','trk_1c68b875c61c: no line: '+JSON.stringify(none.line));
+  assert(none.line===null&&once(none,['bermuda-day']),'trk_1c68b875c61c: no line: '+JSON.stringify([none.line,none.visit,none.asked]));
   assert(Object.values(none.moved).every(v=>v===0),'trk_1c68b875c61c: nothing moves');
   out.push('trk_1c68b875c61c no line');
+  // Robosonic, opened by its address after a fresh load: On the radio says since when each track plays on its station,
+  // where the changes date it, each name with its day whole. Every frame from the body's first paint to 2 s after it, the
+  // tops of the region, of each of its rows and of the region under it stay where they first stood in the explorer, which
+  // may still be sliding open. Its record asks the journals of its tracks' three stations once, and a second hop to it
+  // asks none.
+  const robosonic={en:[['In My Arms (extended vocal mix)','Fontanna'],['Drowning (club version)','Essentials since Nov 16'],['Drowning (Club Version)','Under the Sun']],de:[['In My Arms (extended vocal mix)','Fontanna'],['Drowning (club version)','Essentials seit 16. Nov.'],['Drowning (Club Version)','Under the Sun']]};
+  for(const [w,h,lang,list] of [[1440,900,'en',false],[1440,900,'en',true],[390,844,'en',false],[360,740,'de',false]]){
+   const at='art_4d5a69aef55a '+w+(list?' list ':' ')+lang;
+   await p.setViewportSize({width:w,height:h});asked.length=0;
+   await p.goto(origin+'/?station=palac-feel');
+   await p.evaluate(list=>{try{localStorage.setItem('pavoia-explorer-view',list?'list':'map');}catch{}},list);
+   await p.reload();await p.waitForFunction(()=>window.Pavoia?.stations?.length===9,null,{timeout:30000});
+   await p.locator('#language [value='+lang+']').dispatchEvent('click');
+   await p.evaluate(()=>{
+    const frames=window.__frames=[];window.__done=false;let body=0;
+    const top=n=>n?Math.round((n.getBoundingClientRect().top-document.getElementById('explorer').getBoundingClientRect().top)*10)/10:null;
+    const tick=now=>{
+     const region=document.querySelector('#entity-inspector section[aria-labelledby=r-onRadio]');
+     if(region&&document.querySelector('#entity-inspector h3')?.textContent==='Robosonic'){
+      if(!body)body=now;
+      frames.push({region:top(region),rows:[...region.querySelectorAll('.row')].map(top),next:top(region.nextElementSibling),lines:[...region.querySelectorAll('.row-line')].map(n=>n.textContent).join('|')});
+     }
+     if(body&&now-body>=2000){window.__done=true;return;}
+     requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);location.hash='#explore/art_4d5a69aef55a';
+   });
+   await p.waitForFunction(()=>window.__done,null,{timeout:30000});
+   const frames=await p.evaluate(()=>window.__frames),first=frames[0];
+   const moved=Math.max(...frames.flatMap(f=>[f.region-first.region,(f.next??0)-(first.next??0),...f.rows.map((t,i)=>t-first.rows[i])].map(Math.abs)));
+   const r=await p.evaluate(()=>{const region=document.querySelector('#entity-inspector section[aria-labelledby=r-onRadio]'),explorer=document.getElementById('explorer');
+    return {rows:[...region.querySelectorAll('.row')].map(a=>[a.querySelector('.row-name').textContent,a.querySelector('.row-line').textContent]),
+     cut:[...region.querySelectorAll('.row-line')].filter(n=>n.scrollWidth>n.clientWidth+1).map(n=>n.textContent),
+     over:[document.documentElement.scrollWidth-innerWidth,explorer.scrollWidth-explorer.clientWidth,region.scrollWidth-region.clientWidth],
+     map:Boolean(document.querySelector('#entity-inspector .neighbourhood'))};});
+   const want=robosonic[lang].map(([name,line])=>[name,line.replace(/ /g,' ')]);
+   assert(JSON.stringify(r.rows)===JSON.stringify(want),at+': the three lines, each name with its day whole: '+JSON.stringify(r.rows));
+   assert(r.map===!list&&w>1100||w<1100,at+': the view asked for');
+   assert(r.cut.length===0&&r.over.every(v=>v<=0),at+': no line is cut and nothing overflows: '+JSON.stringify([r.cut,r.over]));
+   assert(moved===0&&frames.every(f=>f.lines===frames[0].lines),at+': the dates come with the rows, and nothing in the region or under it moves: '+JSON.stringify([moved,frames[0].lines]));
+   assert(asked.length===3&&[...asked].sort().join()==='bermuda-day,essentials,fontanna',at+': the journals of its tracks\' three stations, once: '+asked);
+   out.push(at+' '+frames.length+' frames, moved '+moved+' px');
+  }
+  asked.length=0;
+  await p.evaluate(()=>{location.hash='#explore/trk_1c68b875c61c';});
+  await p.waitForFunction(()=>document.querySelector('#entity-inspector h3')?.textContent==='Drowning (Club Version)'&&document.querySelector('#entity-inspector .regions'),null,{timeout:30000});
+  await p.evaluate(()=>{location.hash='#explore/art_4d5a69aef55a';});
+  await p.waitForFunction(()=>document.querySelector('#entity-inspector h3')?.textContent==='Robosonic'&&document.querySelector('#entity-inspector section[aria-labelledby=r-onRadio]'),null,{timeout:30000});
+  assert(asked.length===0,'a second hop to Robosonic within 5 minutes asks no journal: '+asked);
+  out.push('a second hop to Robosonic asks 0');
   assert(errors.length===0,'no page error: '+errors.join(' | '));
   return out.join('; ');
  }finally{await context.close();}

@@ -4154,18 +4154,20 @@ const onRadioOf=e=>byClass(inspector(e),'region').find(r=>r.attrs['aria-labelled
 const radioRows=e=>onRadioOf(e).children.find(n=>n.localName==='ol').children.map(li=>[byClass(li,'release-line')[0]?.textContent??null,...['row-name','row-line','row-fact'].map(k=>byClass(li,k)[0]?.textContent??'')]);
 const nb=s=>s.replace(/ /g,' ');
 
-test('On the radio groups an artist\'s tracks by release, newest first, undated last, the record\'s order inside',async()=>{
+test('On the radio groups an artist\'s tracks by release, newest first, undated last, the record\'s order inside, and says since when a track the changes date plays',async()=>{
  const e=setup({journey:true});await flush();const show=shower(e),R=n=>id('rel',n);
  const releases=[rec(R(1),'Old EP',[],{releaseDate:'2014-05-01'}),rec(R(2),'New EP',[],{releaseDate:'2020-07-23'}),rec(R(3),'No Date EP',[],{releaseDate:''}),rec(R(0),'Twin EP',[],{releaseDate:'2020-07-23'})];
  // In the record's order: Old, none, New, No Date, New, a release whose record is not at hand, dated by its track, and a
  // release of the same day as New EP, with a lower id, that comes later in the record.
- const tracks=[song(1,'Old One',{release:R(1),album:'Old EP',date:'2014-05-01'}),song(2,'Loose',{album:'Loose Album'}),song(3,'New One',{release:R(2),album:'New EP',date:'2020-07-23'}),
+ // New One came to Night in Motion on 16 November, as its journal says; the others were there before tracking.
+ e.clock.now=new Date(2026,10,17,19,0).getTime();e.changes=url=>url.split('/')[3]==='palac-dance'?{trackingSince:'2026-10-07T00:15:13Z',changes:[{sequence:'1',kind:'added',id:'803',title:'New One',artist:'Maceo Plex',album:'',observedAt:new Date(2026,10,16,12,51).toISOString()}],next:null}:null;
+ const tracks=[song(1,'Old One',{release:R(1),album:'Old EP',date:'2014-05-01'}),song(2,'Loose',{album:'Loose Album'}),{...song(3,'New One',{release:R(2),album:'New EP',date:'2020-07-23'}),plexId:'803'},
   song(4,'Undated',{release:R(3),album:'No Date EP'}),song(5,'New Two',{release:R(2),album:'New EP',date:'2020-07-23'}),song(6,'Elsewhere',{release:R(4),album:'Lost EP',date:'2017-03-03'}),song(7,'Twin',{release:R(0),album:'Twin EP',date:'2020-07-23'})];
  await show(tracked(rec(id('art',1),'Maceo Plex',[],{trackCount:7}),tracks,releases));
  byClass(onRadioOf(e),'text-button')[0].emit('click');
  const motion=nb('Night in Motion');
- assert.deepEqual(radioRows(e),[['New EP · 2020','New One',motion,'5:00'],[null,'New Two',motion,'5:00'],['Twin EP · 2020','Twin',motion,'5:00'],['Lost EP · 2017','Elsewhere',motion,'5:00'],['Old EP · 2014','Old One',motion,'5:00'],
-  ['No Date EP','Undated',motion,'5:00'],[null,'Loose',motion,'5:00']],'newest first, two releases of one day in the record\'s order; a release not at hand takes its track\'s album and date; undated next; no release last, with no line');
+ assert.deepEqual(radioRows(e),[['New EP · 2020','New One',nb('Night in Motion since Nov 16'),'5:00'],[null,'New Two',motion,'5:00'],['Twin EP · 2020','Twin',motion,'5:00'],['Lost EP · 2017','Elsewhere',motion,'5:00'],['Old EP · 2014','Old One',motion,'5:00'],
+  ['No Date EP','Undated',motion,'5:00'],[null,'Loose',motion,'5:00']],'newest first, two releases of one day in the record\'s order; a release not at hand takes its track\'s album and date; undated next; no release last, with no line; the track the changes date says since when');
  assert.deepEqual(onRadioOf(e).children.find(n=>n.localName==='ol').children.map(li=>li.children.map(cls)),[['release-line','row'],['row'],['release-line','row'],['release-line','row'],['release-line','row'],['release-line','row'],['row']],'a release line sits in the item of its first track, before its row');
  const rules=cssRules();
  assert.match(rules.get('.release-line'),/margin:var\(--s3\) 0 var\(--s1\); font-size:12px; line-height:1\.4; color:var\(--muted\); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;/,'the small muted words of a row, on one line, 4px over its row so the row\'s focus ring clears its letters');
@@ -6060,4 +6062,95 @@ test('a journal that fails leaves only its station out of a track\'s line; a day
  assert.deepEqual([textOf(line),whole(line),linksIn(line)],['Added to Essentials, Fontanna, Etage 0, and Ambiance on Nov 16',['Essentials','Fontanna','Etage 0','Ambiance'],[]],'four stations of one day: each is named, and each plain name is one piece that stays on its row');
  e.setLanguage('de');await flush();
  assert.equal(textOf(joinedOf(e)),'Am 16. Nov. zu Essentials, Fontanna, Etage 0 und Ambiance hinzugefügt');
+});
+
+// Step D5: On the radio says since when each track of an artist or a release plays on each station, from the journals.
+// A track of the radio with its own Plex file, on its stations, as the playlists name them.
+const plexSong=(n,title,plexId,stations,more={})=>({...song(n,title,{stations,...more}),plexId});
+// A line of stations as a row shows it: each station with its day in one piece, the pieces apart.
+const pieces=line=>{const apart=line.includes('; ')?'; ':', ';return line.split(apart).map(nb).join(apart);};
+
+test('On the radio says since when a track plays on each station the changes date, in the rail\'s order, each name and its date whole',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);const A=id('art',1),L=id('art',2);
+ // One came to Essentials and was on Fontanna before tracking; Two came to Fontanna and to Essentials on two days; Three
+ // came to Etage 0 with a whole playlist; Four is not on Under the Sun's first three pages; Five came to Closing
+ // in a look that Closing's first two pages cut, at 1 record a page; Six was removed from Ambiance last; Seven has no Plex
+ // file. Each lists its stations out of the rail's order.
+ const X=[2026,10,14,10,0],feeds={essentials:[change(3,702,[2026,10,16,14,10]),change(2,701,[2026,10,16,12,51])],fontanna:[change(5,702,[2026,10,3,21,30])],
+  'etage-zero':[703,1001,1002,1003,1004].map((plex,i)=>change(5-i,plex,[2026,9,15,6,48])),'bermuda-day':changeFeed(250,9,e.clock.now),
+  closing:[change(3,705,X),change(2,990,X),change(1,991,[2026,10,10,10,0])],ambiance:[change(2,706,[2026,10,10,9,0],'removed'),change(1,706,[2026,10,2,9,0])],
+  'palac-dance':changeFeed(250,9,e.clock.now)};
+ const most={closing:1};
+ e.changes=url=>{const stage=url.split('/')[3];return changePage(feeds[stage]||[],undefined,most[stage])(url);};
+ const tracks=[plexSong(1,'One','701',['Essentials','Fontanna']),plexSong(2,'Two','702',['Essentials','Fontanna']),plexSong(3,'Three','703',['Etage 0']),plexSong(4,'Four','704',['Under the Sun']),
+  plexSong(5,'Five','705',['Closing']),plexSong(6,'Six','706',['Ambiance']),song(7,'Seven',{stations:['As Night Begins']})];
+ const records={[A]:tracked(rec(A,'Maceo Plex'),tracks),[L]:tracked(rec(L,'Lone'),[plexSong(8,'Eight','708',['Night in Motion'],{on:L,artist:'Lone'})])};
+ e.discovery=url=>records[url.split('/').pop()]||entity(url.split('/').pop());
+ routeTo(e,'#explore/'+A);await settled(e,'Maceo Plex');
+ byClass(onRadioOf(e),'text-button')[0]?.emit('click');
+ const want=['Fontanna; Essentials since Nov 16','Fontanna since Nov 3; Essentials since Nov 16','Etage 0 since Oct 15','Under the Sun','Closing since Nov 14','Ambiance','As Night Begins'];
+ assert.deepEqual(radioRows(e).map(r=>r.slice(1,3)),tracks.map((t,i)=>[t.title,pieces(want[i])]),'a dated station says since when, in the rail\'s order, and a line with a day parts its stations with semicolons; a station from before tracking, one removed last, one not on the pages read and a track with no Plex file say their name alone; a track of a whole playlist says since when too');
+ assert.ok(radioRows(e).every(r=>r[2].split(r[2].includes('; ')?'; ':', ').every(p=>!p.includes(' '))),'each name and its date are one piece: the line breaks only between stations');
+ assert.deepEqual(['essentials','fontanna','etage-zero','bermuda-day','closing','ambiance','bermuda-evening'].map(s=>asksOf(e,s)),[['first'],['first'],['first'],['first','151','51'],['first','3','2'],['first'],[]],'page 1 of each station of a track with a Plex file; a file not found there and a look cut read on, 3 pages at most, as the track\'s record does');
+ e.setLanguage('de');await flush();
+ assert.deepEqual(radioRows(e).slice(0,2).map(r=>r[2]),['Fontanna; Essentials seit 16. Nov.','Fontanna seit 3. Nov.; Essentials seit 16. Nov.'].map(pieces));
+ e.setLanguage('en');routeTo(e,'#explore/'+L);await settled(e,'Lone');
+ assert.deepEqual([radioRows(e).map(r=>r[2]),asksOf(e,'palac-dance')],[[nb('Night in Motion')],['first','151','51']],'an artist with one track that the journal does not name reads 3 pages, and no more');
+});
+
+test('an artist\'s or a release\'s dates come at the body paint, or not at all when the journals are late',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);const A=id('art',1),R=id('rel',1),held=new Map();
+ const feeds={essentials:[change(1,501,[2026,10,16,12,51])],fontanna:[change(1,502,[2026,10,3,20,0])]};
+ e.changes=url=>{const stage=url.split('/')[3];return new Promise(resolve=>{held.set(stage,()=>resolve(changePage(feeds[stage]||[])(url)));});};
+ const records={[A]:tracked(rec(A,'Maceo Plex'),[plexSong(1,'One','501',['Essentials'])]),[R]:tracked(rec(R,'An EP',[],{artist:'Maceo Plex'}),[plexSong(2,'Two','502',['Fontanna'],{on:null,release:R})])};
+ e.discovery=url=>records[url.split('/').pop()]||entity(url.split('/').pop());
+ const lines=()=>onRadioOf(e)?radioRows(e).map(r=>r[2]):null;
+ routeTo(e,'#explore/'+A);await flush();
+ assert.deepEqual([titleShown(e),byClass(inspector(e),'region').length,[...held.keys()]],['Maceo Plex',0,['essentials']],'the header paints, and the body waits for the journal of its track\'s station');
+ held.get('essentials')();const seen=await states(lines);await flush();
+ assert.deepEqual(seen,[null,[nb('Essentials since Nov 16')]],'the rows come with their date, never first without it');
+ routeTo(e,'#explore/'+R);await flush();
+ assert.deepEqual([titleShown(e),byClass(inspector(e),'region').length,held.has('fontanna')],['An EP',0,true]);
+ e.fire(2500);await flush();
+ assert.deepEqual(lines(),['Fontanna'],'the deadline paints the body without the date');
+ held.get('fontanna')();await flush();
+ assert.deepEqual(lines(),['Fontanna'],'the journal that comes later adds no date: nothing moves');
+ e.setLanguage('de');await flush();
+ assert.deepEqual(lines(),[nb('Fontanna seit 3. Nov.')],'a language switch draws the date from memory');
+ e.setLanguage('en');routeTo(e,'#explore/'+A);await flush();
+ // Back more than 5 minutes later: the place paints at once, from memory, and asks no journal.
+ e.clock.now+=300001;const asked=e.changesRequests.length;
+ e.history.back();await flush();
+ assert.deepEqual([titleShown(e),lines(),e.changesRequests.length-asked],['An EP',[nb('Fontanna since Nov 3')],0],'Back draws the date from memory, with no request');
+ assert.ok(![...e.timers.values()].some(t=>t.delay===2500),'the body deadline is over');
+});
+
+test('an artist\'s row and its track\'s record give one answer, whichever opens first, also when the addition is past page 1',async()=>{
+ const e=setup({journey:true});await flush();sessionsAt(e);const A=id('art',1);
+ // 150 newer changes of other files, then the addition of One on page 2, then 99 older ones; Two, on Fontanna only, is
+ // not in the journal of Essentials, so it makes Essentials read no further page; Fontanna's one page names neither.
+ const feed=changeFeed(250,9,e.clock.now).map((c,i)=>({...c,sequence:String(1000-i),...i===150&&{kind:'added',id:'701',title:'One'}}));
+ e.changes=url=>url.split('/')[3]==='essentials'?changePage(feed)(url):{trackingSince:'2026-10-07T00:15:13Z',changes:[],next:null};
+ const one=plexSong(1,'One','701',['Essentials']),two=plexSong(2,'Two','702',['Fontanna']);
+ const records={[A]:tracked(rec(A,'Maceo Plex'),[one,two]),[one.id]:{entity:one,included:[]}};
+ e.discovery=url=>records[url.split('/').pop()]||entity(url.split('/').pop());
+ routeTo(e,'#explore/'+A);await settled(e,'Maceo Plex');
+ assert.deepEqual([radioRows(e).map(r=>r[2]),asksOf(e,'essentials'),asksOf(e,'fontanna')],[[nb('Essentials since Nov 1'),'Fontanna'],['first','901'],['first']],'the artist reads on to the page that names its track, and no further, at the first paint');
+ routeTo(e,'#explore/'+one.id);await settled(e,'One');for(let i=0;i<4;i++)await flush();
+ assert.deepEqual([textOf(joinedOf(e)),asksOf(e,'essentials')],['Added to Essentials on Nov 1',['first','901']],'the track says the same day, with no new request');
+ e.history.back();await flush();await flush();
+ assert.deepEqual(radioRows(e).map(r=>r[2]),[nb('Essentials since Nov 1'),'Fontanna'],'Back shows the same line as the first visit');
+});
+
+test('a row with a day of another year keeps each station apart with semicolons, and a row with no day keeps its commas',async()=>{
+ const e=setup({journey:true});await flush();e.clock.now=new Date(2027,0,12,19,0).getTime();const A=id('art',1);
+ const feeds={essentials:[change(1,701,[2026,10,16,12,51])],fontanna:[change(1,701,[2026,10,3,21,30])]};
+ e.changes=url=>changePage(feeds[url.split('/')[3]]||[])(url);
+ const tracks=[plexSong(1,'One','701',['Essentials','Fontanna']),plexSong(2,'Two','702',['Essentials','Fontanna'])];
+ const records={[A]:tracked(rec(A,'Maceo Plex'),tracks)};
+ e.discovery=url=>records[url.split('/').pop()]||entity(url.split('/').pop());
+ routeTo(e,'#explore/'+A);await settled(e,'Maceo Plex');
+ assert.deepEqual(radioRows(e).map(r=>r[2]),['Fontanna since Nov 3, 2026; Essentials since Nov 16, 2026','Fontanna, Essentials'].map(pieces),'the comma of a day never parts two stations');
+ e.setLanguage('de');await flush();
+ assert.deepEqual(radioRows(e).map(r=>r[2]),['Fontanna seit 3. Nov. 2026; Essentials seit 16. Nov. 2026','Fontanna, Essentials'].map(pieces));
 });

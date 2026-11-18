@@ -82,7 +82,7 @@
     sessionNew1:'1 new track',sessionNew:'{n} new tracks',sessionGone1:'1 removed',sessionGone:'{n} removed',earlierThatDay:'Earlier that day',
     atOnce:'{n} tracks added at once',atOnceGone:'{n} tracks removed at once',atOnceAtLeast:'At least {n} tracks added at once',
     changesLate:'A change shows the time the radio saw it. The radio looks at the playlists every 5 minutes.',
-    joinedOn:'Added to {names} on {date}',joinedWith:'Came to {stage} on {date} with {n}\u00a0other\u00a0tracks',
+    joinedOn:'Added to {names} on {date}',joinedWith:'Came to {stage} on {date} with {n}\u00a0other\u00a0tracks',sinceDay:'{stage} since {date}',
     airNow:'On air now',airTotal:'{n} listening on all stations',airLoading:'Loading track…',airNoTrack:'No track announced',airError:'What plays now could not load.',
     sortCount:'Most tracks',sortName:'A to Z',filterArtists:'Filter artists',filterLabels:'Filter labels',nOfTotal:'{n} of {total}',noArtistMatch:'No artist matches “{q}”.',noLabelMatch:'No label matches “{q}”.',
     indexTab:'Index',toHistory:'to History',toStatistics:'to Statistics',toIndexTab:'to the Index',sides:'Artists or labels',order:'Order',namesLoading:'Loading the names…',namesError:'The names could not load.',alsoOnStages:'Also on {names}',onlyHere:'Only here',lookAll:'Look on all stations ({n})',
@@ -98,7 +98,7 @@
     sessionNew1:'1 neuer Track',sessionNew:'{n} neue Tracks',sessionGone1:'1 entfernt',sessionGone:'{n} entfernt',earlierThatDay:'Früher am selben Tag',
     atOnce:'{n} neue Tracks auf einmal',atOnceGone:'{n} Tracks auf einmal entfernt',atOnceAtLeast:'Mindestens {n} neue Tracks',
     changesLate:'Eine Änderung zeigt die Zeit, zu der das Radio sie bemerkt hat. Das Radio schaut alle 5 Minuten in die Playlists.',
-    joinedOn:'Am {date} zu {names} hinzugefügt',joinedWith:'Kam am {date} mit {n}\u00a0weiteren\u00a0Tracks zu {stage}',
+    joinedOn:'Am {date} zu {names} hinzugefügt',joinedWith:'Kam am {date} mit {n}\u00a0weiteren\u00a0Tracks zu {stage}',sinceDay:'{stage} seit {date}',
     airNow:'Gerade läuft',airTotal:'{n} hören auf allen Sendern',airLoading:'Titel wird geladen…',airNoTrack:'Kein Titel gemeldet',airError:'Was gerade läuft, konnte nicht geladen werden.',
     sortCount:'Die meisten Tracks',sortName:'A bis Z',filterArtists:'Künstler filtern',filterLabels:'Labels filtern',nOfTotal:'{n} von {total}',noArtistMatch:'Kein Künstler passt zu „{q}“.',noLabelMatch:'Kein Label passt zu „{q}“.',
     indexTab:'Index',toHistory:'zum Verlauf',toStatistics:'zur Statistik',toIndexTab:'zum Index',sides:'Künstler oder Labels',order:'Reihenfolge',namesLoading:'Namen werden geladen…',namesError:'Die Namen konnten nicht geladen werden.',alsoOnStages:'Auch auf {names}',onlyHere:'Nur hier',lookAll:'Auf allen Sendern suchen ({n})',
@@ -478,14 +478,18 @@
       // and focus in it stays on the title.
       if(!place&&selected&&e.previewUrl&&!selected.previewUrl&&!bodyShown){const held=$('entity-inspector').contains(document.activeElement);renderEntity(e);if(held)recordTitle.focus({preventScroll:true});}
       if(selected)selected=e;else header(e);
-      // A track reads the journals of its stations, or of every station for one that names none, beside its credited
-      // artists and under the same deadline: page 1, then the next ones, 3 in all at most, while its own Plex file is not
-      // in them or its look is cut there (see joinsOf()). A journal that fails or comes late leaves its station out. A
-      // record that leaves stops waiting and reads on no further, and the page it waits for still fills the journal, for
-      // the place that needs it next. Back and Forward draw the line from memory, at once, as it was when left.
-      const plex=e.type==='track'&&/^\d+$/.test(e.plexId||'')?e.plexId:'';
-      const more=(stage,v)=>{const c=v.items.find(c=>c.id===plex&&!c.again);return hop===controller&&(!c||cut(c,v))&&v.next&&v.pages<3?journalMore(stage).then(w=>more(stage,w)):v;};
-      const joins=plex&&!place&&Promise.all((stagesOf(e).length?stagesOf(e):radio.stations).map(s=>journal(s.id).then(v=>more(s.id,v)).catch(()=>null)));
+      // A track reads the journals of its stations, or of every station for one that names none, and an artist or a
+      // release those of its tracks' stations, beside the credited artists and under the same deadline: page 1, then the
+      // next ones, 3 in all at most, while one of its own Plex files that plays there is not in them, or its newest record
+      // there is in a look cut there (see joinsOf()). So an artist's row says what its track's record says. A journal that
+      // fails or comes late leaves its station out. A record that leaves stops waiting and reads on no further, and the
+      // page it waits for still fills the journal, for the place that needs it next. Back and Forward draw the days from
+      // memory, at once, as they were.
+      const track=e.type==='track',own=(track?[e]:['artist','release'].includes(e.type)?tracksOf(e):[]).filter(t=>/^\d+$/.test(t.plexId||''));
+      const filesOn=stage=>own.filter(t=>track||stagesOf(t).some(s=>s.id===stage)).map(t=>t.plexId);
+      const more=(stage,v,files=filesOn(stage))=>{const newest=files.map(p=>v.items.find(c=>c.id===p&&!c.again));return hop===controller&&newest.some(c=>!c||cut(c,v))&&v.next&&v.pages<3?journalMore(stage).then(w=>more(stage,w,files)):v;};
+      const stations=track&&!stagesOf(e).length?radio.stations:[...new Set(own.flatMap(stagesOf))];
+      const joins=own.length&&!place&&Promise.all(stations.map(s=>journal(s.id).then(v=>more(s.id,v)).catch(()=>null)));
       const ours=[data,...(await Promise.all(near.credited(e).map(a=>fetched(a).catch(()=>null)))).filter(Boolean)];
       const pool=new Map(ours.flatMap(p=>[p.entity,...p.included]).map(r=>[r.id,r]));
       await Promise.all([...near.namingPlan(near.regions(e,records),pool,payloads,navigator.connection?.saveData===true).map(a=>fetched(a).catch(()=>null)),joins]);
@@ -505,6 +509,8 @@
   const stagesOf=t=>[...new Set((t.playlists||[]).map(p=>radio.stations.find(s=>s.id===p.id||s.name===p.station)).filter(Boolean))];
   // The same stages in the order of the rail, as the listener sees it.
   const railStations=t=>{const rail=radio.stations.map(s=>s.id);return stagesOf(t).sort((a,b)=>rail.indexOf(a.id)-rail.indexOf(b.id));};
+  // An artist's or a release's tracks at hand, in the record's order.
+  const tracksOf=e=>(e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track');
   // Whose track it is, when it is not simply this artist's or this release's: on an artist, a track where the artist is
   // not the main artist, such as a remix or a featuring; on a release, a track by another artist than the release's.
   // A joint credit stays silent when the artist is its main one. A raw credit's ";" reads as a list.
@@ -515,20 +521,24 @@
   }
   // A record's tracks on the radio, by release, the newest first: a release dates from its record, or from its first
   // track when its record is not at hand; undated releases follow, then the tracks with no release. Ties, and the
-  // tracks inside a release, keep the record's order. Each track says where it plays, in the rail's order, each name
-  // whole, so the line breaks only between names; then whose it is when that is someone else; where no stage plays it
-  // and no line names its release, its album. With two groups or more, a release is named once, with its year, over
-  // its first track.
+  // tracks inside a release, keep the record's order. Each track says where it plays, in the rail's order, and since
+  // when, on each station the changes date (see joinsOf()), each name with its day whole, so the line breaks only between
+  // names; a line with a day parts its names with semicolons, since a day of another year holds a comma and a comma
+  // could seem to give one day to two names; then whose it is when that is someone else; where no stage plays it and
+  // no line names its release, its album. With two groups or more, a release is named once, with its year, over its
+  // first track.
   function radioTracks(e) {
     const groups=new Map();
-    for(const t of (e.connections||[]).filter(c=>c.relation==='track').map(c=>records.get(c.id)).filter(t=>t?.type==='track')){
+    for(const t of tracksOf(e)){
       const key=(t.connections||[]).find(c=>c.relation==='release')?.id||'';if(!groups.has(key))groups.set(key,[]);groups.get(key).push(t);
     }
     const dated=[...groups].map(([key,tracks])=>({key,tracks,date:records.get(key)?.releaseDate||tracks[0].releaseDate||''}));
     dated.sort((a,b)=>!a.key-!b.key||!a.date-!b.date||(a.date<b.date)-(a.date>b.date));
     return dated.flatMap(({key,tracks,date})=>tracks.map((t,i)=>{
       const group=groups.size>1&&key&&!i?[records.get(key)?.title||t.album,/^\d{4}/.exec(date)?.[0]].filter(Boolean).join(' · '):'';
-      const credit=creditOf(t,e),where=railStations(t).map(s=>s.name.replace(/ /g,'\u00a0')).join(', ')||(groups.size>1&&key?'':t.album||'');
+      const joins=/^\d+$/.test(t.plexId||'')?joinsOf(t.plexId):[],since=s=>joins.find(j=>j.stage===s.id);
+      const credit=creditOf(t,e),stages=railStations(t),apart=stages.some(since)?'; ':', ';
+      const where=stages.map(s=>(since(s)?word('sinceDay').replace('{stage}',()=>s.name).replace('{date}',()=>dayOf(since(s).at)):s.name).replace(/ /g,'\u00a0')).join(apart)||(groups.size>1&&key?'':t.album||'');
       return {...t,group,line:[where,credit&&word('byNames').replace('{names}',credit)].filter(Boolean).join(' · '),fact:t.durationMs?time(t.durationMs/1000):''};
     }));
   }
