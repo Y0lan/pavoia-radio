@@ -80,19 +80,19 @@ All nine stations are public.
 
 ## 2. Listening, access and sharing
 
-A listener on a train loses the network for a minute. On production the
-player tries four times in about 15 s, then stops with "Stream lost. Press
-play to retry." On dev it keeps trying, and the music comes back without a touch.
+A listener on a train loses the network for a minute. Until `efaa40a` the
+player tried four times in about 15 s, then stopped with "Stream lost. Press
+play to retry." Now it keeps trying, and the music comes back without a touch.
 
 | Feature | Status | Where, or why |
 | --- | --- | --- |
-| The player keeps reconnecting while the listener wants to play (item A) | Built, on dev, waits for the owner's push to prod | It tries at +1, +3, +7, +15 and +30 s, then every 15 s, and at once when the network comes back or the page shows again. It says "Reconnecting…" or "Offline. Waiting for the network…". A pause stays a pause. |
-| Open a station by its own address, and come back to the last station, with no autoplay (item B) | Built, on dev, waits for the owner's push to prod | `/?station=<id>`, for example `/?station=fontanna`. The address always names the station on screen. The browser keeps the last station chosen or played (`pavoia-station` in localStorage). A link wins over the remembered station. With empty storage and no link, the radio opens on Lost in Feelings. |
-| Look at another station without losing the music | Built, on dev, waits for the owner's push to prod | While the radio plays, the rail, the phone sheet, a swipe, the arrow keys and `1` to `9` only show a station, and ask for no stream. The music moves when the listener presses play on the station shown: a play ring after the stage name in the hero, with what that station plays now. A red dot marks the station heard, and the bar's "Tuned to {station}" leads back to it. With the radio off, a station change is the station to play, as before. |
-| Keys `1` to `9`, `M` and `?` (item I) | Built, on dev, waits for the owner's push to prod | `1` to `9` show the station at that place in the order on screen, as the rail does, and start nothing while the radio is paused. With the explorer open and the radio on, they move the music. `M` turns the sound off and on again. `?` opens the Keyboard shortcuts list under "See the roots it's built on", while the explorer is closed. No key acts while typing, with a modifier key or while a modal dialog is open. |
-| Mute | Built, on dev, waits for the owner's push to prod | The `M` key sets the volume slider to 0 and back. There is no dedicated button. The key acts only where the slider shows, and the radio does not store it. |
-| Installable home-screen icon; no offline interface, no service worker (item G) | Built, on dev, waits for the owner's push to prod | [web/manifest.webmanifest](../web/manifest.webmanifest) and four icons in `web/assets/`, made from the Gaende mark. The installed app opens full screen at `/`, named "Pavoia". Live audio needs a connection. |
-| A shared link shows a preview (item J) | Built, on dev, waits for the owner's push to prod | Description and Open Graph tags in `web/index.html` give "Pavoia Radio", "So it never ends. A personal selection by Gaende." and the photo `photos/hero-night.jpg`. One preview serves every link, also a station link. |
+| The player keeps reconnecting while the listener wants to play (item A) | Delivered in `efaa40a` | It tries at +1, +3, +7, +15 and +30 s, then every 15 s, and at once when the network comes back or the page shows again. It says "Reconnecting…" or "Offline. Waiting for the network…". A pause stays a pause. |
+| Open a station by its own address, and come back to the last station, with no autoplay (item B) | Delivered in `efaa40a` | `/?station=<id>`, for example `/?station=fontanna`. The address always names the station on screen. The browser keeps the last station chosen or played (`pavoia-station` in localStorage). A link wins over the remembered station. With empty storage and no link, the radio opens on Lost in Feelings. |
+| Look at another station without losing the music | Delivered in `efaa40a` | While the radio plays, the rail, the phone sheet, a swipe, the arrow keys and `1` to `9` only show a station, and ask for no stream. The music moves when the listener presses play on the station shown: a play ring after the stage name in the hero, with what that station plays now. A red dot marks the station heard, and the bar's "Tuned to {station}" leads back to it. With the radio off, a station change is the station to play, as before. |
+| Keys `1` to `9`, `M` and `?` (item I) | Delivered in `efaa40a` | `1` to `9` show the station at that place in the order on screen, as the rail does, and start nothing while the radio is paused. With the explorer open and the radio on, they move the music. `M` turns the sound off and on again. `?` opens the Keyboard shortcuts list under "See the roots it's built on", while the explorer is closed. No key acts while typing, with a modifier key or while a modal dialog is open. |
+| Mute | Delivered in `efaa40a` | The `M` key sets the volume slider to 0 and back. There is no dedicated button. The key acts only where the slider shows, and the radio does not store it. |
+| Installable home-screen icon; no offline interface, no service worker (item G) | Delivered in `efaa40a` | [web/manifest.webmanifest](../web/manifest.webmanifest) and four icons in `web/assets/`, made from the Gaende mark. The installed app opens full screen at `/`, named "Pavoia". Live audio needs a connection. |
+| A shared link shows a preview (item J) | Delivered in `efaa40a` | Description and Open Graph tags in `web/index.html` give "Pavoia Radio", "So it never ends. A personal selection by Gaende." and the photo `photos/hero-night.jpg`. One preview serves every link, also a station link. |
 | Lower-bandwidth audio options | Waiting (item 7) | Each station needs a second stream on the server. |
 
 Tests pin each row. The reconnecting player has
@@ -138,10 +138,10 @@ playback and its short gap when the station changes.
 | Clearly distinguish owned music, radio selections and Essentials favourites throughout those views | Partial, approved | |
 | Extend artist recommendations inside and outside the collection, with a clear basis for each connection | Partial, approved | |
 | Grow the existing diagram into the agreed connected Explore experience, with shared context and usable mobile navigation | Partial, approved | |
-| The Index rail from A to Z, type-ahead, and the letter in the address (item C) | Built, on dev, waits for the owner's push to prod | The rail in the right gutter jumps to a letter, or to a band of track counts in Most tracks. Typing in the list goes to the first name with those letters. `/` goes to the filter. The address keeps the letter, for example `#index/artists?at=M`. |
-| An artist's and a release's tracks on the radio, each with its stations | Built, on dev, waits for the owner's push to prod | "On the radio" on an artist's or a release's record lists its tracks that play, by release, the newest first. Each row names the stations that play the track, in the order on screen. On a phone the region comes first. |
-| Since when a track plays on a station | Built, on dev, waits for the owner's push to prod | A row of On the radio reads "Essentials since Nov 16" where the station's changes date the track. A track's own record ends its header on "Added to Essentials on Nov 16", or on "Came to Etage 0 on Oct 15 with 6 other tracks" for a track that came with a playlist. A track from before the radio recorded changes says nothing. |
-| Back and Forward walk through the explorer | Built, on dev, waits for the owner's push to prod | Each record and each tab move is one entry of the browser's history, and every place has one address. A line over a record's title names the place before and the place after, and steps to them. History, Statistics and the Index come back as they were left, with their rows, scroll and focus. |
+| The Index rail from A to Z, type-ahead, and the letter in the address (item C) | Delivered in `efaa40a` | The rail in the right gutter jumps to a letter, or to a band of track counts in Most tracks. Typing in the list goes to the first name with those letters. `/` goes to the filter. The address keeps the letter, for example `#index/artists?at=M`. |
+| An artist's and a release's tracks on the radio, each with its stations | Delivered in `efaa40a` | "On the radio" on an artist's or a release's record lists its tracks that play, by release, the newest first. Each row names the stations that play the track, in the order on screen. On a phone the region comes first. |
+| Since when a track plays on a station | Delivered in `efaa40a` | A row of On the radio reads "Essentials since Nov 16" where the station's changes date the track. A track's own record ends its header on "Added to Essentials on Nov 16", or on "Came to Etage 0 on Oct 15 with 6 other tracks" for a track that came with a playlist. A track from before the radio recorded changes says nothing. |
+| Back and Forward walk through the explorer | Delivered in `efaa40a` | Each record and each tab move is one entry of the browser's history, and every place has one address. A line over a record's title names the place before and the place after, and steps to them. History, Statistics and the Index come back as they were left, with their rows, scroll and focus. |
 | Cover grids | Candidate | |
 | Advanced library filters, sortable tables and saved/shared views | Out | |
 | Graph zoom/pan, clusters, and artist/label/release/remix/genre/stage modes | Out | It is the Music Universe workspace. |
@@ -188,8 +188,8 @@ wanted. Full-track on-demand playback is outside the agreed preview model.
 | Feature | Status | Where, or why |
 | --- | --- | --- |
 | Public recent-play history with station and period navigation | Delivered at `#history` | |
-| What all nine stations play now (item E) | Built, on dev, waits for the owner's push to prod | History, All stations, at `#history/radio`, under "On air now". One row per station, in the order on screen, gives the track over "artist · station", with the station name always whole. The station you hear reads Now. The total of audio connections shows only when all nine stations answered, and never as 0. |
-| What was added to and removed from each playlist (item F1) | Built, on dev, waits for the owner's push to prod | "Added and removed" comes first in each station's Statistics place (`#statistics/<id>`). The changes read as digging sessions: a line such as "Monday, November 16 · 1 new track" heads the changes of one session, and a session starts after 4 hours or more without a change. Five additions or more in one look at a playlist read as one row, "86 tracks added at once". "Show earlier changes" adds whole sessions. A place with no change or with no record yet says so, and a failed answer has "Try again". All stations merges the nine feeds by time, and its rows read "station · artist". |
+| What all nine stations play now (item E) | Delivered in `efaa40a` | History, All stations, at `#history/radio`, under "On air now". One row per station, in the order on screen, gives the track over "artist · station", with the station name always whole. The station you hear reads Now. The total of audio connections shows only when all nine stations answered, and never as 0. |
+| What was added to and removed from each playlist (item F1) | Delivered in `efaa40a` | "Added and removed" comes first in each station's Statistics place (`#statistics/<id>`). The changes read as digging sessions: a line such as "Monday, November 16 · 1 new track" heads the changes of one session, and a session starts after 4 hours or more without a change. Five additions or more in one look at a playlist read as one row, "86 tracks added at once". "Show earlier changes" adds whole sessions. A place with no change or with no record yet says so, and a failed answer has "Try again". All stations merges the nine feeds by time, and its rows read "station · artist". |
 | Public playlist-addition calendar with a yearly heatmap and day details | Out | The digging calendar is rejected for this site. |
 | Calendar playlist filters, counting rules and timezone | Out | They belong to the calendar. |
 | Session views for first listens, revisits, acceptance and rejection | Out | |
@@ -218,7 +218,7 @@ listens are different events. Keep synthetic dates separate from real records.
 | --- | --- | --- |
 | Public collection statistics with clear definitions and coverage | Delivered at `#statistics` | |
 | Artist, label, release-year and stage distributions | Delivered; charts show metadata coverage | |
-| The counts of artists and labels open the Index on that station, most tracks first (item D) | Built, on dev, waits for the owner's push to prod | `#index/artists/<id>?by=tracks` and `#index/labels/<id>?by=tracks`. Without the labels document, the place shows its counts with no link. |
+| The counts of artists and labels open the Index on that station, most tracks first (item D) | Delivered in `efaa40a` | `#index/artists/<id>?by=tracks` and `#index/labels/<id>?by=tracks`. Without the labels document, the place shows its counts with no link. |
 | Stage overlaps and frequently played records | Delivered | |
 | Selected tracks not played during the last 30 days | Delivered as a count per station | |
 | List the tracks of a station that did not play (item F2) | Waiting (item 6) | Without a server route, one click on a big station costs up to about 96 requests in the browser. |
@@ -345,11 +345,6 @@ Each item names what it waits for and who acts.
      say when it last played;
    - a preview per station link, from a page per station on the server. The
      owner decides first whether one preview for the whole site is enough.
-8. **Production.** The whole build waits for the owner's look at dev and his
-   "push to prod". After that push, the developer makes one follow-up commit
-   that changes this build's items in this file from "Built, on dev, waits for
-   the owner's push to prod" to "Delivered". Without that commit, this file
-   says "on dev" for features that production serves.
 
 ## Against the original roadmap
 
@@ -359,13 +354,10 @@ sections. The radio of today replaces its look (cyber-brutalist, a sidebar,
 stage cards, glass, crossfades, toasts, WebSocket and SSE, an admin panel).
 Its ideas still count where they fit one page, one stream and one look.
 
-The third column describes dev. Production does not serve this build's parts
-until the owner's push: the reconnect that never gives up and its words,
-station links and the last station, the `1` to `9`, `M` and `?` keys, the
-manifest and icons, the link preview, the Index rail, type-ahead and `/`, the
-counts that open the Index, Added and removed, and On air now.
+The third column describes production, which serves `efaa40a`, the same
+build as dev.
 
-| Category | The original asked | The radio has on dev | Waits | Out, and why |
+| Category | The original asked | The radio has | Waits | Out, and why |
 | --- | --- | --- | --- | --- |
 | Core audio | Crossfade engine, volume, mute, quality by connection, reconnect | One audio element, volume, the `M` key, reconnect for as long as the listener wants | A lower-bandwidth stream | The owner rejects crossfades. Nobody asked for normalization. |
 | Uninterrupted playback | Player kept across navigation | One page; the explorer is a dialog over it; station links never reload | — | Live push (WebSocket) is rejected. |
