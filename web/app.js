@@ -105,7 +105,7 @@ Object.assign(words.en, {orderStations:'Order the stations', byFeeling:'By feeli
 Object.assign(words.de, {orderStations:'Sender ordnen', byFeeling:'Nach Stimmung', byStage:'Nach Bühne', day:'Tag', night:'Nacht', anyTime:'Jederzeit', stageOf:'Bühne {stage}',
   phrases:{bermuda:'Unter freiem Himmel', palac:'Höhepunkt und Blick nach innen', etage:'Der Keller', fontanna:'Tanzen bei Tageslicht', ambiance:'Ein sicherer, ruhiger Ort', bus:'Irgendwo im Wald'}});
 // The shortcuts under the roots: each key's name where it has one, and what it does.
-Object.assign(words.en, {keysTitle:'Keyboard shortcuts', keySpace:'Play or pause', keyArrowsName:'Left and right arrows', keyArrows:'Show the previous or next station',
+Object.assign(words.en, {keysTitle:'Keyboard shortcuts', keySpace:'Play or pause', enterKey:'Enter', keyEnter:'Play the station shown', keyArrowsName:'Left and right arrows', keyArrows:'Show the previous or next station',
   keyNumbers:'Show the station at that place in the list', keyMute:'Sound off, and on again', keyFilter:'In the Index: filter the names', keyClose:'Back to listening', keyHelp:'Show or hide these shortcuts'});
 // Away from the station heard (on the Bus or on another station), the bar's label is a door back to it; the radio
 // heard says so. The German word is no longer than the English one, so the waveform keeps its room in the one-row bar.
@@ -114,7 +114,7 @@ Object.assign(words.de, {tunedTo:'Sender: {station}', backTo:'Zurück zu {statio
 // The hero's play names the station shown, and what it plays now, so its name holds the words it shows.
 Object.assign(words.en, {playShown:'Play {station}', playShownNow:'Play {station}, now {title} · {artist}'});
 Object.assign(words.de, {playShown:'{station} abspielen', playShownNow:'{station} abspielen, gerade {title} · {artist}'});
-Object.assign(words.de, {keysTitle:'Tastenkürzel', keySpace:'Abspielen oder pausieren', keyArrowsName:'Pfeiltasten links und rechts', keyArrows:'Vorherigen oder nächsten Sender zeigen',
+Object.assign(words.de, {keysTitle:'Tastenkürzel', keySpace:'Abspielen oder pausieren', enterKey:'Eingabetaste', keyEnter:'Den gezeigten Sender abspielen', keyArrowsName:'Pfeiltasten links und rechts', keyArrows:'Vorherigen oder nächsten Sender zeigen',
   keyNumbers:'Den Sender an dieser Stelle der Liste zeigen', keyMute:'Ton aus und wieder an', keyFilter:'Im Index: Namen filtern', keyClose:'Zurück zum Radio', keyHelp:'Diese Kürzel zeigen oder verbergen'});
 let language = 'en';
 try { const saved=localStorage.getItem('pavoia-language'); if (Object.hasOwn(words,saved)) language=saved; } catch { /* Storage is optional. */ }
@@ -562,8 +562,8 @@ function renderAway() {
   renderShown();
 }
 // The hero's play, in the eyebrow: while the bar holds another station, off the Bus, it plays the station shown and
-// names what that station plays now, as the bar names a track. A control that goes while it has focus gives it to the
-// bar's play button.
+// names what that station plays now, as the bar names a track; its tip names its key, Enter. A control that goes while
+// it has focus gives it to the bar's play button.
 function renderShown() {
   const control = $('play-shown');
   if (!apart() || location.hash === '#bus' || !currentMood.stage) {
@@ -576,7 +576,7 @@ function renderShown() {
   $('play-shown-text').textContent = now ? `${title} · ${artist}` : entry.loading ? text('loading') : text('play');
   control.setAttribute('aria-label', now ? text('playShownNow').replace('{station}', name).replace('{title}', title).replace('{artist}', artist)
     : entry.loading ? `${play}, ${text('loading')}` : play);
-  control.title = play;
+  control.title = `${play} (${text('enterKey')})`;
   control.hidden = false;
 }
 // The bar's label, its only writer. It names the station held, and the stage after a station named otherwise; where its
@@ -795,8 +795,12 @@ button.addEventListener('click', toggle);
 // Space keeps its native action on a control the keyboard reached, and on a station not yet selected.
 // A control last pressed with the mouse or a finger does not capture it, even if Tab reached it first.
 // The arrows stay with a modal dialog, the stations sheet; the explorer leaves the player and its keys in reach.
+// Enter plays the station shown, as the hero's play does, from the page or a station on the rail, so the arrows choose
+// and Enter listens. Every other control keeps its own Enter, and so do a dialog, the open explorer and the Bus. The
+// fields already keep it as typing; the slider and the inside of editable text keep it here.
 let keyboardFocus = false;
 const typing = 'input:not([type=range],[type=radio]), textarea, select, [contenteditable]';
+const ownEnter = 'a[href], button, summary, input, [contenteditable], [tabindex], dialog';
 document.addEventListener('focusin', event => { keyboardFocus = event.target.matches(':focus-visible'); });
 document.addEventListener('pointerdown', () => { keyboardFocus = false; }, true);
 document.addEventListener('keydown', event => {
@@ -810,6 +814,10 @@ document.addEventListener('keydown', event => {
     const dir = event.key === 'ArrowLeft' ? -1 : 1;
     if ($('explorer').open) pick(beside(currentMood, dir).id);
     else step(dir);
+  } else if (event.key === 'Enter' && !event.repeat && !event.shiftKey && location.hash !== '#bus' && !document.querySelector('dialog:modal') && !$('explorer').open
+    && (target.matches('[type=radio]') || !target.closest(ownEnter))) {
+    event.preventDefault();
+    playShown();
   }
 });
 // The other page keys listen on the window, after every handler of the document, so a key the Index or Escape took

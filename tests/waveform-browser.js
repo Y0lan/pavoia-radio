@@ -59,6 +59,14 @@ async page => {
   assert(reduced===await page.locator('#waveform').evaluate(c=>c.toDataURL()),'Reduced motion ignored');
   await page.locator('#play').click();
   await page.emulateMedia({reducedMotion:'no-preference'});
+  // Enter on a fresh page plays the station shown with no press of a play button, and the waveform draws it too.
+  await page.reload();
+  await page.waitForFunction(()=>!document.getElementById('go-deeper').disabled);
+  await page.evaluate(()=>document.activeElement?.blur());
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(()=>document.getElementById('audio').currentTime>1);
+  await page.waitForFunction(()=>{const c=document.getElementById('waveform');return c.getContext('2d').getImageData(0,0,c.width,c.height/3).data.some((v,i)=>i%4===3&&v>0);});
+  await page.locator('#play').click();
   // Unsupported capture must not change the native playback route.
   await page.addInitScript(()=>{HTMLMediaElement.prototype.captureStream=undefined;HTMLMediaElement.prototype.mozCaptureStream=undefined;});
   await page.reload();
@@ -67,5 +75,5 @@ async page => {
   assert(await page.locator('#audio').evaluate(a=>!a.paused),'Fallback stopped audio');
   await page.locator('#play').click();
   assert(errors.length===0,errors.join('; '));
-  return {passed:['live waveform samples','station switch','volume','Explore during playback','EN/DE responsive layout','paused waveform','reduced motion','capture unavailable fallback'],pageErrors:errors};
+  return {passed:['live waveform samples','station switch','volume','Explore during playback','EN/DE responsive layout','paused waveform','reduced motion','Enter on a fresh page','capture unavailable fallback'],pageErrors:errors};
 }

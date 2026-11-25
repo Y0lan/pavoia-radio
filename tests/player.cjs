@@ -28,8 +28,10 @@ function cssMatches(list, el) {
     return true;
   });
 }
-// A focused element as the key handler sees it. Chromium reports :focus-visible during any keydown.
-const control=(tag,attrs={},focusVisible=false)=>{const el={tag,attrs,focusVisible};el.matches=selector=>cssMatches(selector,el);return el;};
+// A focused element as the key handler sees it. Chromium reports :focus-visible during any keydown. Its ancestors, the
+// nearest first, are tags or controls the test gives, and closest() finds the nearest of it and them that matches.
+const control=(tag,attrs={},focusVisible=false,ancestors=[])=>{const el={tag,attrs,focusVisible};el.matches=selector=>cssMatches(selector,el);
+ el.closest=selector=>[el,...ancestors.map(a=>typeof a==='string'?control(a):a)].find(n=>n.matches(selector))||null;return el;};
 // Stylesheet rules as selector -> declarations: the top level, or every @media block with this exact condition.
 const blocks=css=>{const out=[];let depth=0,start=0,open=0;for(let i=0;i<css.length;i++){if(css[i]==='{'&&!depth++)open=i;else if(css[i]==='}'&&!--depth){out.push([css.slice(start,open).trim(),css.slice(open+1,i)]);start=i+1;}}return out;};
 const cssRules=(media='')=>{
@@ -1059,7 +1061,7 @@ test('the hero names the station\'s stage over its title, and hides it on the Bu
  e.location.hash='#bus';e.window.emit('hashchange');assert.equal(eyebrow.hidden,true,'the Bus hides it, since its title is its stage');
  e.location.hash='';e.window.emit('popstate');assert.equal(eyebrow.hidden,false,'leaving the Bus shows it again');
  assert.equal(eyebrow.textContent,'','the fact is written into its span, so the eyebrow keeps its child');
- assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage"><span id="mood-fact">Pałac stage<\/span><button type="button" id="play-shown" class="play-shown" hidden>.*?<\/button><\/p>\s*<h1 id="mood-name">/,'over the title from the first paint, then the hero\'s play, hidden');
+ assert.match(web('index.html'),/<div class="bottom">\s*<p class="eyebrow" id="mood-stage"><span id="mood-fact">Pałac stage<\/span><button type="button" id="play-shown" class="play-shown" aria-keyshortcuts="Enter" hidden>.*?<\/button><\/p>\s*<h1 id="mood-name">/,'over the title from the first paint, then the hero\'s play, hidden');
 });
 
 test('the spoken position says the stage once',async()=>{
@@ -1889,26 +1891,26 @@ test('the hero\'s play shows only while the bar holds another station, never on 
  e.click();e.playing();
  let reply;const audience=status('x').audience;e.air=id=>id==='bermuda-day'?new Promise(resolve=>{reply=resolve;}):{track:{id:'1',title:'Dance',artist:'A'},audience};
  e.change('01');
- assert.deepEqual(read(),[false,'Loading track…','Play Under the Sun, Loading track…','Play Under the Sun'],'while its answer is on its way, it says so, and its name holds its words');
+ assert.deepEqual(read(),[false,'Loading track…','Play Under the Sun, Loading track…','Play Under the Sun (Enter)'],'while its answer is on its way, it says so, its name holds its words, and its tip names its key');
  reply({track:{id:'9',title:'Rumba',artist:'Bawrut'},audience});await flush();
- assert.deepEqual(read(),[false,'Rumba · Bawrut','Play Under the Sun, now Rumba · Bawrut','Play Under the Sun'],'a track: its title and artist, as the bar writes them');
+ assert.deepEqual(read(),[false,'Rumba · Bawrut','Play Under the Sun, now Rumba · Bawrut','Play Under the Sun (Enter)'],'a track: its title and artist, as the bar writes them');
  e.air=id=>id==='bermuda-day'?{track:{id:'8',title:'',artist:''},audience}:{track:null,audience};await e.poll();
- assert.deepEqual(read(),[false,'Untitled track · Unknown artist','Play Under the Sun, now Untitled track · Unknown artist','Play Under the Sun'],'a track with no title or artist');
+ assert.deepEqual(read(),[false,'Untitled track · Unknown artist','Play Under the Sun, now Untitled track · Unknown artist','Play Under the Sun (Enter)'],'a track with no title or artist');
  e.air=id=>({track:null,audience});await e.poll();
- assert.deepEqual(read(),[false,'Play','Play Under the Sun','Play Under the Sun'],'no track announced: the word Play');
+ assert.deepEqual(read(),[false,'Play','Play Under the Sun','Play Under the Sun (Enter)'],'no track announced: the word Play');
  e.air=id=>({track:{id:'9',title:'Rumba',artist:'Bawrut'},audience});await e.poll();e.air=()=>null;await e.poll();
- assert.deepEqual(read(),[false,'Play','Play Under the Sun','Play Under the Sun'],'a failed answer: Play, never a track it may no longer play');
+ assert.deepEqual(read(),[false,'Play','Play Under the Sun','Play Under the Sun (Enter)'],'a failed answer: Play, never a track it may no longer play');
  e.air=id=>({track:{id:'9',title:'Rumba',artist:'Bawrut'},audience});await e.poll();
  e.setLanguage('de');
- assert.deepEqual(read(),[false,'Rumba · Bawrut','Under the Sun abspielen, gerade Rumba · Bawrut','Under the Sun abspielen'],'in German');
+ assert.deepEqual(read(),[false,'Rumba · Bawrut','Under the Sun abspielen, gerade Rumba · Bawrut','Under the Sun abspielen (Eingabetaste)'],'in German');
  e.air=()=>({track:null,audience});await e.poll();
- assert.deepEqual(read(),[false,'Abspielen','Under the Sun abspielen','Under the Sun abspielen'],'and its play word');
+ assert.deepEqual(read(),[false,'Abspielen','Under the Sun abspielen','Under the Sun abspielen (Eingabetaste)'],'and its play word');
  e.setLanguage('en');
  e.visit('#bus');assert.equal(control.hidden,true,'the Bus has no stream: it hides');
  e.history.back();assert.equal(control.hidden,false,'leaving the Bus brings it back');
  e.change('03');assert.equal(control.hidden,true,'back on the station heard, it goes');
  const html=web('index.html'),rules=cssRules();
- assert.match(html,/<span id="mood-fact">Pałac stage<\/span><button type="button" id="play-shown" class="play-shown" hidden><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle [^>]+\/><path [^>]+\/><\/svg><span id="play-shown-text"><\/span><\/button>/,'a button after the stage, hidden until needed: a ring with a triangle, unread, then its words');
+ assert.match(html,/<span id="mood-fact">Pałac stage<\/span><button type="button" id="play-shown" class="play-shown" aria-keyshortcuts="Enter" hidden><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle [^>]+\/><path [^>]+\/><\/svg><span id="play-shown-text"><\/span><\/button>/,'a button after the stage that names its key, hidden until needed: a ring with a triangle, unread, then its words');
  assert.match(rules.get('#mood-stage:has(#play-shown:not([hidden]))'),/display:flex; align-items:center; gap:var\(--s3\); width:0; min-width:100%;/,'it shares the eyebrow row, which never widens the title block');
  assert.match(rules.get('.play-shown'),/min-width:0; height:44px; margin-block:calc\(\(1lh - 44px\) \/ 2\);.*border:0; background:none; color:var\(--cream\); font:inherit;/,'a 44px target that overhangs the line evenly, in the eyebrow\'s letters');
  assert.match(rules.get('.play-shown'),/margin-inline:-10px calc\(100% - max\(100%, 46em\) - 10px\); padding:0 10px;/,'past a short title block, the track runs on to a full one, and the target keeps 10px at each side');
@@ -4516,12 +4518,12 @@ test('? opens the shortcuts under the roots button, in both languages, only whil
  assert.ok(html.indexOf(block)>html.indexOf('<div class="roots-ground">')&&html.indexOf(block)<html.indexOf('</footer>'),'the shortcuts sit in the footer, after the roots');
  assert.match(block,/^<details id="keys" class="keys"><summary data-copy="keysTitle">Keyboard shortcuts<\/summary>\s*<dl>/,'a native disclosure over a list of terms');
  assert.deepEqual([...block.matchAll(/<dt(?: class="key-mute")?><kbd(?: data-copy="(\w+)")?>([^<]+)<\/kbd><\/dt><dd(?: class="key-mute")? data-copy="(\w+)">/g)].map(m=>[m[1]||m[2],m[3]]),
-  [['space','keySpace'],['keyArrowsName','keyArrows'],['1–9','keyNumbers'],['M','keyMute'],['/','keyFilter'],['Esc','keyClose'],['?','keyHelp']],'each key, then what it does');
+  [['space','keySpace'],['enterKey','keyEnter'],['keyArrowsName','keyArrows'],['1–9','keyNumbers'],['M','keyMute'],['/','keyFilter'],['Esc','keyClose'],['?','keyHelp']],'each key, then what it does');
  const sliderGone='(max-width:760px), (pointer:coarse)';
  assert.ok(block.includes('<dt class="key-mute"><kbd>M</kbd></dt><dd class="key-mute" data-copy="keyMute">')&&web('style.css').includes(`@media ${sliderGone} { .keys .key-mute { display:none; } }`)&&web('journey.js').includes(`matchMedia('${sliderGone}')`),'the M row goes where the volume slider goes, by the same query');
  const words=e.run('words'),copied=[...block.matchAll(/data-copy="(\w+)"/g)].map(m=>m[1]);
  assert.deepEqual(copied.map(key=>[words.en[key],words.de[key]]),[
-  ['Keyboard shortcuts','Tastenkürzel'],['Space','Leertaste'],['Play or pause','Abspielen oder pausieren'],['Left and right arrows','Pfeiltasten links und rechts'],
+  ['Keyboard shortcuts','Tastenkürzel'],['Space','Leertaste'],['Play or pause','Abspielen oder pausieren'],['Enter','Eingabetaste'],['Play the station shown','Den gezeigten Sender abspielen'],['Left and right arrows','Pfeiltasten links und rechts'],
   ['Show the previous or next station','Vorherigen oder nächsten Sender zeigen'],['Show the station at that place in the list','Den Sender an dieser Stelle der Liste zeigen'],['Sound off, and on again','Ton aus und wieder an'],
   ['In the Index: filter the names','Im Index: Namen filtern'],['Back to listening','Zurück zum Radio'],['Show or hide these shortcuts','Diese Kürzel zeigen oder verbergen']],'every words in English and German');
  const rules=cssRules();
@@ -4531,6 +4533,61 @@ test('? opens the shortcuts under the roots button, in both languages, only whil
  assert.match(rules.get('.keys dt'),/font-size:11px; line-height:1\.4/,'so does a wrapped key name');
  assert.doesNotMatch([...rules].filter(([selector])=>selector.includes('.keys')).map(([,d])=>d).join(''),/border|background/,'no border, no background');
  assert.match(cssRules('(hover:none) and (pointer:coarse)').get('.keys:not([open]):not(:focus-within)'),/display:none/,'a touch screen sees nothing new until ? opens it, and a closed list keeps a focused summary');
+});
+
+test('Enter plays the station shown from the page or a rail station, and links, buttons, fields, dialogs and the Bus keep it',async()=>{
+ const e=setup();await flush();const s=()=>e.window.Pavoia.getState(),station=control('input',{type:'radio',checked:''});
+ // Each call of the one play path, counted where the key handler finds it.
+ e.run('var shownCalls=0;{const real=playShown;playShown=()=>{shownCalls++;real();};}');
+ // A preview in the explorer, as the hero's play sees it: each Enter that plays ends it.
+ const cancelled=counting(e,'cancelPreview',undefined),stopped=counting(e,'stopPreview',true);
+ const now=()=>[e.run('shownCalls'),e.audio.calls.length,e.audio.src,s().stage,s().viewing,s().wanted];
+ assert.deepEqual([e.key('Enter').prevented,...now()],[true,1,1,'/stream/palac-feel.mp3','palac-feel','palac-feel',true],'paused, Enter on the page plays the station shown');
+ e.playing();e.change('03');
+ assert.deepEqual([e.key('Enter',station).prevented,...now()],[true,2,2,'/stream/palac-dance.mp3','palac-dance','palac-dance',true],'apart, Enter on the rail\'s station is one cut to the station shown');
+ e.playing();e.change('06');const apart=now();
+ const link=control('a',{href:'#history'});
+ for(const [target,why] of [[link,'a link'],[control('span',{},false,['p',link]),'the words of a link'],[control('button'),'a button pressed with the mouse'],[control('button',{},true),'a button Tab reached'],
+  [control('span',{},false,['svg','button']),'the inside of a button'],[control('summary'),'a summary'],[control('input',{type:'range'}),'the volume slider'],[control('input',{type:'search'}),'a search field'],
+  [control('select'),'a select'],[control('textarea'),'a textarea'],[control('div',{contenteditable:''}),'editable text'],[control('b',{},false,['p',control('div',{contenteditable:''})]),'a word inside editable text'],[control('div',{tabindex:'-1'}),'an element focused by script'],
+  [control('p',{},false,['div','dialog']),'the inside of a dialog']])
+  assert.deepEqual([e.key('Enter',target).prevented,...now()],[false,...apart],why+' keeps its own Enter');
+ for(const extra of [{repeat:true},{shiftKey:true},{ctrlKey:true},{metaKey:true},{altKey:true}])
+  assert.deepEqual([e.key('Enter',undefined,extra).prevented,...now()],[false,...apart],JSON.stringify(extra)+' leaves Enter alone');
+ e.openDialog={};assert.deepEqual([e.key('Enter',station).prevented,...now()],[false,...apart],'the modal stations sheet keeps it');e.openDialog=null;
+ e.elements.explorer.open=true;assert.deepEqual([e.key('Enter').prevented,...now()],[false,...apart],'the open explorer keeps it');e.elements.explorer.open=false;
+ e.visit('#bus');assert.deepEqual([e.key('Enter').prevented,e.key('Enter',station).prevented,...now()],[false,false,...apart],'the Bus has no stream: Enter is not taken');e.history.back();
+ assert.deepEqual([e.key('Enter').prevented,...now()],[true,3,3,'/stream/etage-zero.mp3','etage-zero','etage-zero',true],'back from the Bus, Enter on the page plays the station shown');
+ e.playing();assert.deepEqual([e.key('Enter').prevented,...now()],[true,4,3,'/stream/etage-zero.mp3','etage-zero','etage-zero',true],'on the station heard, Enter keeps it playing: it never pauses');
+ assert.deepEqual([cancelled.length,stopped.length],[3,1],'a preview ends at each Enter that plays: cancelled before a new stream, ended into the station heard');
+ // A key 1 to 9 shows a station while the focus stays on a rail radio it no longer checks: Enter there plays the
+ // station shown, the one the hero names and the rail now checks, not the one the focused radio names.
+ e.change('03');
+ assert.deepEqual([e.key('Enter',control('input',{type:'radio'})).prevented,...now()],[true,5,4,'/stream/palac-dance.mp3','palac-dance','palac-dance',true],'Enter on a rail radio that is not checked plays the station shown');
+});
+
+test('each press that can start the radio makes the waveform\'s analyser, and no other press does',()=>{
+ // waveform.js alone on a page of fakes: it may make an AudioContext only inside a press, so a play started by a press it
+ // misses plays with an empty bar. Each case is a fresh page that counts the contexts made.
+ const page=()=>{
+  const listeners={},made=[],on=(name,fn)=>{(listeners[name] ||= []).push(fn);};
+  class AudioContext{constructor(){made.push(this);}createAnalyser(){return {};}resume(){return Promise.resolve();}suspend(){return Promise.resolve();}}
+  const audio={addEventListener(){},captureStream(){}},canvas={hidden:false,getContext:()=>({})};
+  const document={getElementById:id=>({audio,waveform:canvas})[id],addEventListener:on,hidden:false};
+  runInNewContext(web('waveform.js'),{document,window:{AudioContext},matchMedia:()=>({matches:false,addEventListener(){}}),
+   ResizeObserver:class{observe(){}},requestAnimationFrame(){},cancelAnimationFrame(){},Float32Array});
+  // A target inside the page: closest() finds the id it is in, or nothing.
+  const inside=id=>({closest:selector=>selector.split(/,\s*/).includes('#'+id)?{}:null});
+  return {made,click:id=>listeners.click.forEach(fn=>fn({target:inside(id)})),key:(key,code=key)=>listeners.keydown.forEach(fn=>fn({key,code}))};
+ };
+ for(const [press,why] of [[p=>p.click('play'),'a click on the bar\'s play'],[p=>p.click('play-shown'),'a click on the hero\'s play'],
+  [p=>p.key(' ','Space'),'Space'],[p=>p.key('Enter'),'Enter, which plays the station shown']]){
+  const p=page();press(p);assert.equal(p.made.length,1,why+' makes the analyser before the stream plays');
+  press(p);assert.equal(p.made.length,1,why+' again keeps the one analyser');
+ }
+ for(const [press,why] of [[p=>p.click('roots'),'a click elsewhere'],[p=>p.key('a','KeyA'),'a letter'],[p=>p.key('ArrowRight'),'an arrow']]){
+  const p=page();press(p);assert.equal(p.made.length,0,why+' makes none');
+ }
 });
 
 test('the head names the manifest, the icons and one share preview; the manifest uses the page\'s ink',()=>{

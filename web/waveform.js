@@ -61,10 +61,12 @@
       context.resume().catch(stop);
     } catch { /* Visualization is optional; native playback remains independent. */ }
   }
+  // The analyser is made inside each press that can start the radio, while the browser still allows it: the bar's play,
+  // the hero's play, Space and Enter.
   document.addEventListener('click', event => {
-    if (event.target.closest('#play')) enable();
+    if (event.target.closest('#play, #play-shown')) enable();
   }, { capture: true });
-  document.addEventListener('keydown', event => { if (event.code === 'Space') enable(); }, { capture: true });
+  document.addEventListener('keydown', event => { if (event.code === 'Space' || event.key === 'Enter') enable(); }, { capture: true });
   audio.addEventListener('playing', start);
   for (const event of ['pause', 'emptied', 'ended', 'waiting', 'error']) audio.addEventListener(event, stop);
   document.addEventListener('visibilitychange', () => {

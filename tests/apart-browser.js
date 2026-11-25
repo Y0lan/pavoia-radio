@@ -310,6 +310,21 @@ async page => {
   await page.waitForTimeout(600); await page.screenshot({ path: 'output/playwright/apart/b3-bus-apart-1440.png' });
   await page.locator('#play').click();
 
+  // 14. Enter plays the station shown: while A plays, ArrowRight on the focused rail station shows the next one, and
+  // Enter there moves the music to it in one cut. The stream requests until it plays are the first new one alone.
+  await visit(page); await page.locator('#play').click(); await playing(page, 'palac-feel');
+  await page.keyboard.press('Shift'); await page.locator('#moods input:checked').focus(); await page.keyboard.press('ArrowRight');
+  await page.waitForFunction(() => window.Pavoia.getState().apart, null, { timeout: 30000 });
+  const chosen = (await read(page)).viewing, onRail = await page.evaluate(() => document.activeElement.matches('#moods input[type=radio]:checked'));
+  before = desk.log.length;
+  await page.keyboard.press('Enter'); await playing(page, chosen);
+  const asked = desk.log.slice(before).filter(([kind]) => kind === 'start').map(([, at]) => at);
+  s = await read(page);
+  assert(onRail && asked.length === 1 && asked[0] === '/stream/' + chosen + '.mp3' && s.src === asked[0] && !s.apart && s.stage === chosen,
+    '14: Enter on a rail station while apart: ' + JSON.stringify({ onRail, asked, s }));
+  report.enter = `Enter on the rail's ${chosen} while palac-feel played: ${asked.length} new stream request (${asked[0]}), now playing ${s.stage}`;
+  await page.locator('#play').click();
+
   // 13. No page error and no console error, apart from the stream requests the close mode refused on purpose.
   const refused = consoles.filter(c => /\/stream\/.*\.mp3/.test(c.url) || /503/.test(c.text) && /stream/.test(c.url));
   const other = consoles.filter(c => !refused.includes(c));

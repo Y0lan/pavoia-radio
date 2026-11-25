@@ -90,10 +90,11 @@ play to retry." Now it keeps trying, and the music comes back without a touch.
 | Open a station by its own address, and come back to the last station, with no autoplay (item B) | Delivered in `efaa40a` | `/?station=<id>`, for example `/?station=fontanna`. The address always names the station on screen. The browser keeps the last station chosen or played (`pavoia-station` in localStorage). A link wins over the remembered station. With empty storage and no link, the radio opens on Lost in Feelings. |
 | Look at another station without losing the music | Delivered in `efaa40a` | While the radio plays, the rail, the phone sheet, a swipe, the arrow keys and `1` to `9` only show a station, and ask for no stream. The music moves when the listener presses play on the station shown: a play ring after the stage name in the hero, with what that station plays now. A red dot marks the station heard, and the bar's "Tuned to {station}" leads back to it. With the radio off, a station change is the station to play, as before. |
 | Keys `1` to `9`, `M` and `?` (item I) | Delivered in `efaa40a` | `1` to `9` show the station at that place in the order on screen, as the rail does, and start nothing while the radio is paused. With the explorer open and the radio on, they move the music. `M` turns the sound off and on again. `?` opens the Keyboard shortcuts list under "See the roots it's built on", while the explorer is closed. No key acts while typing, with a modifier key or while a modal dialog is open. |
+| Enter plays the station shown | Built, on dev, waits for the owner's push to prod | `Enter` on the page, or on a station of the rail, does what the hero's play does: the arrows choose a station and Enter moves the music to it, in one cut. With the radio paused, Enter plays the station shown. Links, buttons, fields, a dialog, the open explorer and the Bus keep their own Enter. The hero's play names its key in its tip, and the shortcuts list has the row in English and German. The waveform starts on Enter too. |
 | Mute | Delivered in `efaa40a` | The `M` key sets the volume slider to 0 and back. There is no dedicated button. The key acts only where the slider shows, and the radio does not store it. |
 | Installable home-screen icon; no offline interface, no service worker (item G) | Delivered in `efaa40a` | [web/manifest.webmanifest](../web/manifest.webmanifest) and four icons in `web/assets/`, made from the Gaende mark. The installed app opens full screen at `/`, named "Pavoia". Live audio needs a connection. |
 | A shared link shows a preview (item J) | Delivered in `efaa40a` | Description and Open Graph tags in `web/index.html` give "Pavoia Radio", "So it never ends. A personal selection by Gaende." and the photo `photos/hero-night.jpg`. One preview serves every link, also a station link. |
-| Lower-bandwidth audio options | Waiting (item 7) | Each station needs a second stream on the server. |
+| Lower-bandwidth audio options | Waiting (item 6) | Each station needs a second stream on the server. |
 
 Tests pin each row. The reconnecting player has
 `a lost stream keeps trying on a bounded ladder, and a click pauses it; blocking and cancellation`,
@@ -113,6 +114,8 @@ The keys and mute have
 `M turns the sound off and back on where the volume shows, stores nothing, and does nothing where the device sets the level`,
 `? opens the shortcuts under the roots button, in both languages, only while the explorer is closed`,
 `the page keys wait while typing, with a modifier, with the stations sheet open, and when an earlier handler took the key`,
+`Enter plays the station shown from the page or a rail station, and links, buttons, fields, dialogs and the Bus keep it`,
+`each press that can start the radio makes the waveform's analyser, and no other press does`,
 [tests/keyboard-browser.js](../tests/keyboard-browser.js) and
 [tests/keys-play-browser.js](../tests/keys-play-browser.js).
 Looking at another station has
@@ -221,7 +224,7 @@ listens are different events. Keep synthetic dates separate from real records.
 | The counts of artists and labels open the Index on that station, most tracks first (item D) | Delivered in `efaa40a` | `#index/artists/<id>?by=tracks` and `#index/labels/<id>?by=tracks`. Without the labels document, the place shows its counts with no link. |
 | Stage overlaps and frequently played records | Delivered | |
 | Selected tracks not played during the last 30 days | Delivered as a count per station | |
-| List the tracks of a station that did not play (item F2) | Waiting (item 6) | Without a server route, one click on a big station costs up to about 96 requests in the browser. |
+| List the tracks of a station that did not play (item F2) | Waiting (item 5) | Without a server route, one click on a big station costs up to about 96 requests in the browser. |
 | Collection-growth view | Candidate | It needs months of observed changes. |
 | Genre distributions | Out | Genre coverage is 0 in every statistics document. |
 | BPM and key analysis | Out | No BPM or key field exists. |
@@ -255,7 +258,7 @@ Both sites answered 502 until someone ran `python3 ops/manage.py start` by hand.
 | --- | --- | --- |
 | Keep the source in Git and publish the website from it | Delivered | CI publishes `web/` to dev from `main` and to production from `production` ([README](../README.md), Publishing the website). |
 | Start the radio again after a host reboot | Verification pending | A crontab line that the owner added on the host runs `python3 ops/manage.py boot` every 5 minutes. A real reboot has not tested it yet. `boot` starts the radio unless `secrets/maintenance` exists; `stop` writes that file and `start` removes it ([ops/manage.py](../ops/manage.py)). The repository's `install-cron` writes only the `@reboot` line. The cause of the failed `@reboot` start is not verified. |
-| Serve the install icons and the manifest with their types | Waiting (item 5) | |
+| Serve the install icons and the manifest with their types | Delivered | `ops/manage.py` (commit `c8c1d30`) writes the types; the owner ran `configure` on the host and reloaded Nginx. Both sites serve `manifest.webmanifest` as `application/manifest+json` and the icons as `image/png`. |
 | Improve missing Spotify matches, entity identities and sourced metadata for selected music | Partial | |
 | Physical iPhone background playback and mobile network-change checks | Verification pending; Waiting (item 4) | |
 | Complete a continuous 24-hour observation | Verification pending; Waiting (item 4) | |
@@ -327,18 +330,10 @@ Each item names what it waits for and who acts.
    8. For the 24-hour run, keep the phone on its charger, open https://pavoia-dev.gaende.box.ca/?station=ambiance, play and lock. At 1 h, 8 h and 24 h, note any silence and whether it ended by itself.
    9. At 24 h, unlock the phone. The player shows only the track, with no error words, and Pause works.
    10. Send the notes to the developer. A "no" in the locked step 5 or the installed step 7 opens a follow-up, which the developer makes.
-5. **The types of the install icons and the manifest.** The generated Nginx
-   type map on the host has no entry for png and webmanifest, so Nginx serves
-   the install icons and `manifest.webmanifest` as `application/octet-stream`.
-   The fix is in [ops/manage.py](../ops/manage.py) (commit c8c1d30). It takes
-   effect only when the owner runs `python3 ops/manage.py configure` on the host
-   and reloads Nginx, by the reviewed release process ([README](../README.md)).
-   Chromium reads the manifest and the icons as they are. iPhone behaviour is
-   not tested.
-6. **The list of tracks that did not play.** It waits for a server route
+5. **The list of tracks that did not play.** It waits for a server route
    `/api/radio/<id>/unplayed`, which makes the list one request. The owner
    acts, through a backend release that he runs on the host.
-7. **Other backend changes.** Each one needs the owner to run commands on the host:
+6. **Other backend changes.** Each one needs the owner to run commands on the host:
    - a lower-bandwidth stream per station (Icecast and the controller);
    - an "up next" route for the next tracks of each station;
    - a route for the plays of one track or of one artist, so that a record can
@@ -380,9 +375,9 @@ build as dev.
 | Queue | Up next, reorder, remove, skip | — | Up next, after a server route | Visitors do not control the broadcast. |
 | Notifications | Toasts, push | Honest player words ("Reconnecting…", "Offline. Waiting for the network…") | — | Toasts and push are rejected, and there is no service worker. |
 | Settings | Crossfade, quality, themes, exports | Language, order, Photo only, volume, the last station | — | Themes change the look. Nobody asked for the rest. |
-| PWA | Manifest, icons, shortcuts, Media Session, background audio | Manifest, icons, Media Session | The types on the host, and the iPhone check | The offline cache and the service worker are out. |
+| PWA | Manifest, icons, shortcuts, Media Session, background audio | Manifest, icons, Media Session | The iPhone check | The offline cache and the service worker are out. |
 | Mobile | Swipes, haptics, tab bar, mini player | Phone sheet, swipe between stations, player bar, a thumb scrub on the Index rail | — | The layout stays, so no pull to refresh and no expanding player. |
-| Keyboard | Space, arrows, volume keys, M, F, Ctrl+K, 1 to 9, Esc, ? | Space, left and right arrows, `1` to `9`, `M`, `/`, `Esc`, `?` | — | Up and down scroll the page. Nobody asked for F. Ctrl+K is out. |
+| Keyboard | Space, arrows, volume keys, M, F, Ctrl+K, 1 to 9, Esc, ? | Space, Enter, left and right arrows, `1` to `9`, `M`, `/`, `Esc`, `?` | — | Up and down scroll the page. Nobody asked for F. Ctrl+K is out. |
 | Admin | Token-protected panel | — | — | An admin area is rejected. |
 | Social and sharing | Share track and stage, preview cards, Open Graph | `#bus`, record addresses, station links, one link preview | A preview per station, from a page per station on the server | PNG cards wait with the recaps. |
 | Performance | Virtual scroll, lazy images, service worker, reconnect backoff | Lazy pictures, waveform pause, no requests while hidden, reconnect steps | — | The service worker is out. |

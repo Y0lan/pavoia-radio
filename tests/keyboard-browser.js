@@ -103,6 +103,13 @@ async page => {
   // Phone: the stations sheet keeps its keys, typing keeps its digits, and Ctrl+1 stays the browser's.
   await page.setViewportSize({ width: 390, height: 844 });
   await fresh();
+  // Enter on a button keeps the button's own Enter: the stations button opens the sheet, and no stream is asked for.
+  await page.locator('#open-stations').focus();
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => document.getElementById('stations-sheet').open, null, { timeout: 30000 });
+  assert(!(await wanted()) && streams.length === 0 && await stage() === 'palac-feel', 'Enter on the stations button opens the sheet and asks for no stream');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.getElementById('stations-sheet').open, null, { timeout: 30000 });
   await page.locator('#open-stations').click();
   await page.waitForFunction(() => document.getElementById('stations-sheet').open);
   await page.keyboard.press('3');
